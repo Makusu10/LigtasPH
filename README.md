@@ -41,12 +41,56 @@ flask --app app seed
 # admin default from .env: admin / admin123 (hashed, not plaintext)
 ```
 
-### 5. Run dev server
+### 5. Run / Activate the Website
+
+**Option A — One-click GUI (recommended for demo/lab):**
 ```bash
-flask --app app run --debug
-# or: python wsgi.py
+python run_gui.py
+# Auto-creates venv if missing, installs deps, init-db + seed if needed,
+# then opens http://127.0.0.1:5000 in your default browser.
+# Works from ANY Python: run_gui.py auto-detects .venv → venv → /tmp/ligtas_venv → env
+# and re-executes with that venv's python. Or double-click run_gui.py in Explorer/Finder.
+# Ctrl+C in terminal to stop.
 ```
-Open `http://127.0.0.1:5000` → `Home | Map | Centers | Weather | Hotlines | Admin Login`
+
+**Option B — Manual Flask dev server:**
+```bash
+# Linux / macOS — activate venv first
+source venv/bin/activate          # or source .venv/bin/activate
+
+# Windows CMD
+venv\Scripts\activate
+
+# Windows PowerShell
+venv\Scripts\Activate.ps1
+
+# Then run
+flask --app app run --debug       # http://127.0.0.1:5000 with auto-reload
+# or
+python wsgi.py                    # same, uses wsgi.py:87
+```
+
+**Option C — Production (local prod check):**
+```bash
+gunicorn wsgi:app                 # http://127.0.0.1:8000 (Render uses this; Procfile: web: gunicorn wsgi:app)
+```
+
+**How to know it worked:**
+- Browser shows `LIGTASPH` nav: `Home | Evacuation Map | Evacuation Centers | Weather | Emergency Hotlines | Admin Login`
+- Home shows stats `total 7` (6 live +1 archived hidden) + map preview + recently updated.
+- Login to admin: `http://127.0.0.1:5000/admin/login` → `admin` / `admin123` → redirects to `/admin/dashboard` (protected route returns 302 when anon).
+
+**Deactivate venv when done:**
+```bash
+deactivate
+```
+
+**Troubleshooting:**
+- `externally-managed-environment` → use `python3 -m venv venv` then `source venv/bin/activate` first.
+- `ModuleNotFoundError: No module named 'flask'` → `pip install -r requirements.txt` inside venv.
+- `port 5000 busy` → `flask --app app run --port 5001` or change `PORT` in `run_gui.py:16`.
+- `instance/ligtas.sqlite` locked → stop Flask (`Ctrl+C`) then `flask --app app init-db && flask --app app seed`.
+- Browser didn't open (headless/WSL) → manually visit `http://127.0.0.1:5000`.
 
 ---
 
