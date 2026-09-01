@@ -6,47 +6,111 @@
 
 ---
 
-## 🚀 Quick Start (Local)
+## 🚀 Quick Start (Local) — How to Run / Activate the Website
 
 ### Prerequisites
 - **Python 3.11+** (tested 3.11.9, also works 3.14)
-- **pip** + **venv**
+- **pip** + **venv** (`python3 -m venv`)
 - **Git**
 
-### 1. Clone & venv
+### Recommended: One-Click GUI (easiest for group & demo)
+
+This uses `run_gui.py` which auto-detects/creates your venv, auto-installs deps, auto-seeds DB, and opens the browser.
+
 ```bash
+# 1. Clone
 git clone https://github.com/<your-username>/LigtasPH.git
 cd LigtasPH
-python3 -m venv venv
-# Windows: venv\Scripts\activate
-source venv/bin/activate
-```
 
-### 2. Install dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Configure env
-```bash
+# 2. (first time only) copy env — edit SECRET_KEY + OPENWEATHER_API_KEY if you have one
 cp .env.example .env
-# edit .env: set SECRET_KEY (long random), OPENWEATHER_API_KEY (free 1000/day), ADMIN_USERNAME/PASSWORD
-# GEMINI_API_KEY optional, Open-Meteo + api.weather.gov need no key (free fallback)
+# Windows: copy .env.example .env
+# GEMINI_API_KEY optional; Open-Meteo + api.weather.gov need NO key (free fallback)
+
+# 3. Double-click or run:
+python run_gui.py
+# — it auto-finds .venv / venv / /tmp/ligtas_venv / env
+# — if no venv exists, it creates ./venv and installs requirements.txt automatically
+# — if instance/ligtas.sqlite missing, it runs init-db + seed (7 centers, 12 hotlines, admin admin/admin123 hashed)
+# — opens http://127.0.0.1:5000 in your default browser
+
+# Alternative if you already have a venv active:
+source .venv/bin/activate   # or venv/bin/activate; Windows: .venv\Scripts\activate
+python run_gui.py
 ```
 
-### 4. Init DB & seed (sample centers/hotlines/weather_cache + admin hash)
+> **Stop:** `Ctrl+C` in terminal. **Stuck?** See troubleshooting below.
+
+### Manual (step-by-step — for control / lab defense)
+
 ```bash
+# 1. Clone & venv
+git clone https://github.com/<your-username>/LigtasPH.git
+cd LigtasPH
+python3 -m venv .venv            # creates .venv (also matches venv/ or env/)
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+
+# 2. Install dependencies
+pip install -r requirements.txt  # Flask 3.x, Flask-WTF, Flask-Limiter, gunicorn, whitenoise, pytest, python-dotenv
+
+# 3. Configure env
+cp .env.example .env
+# edit .env with a text editor:
+# SECRET_KEY=change-me-to-a-long-random-string
+# OPENWEATHER_API_KEY=your_free_key (1000/day)  # optional for demo; Open-Meteo works without key
+# ADMIN_USERNAME=admin
+# ADMIN_PASSWORD=admin123
+# GEMINI_API_KEY=... (optional)
+
+# 4. Init DB & seed (sample centers/hotlines/weather_cache + admin hash)
 flask --app app init-db
 flask --app app seed
-# admin default from .env: admin / admin123 (hashed, not plaintext)
+# → instance/ligtas.sqlite 76K created
+# → admin hashed (scrypt), not plaintext; try: admin / admin123
+
+# 5. Run dev server (pick one)
+flask --app app run --debug      # auto-reload, debug on
+# or
+python wsgi.py                   # same as flask run, used for gunicorn/production parity
+# or (production preview)
+gunicorn wsgi:app --bind 127.0.0.1:5000
+
+# 6. Open browser
+# → http://127.0.0.1:5000  (nav: Home | Evacuation Map | Evacuation Centers | Weather | Emergency Hotlines | Admin Login)
+# → Admin Login: admin / admin123  → redirects to /admin/dashboard (protected, 302 if anon)
 ```
 
-### 5. Run dev server
+### Activate Again Next Time
+
 ```bash
-flask --app app run --debug
-# or: python wsgi.py
+# If using venv:
+source .venv/bin/activate        # or venv/bin/activate
+flask --app app run --debug      # or python run_gui.py (auto-detects venv, no need to activate manually)
+
+# If you closed and lost venv activation, run_gui.py still works from system python:
+python run_gui.py                # it will hop into .venv automatically (see run_gui.py:22-26 candidates .venv→venv→/tmp/ligtas_venv→env)
 ```
-Open `http://127.0.0.1:5000` → `Home | Map | Centers | Weather | Hotlines | Admin Login`
+
+### Deactivate / Switch
+
+```bash
+deactivate                       # leaves venv
+# to remove venv completely (fresh start):
+# Windows: rmdir /s /q venv
+# macOS/Linux: rm -rf .venv venv
+```
+
+### Troubleshooting — Website Won’t Activate
+
+| Symptom | Fix |
+| :--- | :--- |
+| `externally-managed-environment` on `pip install` | Use venv: `python3 -m venv .venv && source .venv/bin/activate` then `pip install -r requirements.txt` — never use `--break-system-packages` |
+| `no such table: evacuation_centers` / blank home | DB not seeded: `flask --app app init-db && flask --app app seed` |
+| `ModuleNotFoundError: flask` | venv not active or deps not installed: `source .venv/bin/activate && pip install -r requirements.txt` or just `python run_gui.py` (auto-installs) |
+| `Address already in use :5000` | Another server running: `flask --app app run --port 5001` or `lsof -i :5000 && kill <pid>` |
+| `BuildError: Could not build url for endpoint 'home'` | You’re on old Express code — `git pull` and ensure `app.py` uses blueprints (`routes/public.py:public.home`) |
+| `pytest` fails `401/302` | DB was wiped — re-seed with correct `ADMIN_PASSWORD` from `.env`, then `pytest -q` expects `admin/admin123` if `.env` not set |
+| Browser doesn’t open | Manual: open `http://127.0.0.1:5000` yourself; check terminal for `* Running on http://127.0.0.1:5000` |
 
 ---
 
