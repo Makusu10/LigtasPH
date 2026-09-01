@@ -1,162 +1,145 @@
 #!/usr/bin/env python3
-import argparse
-import shutil
+"""
+LigtasPH GUI Launcher — one-click open for Flask.
+Usage: python run_gui.py  (or double-click)
+- Auto init-db + seed if instance/ligtas.sqlite missing
+- Opens browser to http://127.0.0.1:5000
+- No secrets committed; reads .env via python-dotenv
+"""
+import os
+import pathlib
 import subprocess
 import sys
+import threading
 import time
 import webbrowser
-from pathlib import Path
-from urllib.request import urlopen
-from urllib.error import URLError
 
-PROJECT_ROOT = Path(__file__).parent.resolve()
-DEFAULT_PORT = 3000
-DEFAULT_URL = f"http://localhost:{DEFAULT_PORT}"
-HEALTH_ENDPOINT = f"/api/centers"  # defined at server.ts:167
-POLL_INTERVAL_SEC = 1.0
-POLL_TIMEOUT_SEC = 45.0
+HOST = "127.0.0.1"
+PORT = 5000
+URL = f"http://{HOST}:{PORT}"
 
+# Candidate venv locations (checked in order)
+VENV_CANDIDATES = [
+    pathlib.Path("./.venv"),
+    pathlib.Path("./venv"),
+    pathlib.Path("/tmp/ligtas_venv"),
+    pathlib.Path("./env"),
+]
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Launch LigtasPH GUI in browser")
-    parser.add_argument("--no-server", action="store_true",
-                        help="Do not start dev server; only open browser")
-    parser.add_argument("--port", type=int, default=DEFAULT_PORT,
-                        help=f"Server port (default: {DEFAULT_PORT})")
-    parser.add_argument("--url", type=str, default=None,
-                        help="Full URL to open (overrides --port)")
-    parser.add_argument("--no-browser", action="store_true",
-                        help="Start server but do not open browser (useful for CI)")
-    return parser.parse_args()
+def _venv_python(venv_path: pathlib.Path):
+    # Unix venv python
+    p = venv_path / "bin" / "python"
+    if p.exists():
+        return str(p)
+    # Windows
+    p = venv_path / "Scripts" / "python.exe"
+    if p.exists():
+        return str(p)
+    return None
 
-
-def check_dependencies() -> None:
-    """Verify Node and package manager are available."""
-    if shutil.which("node") is None:
-        print("ERROR: 'node' not found in PATH. Install Node.js 22+ first.", file=sys.stderr)
-        sys.exit(1)
-    # npm or bun — prefer npm if both exist (matches package-lock.json)
-    has_npm = shutil.which("npm") is not None
-    has_bun = shutil.which("bun") is not None
-    if not has_npm and not has_bun:
-        print("ERROR: neither 'npm' nor 'bun' found in PATH.", file=sys.stderr)
-        sys.exit(1)
-
-
-def is_server_up(url: str) -> bool:
-    """Poll HEALTH_ENDPOINT to see if Express is already serving."""
-    try:
-        with urlopen(f"{url}{HEALTH_ENDPOINT}", timeout=2) as resp:
-            return resp.status == 200
-    except URLError:
-        return False
-    except Exception:
-        return False
-
-
-def start_dev_server() -> subprocess.Popen:
-    """Start `npm run dev` (tsx server.ts) as a child process."""
-    # Choose package manager: prefer npm, fallback to bun
-    if shutil.which("npm"):
-        cmd = ["npm", "run", "dev"]
-    else:
-        cmd = ["bun", "run", "dev"]
-
-    print(f"Starting dev server: {' '.join(cmd)} (cwd={PROJECT_ROOT})")
-    # Use project root as cwd so server.ts resolves correctly
-    proc = subprocess.Popen(
-        cmd,
-        cwd=str(PROJECT_ROOT),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-    )
-    return proc
-
-
-def wait_for_server(url: str, timeout: float = POLL_TIMEOUT_SEC) -> bool:
-    """Block until HEALTH_ENDPOINT returns 200 or timeout expires."""
-    print(f"Waiting for server at {url}{HEALTH_ENDPOINT} (timeout {timeout}s)...")
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        if is_server_up(url):
-            print("Server is ready.")
+def ensure_venv():
+    """
+    Ensure we run inside a venv with Flask installed.
+    - If already inside a venv (sys.prefix != sys.base_prefix) -> ok.
+    - Else, try to re-exec with first valid venv python found.
+    - Else, guide user to create venv.
+    """
+    in_venv = sys.prefix != sys.base_prefix
+    if in_venv:
+        # check Flask installed
+        try:
+            import flask  # noqa
             return True
-        time.sleep(POLL_INTERVAL_SEC)
+        except ImportError:
+            print("[run_gui] venv active but Flask missing — installing requirements...", file=sys.stderr)
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
+            return True
+
+    # not in venv — try to find one and re-exec
+    for cand in VENV_CANDIDATES:
+        py = _venv_python(cand)
+        if py:
+            # avoid infinite loop: don't re-exec if already that python
+            if pathlib.Path(py).resolve() == pathlib.Path(sys.executable).resolve():
+                return True
+            print(f"[run_gui] Found venv at {cand} → re-executing with {py}")
+            # re-exec preserves args
+            os.execv(py, [py] + sys.argv)
+
+    # no venv found — auto-create ./venv if possible
+    venv_path = pathlib.Path("./venv")
+    if not venv_path.exists():
+        print("[run_gui] No venv found — creating ./venv (Python 3.11+ required)...")
+        try:
+            subprocess.check_call([sys.executable, "-m", "venv", str(venv_path)])
+            py = _venv_python(venv_path)
+            print(f"[run_gui] Created {venv_path}. Installing dependencies...")
+            subprocess.check_call([py, "-m", "pip", "install", "-q", "-r", "requirements.txt"])
+            print(f"[run_gui] Setup done. Re-executing with {py}...")
+            os.execv(py, [py] + sys.argv)
+        except Exception as e:
+            print(f"[run_gui] Auto-venv failed: {e}", file=sys.stderr)
+            print("[run_gui] Fix manually:", file=sys.stderr)
+            print("  python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt", file=sys.stderr)
+            return False
+    else:
+        print(f"[run_gui] venv exists at {venv_path} but not active.", file=sys.stderr)
+        print(f"[run_gui] Activate it:", file=sys.stderr)
+        print("  source venv/bin/activate  # Windows: venv\\Scripts\\activate", file=sys.stderr)
+        print("  pip install -r requirements.txt", file=sys.stderr)
+        return False
     return False
 
-
-def main() -> None:
-    args = parse_args()
-    url = args.url if args.url else f"http://localhost:{args.port}"
-
-    check_dependencies()
-
-    server_proc: subprocess.Popen | None = None
-
+def ensure_db():
+    db_path = pathlib.Path("instance/ligtas.sqlite")
+    if db_path.exists():
+        return
+    print("[run_gui] DB not found — initializing and seeding...")
     try:
-        if not args.no_server:
-            # If server already up, reuse it instead of spawning a second one
-            if is_server_up(url):
-                print(f"Server already running at {url} — reusing existing instance.")
-            else:
-                server_proc = start_dev_server()
-                ready = wait_for_server(url)
-                if not ready:
-                    print(f"Timed out waiting for {url}. Check terminal output above.", file=sys.stderr)
-                    if server_proc and server_proc.poll() is None:
-                        print("Server process is still running but not responding on /api/centers.", file=sys.stderr)
-                    # Still try to open browser — Vite may still be compiling
-                # Give Vite a moment to finish HMR setup
-                time.sleep(1.0)
-        else:
-            print(f"--no-server: skipping server start, will open {url} directly.")
+        from app import create_app
+        from utils.db import init_db
+        from utils.seed import seed_db
+        app = create_app()
+        with app.app_context():
+            init_db()
+            seed_db()
+        print("[run_gui] DB ready at", db_path)
+    except Exception as e:
+        print(f"[run_gui] DB init failed: {e}", file=sys.stderr)
 
-        if not args.no_browser:
-            print(f"Opening browser at {url}")
-            # webbrowser.open is cross-platform (uses `xdg-open` on Linux, `open` on macOS, start on Windows)
-            opened = webbrowser.open(url)
-            if not opened:
-                print(f"Could not open browser automatically. Please navigate to {url} manually.")
-            else:
-                print(f"Browser opened. If geolocation is denied, map falls back to Marikina default (server.ts:93).")
-                print(f"Admin login: admin / password (seeded at server.ts:106)")
-        else:
-            print(f"--no-browser: not opening browser. Server at {url}")
+def open_browser():
+    time.sleep(1.5)
+    try:
+        webbrowser.open(URL)
+        print(f"[run_gui] Opened browser to {URL}")
+    except Exception as e:
+        print(f"[run_gui] Could not open browser: {e}. Visit {URL} manually.")
 
-        if server_proc:
-            print("\nDev server is running. Press Ctrl+C to stop.")
-            # Stream server logs to console until interrupted
-            try:
-                assert server_proc.stdout is not None
-                for line in server_proc.stdout:
-                    print(line, end="")
-                    # Also detect readiness from stdout as fallback
-                    if is_server_up(url):
-                        pass
-            except KeyboardInterrupt:
-                pass
-        else:
-            if not args.no_server:
-                # We reused existing server — nothing to stream; just exit after opening browser
-                print("Done. Existing server will keep running. Stop it with: pkill -f \"tsx server.ts\"")
-            else:
-                print("Done.")
+def main():
+    # 1. Ensure venv + deps before anything else (auto-creates/re-execs if needed)
+    if not ensure_venv():
+        # if we didn't re-exec, still try to continue with system python
+        try:
+            import flask  # noqa
+        except ImportError:
+            print("[run_gui] Flask not installed. Run: pip install -r requirements.txt", file=sys.stderr)
+            sys.exit(1)
 
-    except KeyboardInterrupt:
-        print("\nInterrupted by user (Ctrl+C).")
+    print(f"[run_gui] Using Python: {sys.executable}")
+    print(f"[run_gui] venv active: {sys.prefix != sys.base_prefix} (prefix={sys.prefix})")
 
-    finally:
-        if server_proc and server_proc.poll() is None:
-            print("Stopping dev server...")
-            server_proc.terminate()
-            try:
-                server_proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                server_proc.kill()
-            print("Server stopped.")
-
+    ensure_db()
+    # start browser thread
+    t = threading.Thread(target=open_browser, daemon=True)
+    t.start()
+    try:
+        from app import app
+        print(f"[run_gui] Starting LigtasPH GUI at {URL} — Ctrl+C to stop")
+        # use_reloader False so browser doesn't open twice
+        app.run(host=HOST, port=PORT, debug=False, use_reloader=False)
+    except ImportError as e:
+        print(f"[run_gui] Import failed: {e}. Did you activate venv and pip install -r requirements.txt?", file=sys.stderr)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}Manage Centers — LigtasPH{% endblock %}
+{% block content %}
+{% include 'partials/nav_admin.html' %}
+<h1 style="margin:12px 0 8px;">Evacuation Center Management</h1>
+<p style="color:var(--text-secondary); margin:0 0 12px;">Archive instead of delete. Supply statuses: Unknown/Low/Adequate/High. Occupancy validated.</p>
+<div style="overflow:auto; border:1px solid var(--border); border-radius:8px;">
+<table>
+  <thead><tr><th>Name</th><th>City</th><th>Capacity</th><th>Occupancy</th><th>Status</th><th>Updated</th><th>Archived</th></tr></thead>
+  <tbody>
+    {% for c in centers %}
+      <tr>
+        <td style="font-weight:700;"><a href="{{ url_for('public.center_detail', center_id=c['id']) }}">{{ c['name'] }}</a></td>
+        <td>{{ c['city'] }}</td><td>{{ c['capacity'] }}</td><td>{{ c['current_occupancy'] }}</td>
+        <td><span class="badge badge-unknown">{{ c['operational_status'] }}</span> Food {{ c['food_status'] }} Water {{ c['water_status'] }}</td>
+        <td style="font-size:12px;">{{ c['updated_at'] }}</td><td>{{ 'Yes' if c['archived'] else 'No' }}</td>
+      </tr>
+    {% else %}<tr><td colspan="7" style="color:var(--text-secondary);">No centers. Run flask seed.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+<p style="color:var(--text-secondary); font-size:12px; margin-top:8px;">Full CRUD for capacity/occupancy/supply/coordinates/notes will be added in Sprint 2. This Sprint 1 view verifies DB + auth + archiving.</p>
+{% endblock %}

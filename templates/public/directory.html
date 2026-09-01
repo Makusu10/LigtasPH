@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}Evacuation Centers — LigtasPH{% endblock %}
+{% block content %}
+<h1 style="margin:0 0 8px;">Evacuation Centers</h1>
+<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+  <input id="q" placeholder="Search name, city, address" style="flex:1; min-width:220px;">
+  <select id="city"><option value="">All cities</option></select>
+  <select id="status"><option value="">All statuses</option><option>Available</option><option>Nearly Full</option><option>Full</option></select>
+  <select id="sort"><option value="updated">Recently updated</option><option value="name">Name</option><option value="available">Available slots</option><option value="occupancy">Occupancy %</option></select>
+</div>
+<div id="grid" class="grid-3"></div>
+<div id="empty" style="display:none; color:var(--text-secondary); padding:20px; text-align:center; border:1px dashed var(--border); border-radius:8px; margin-top:12px;">No centers match the selected filters. Clear filters or view all.</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let all=[];
+document.addEventListener('DOMContentLoaded', async()=>{
+  await load();
+  document.getElementById('q').addEventListener('input', render);
+  document.getElementById('city').addEventListener('change', render);
+  document.getElementById('status').addEventListener('change', render);
+  document.getElementById('sort').addEventListener('change', load);
+});
+async function load(){
+  const sort=document.getElementById('sort')?.value || 'updated';
+  const res=await fetch('/api/centers?sort='+sort);
+  all=await res.json();
+  const cities=[...new Set(all.map(c=>c.city))].sort();
+  const sel=document.getElementById('city');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">All cities</option>';
+  cities.forEach(ci=>{ const o=document.createElement('option'); o.value=ci; o.textContent=ci; sel.appendChild(o); });
+  sel.value=cur;
+  render();
+}
+function render(){
+  const q=document.getElementById('q').value.toLowerCase();
+  const city=document.getElementById('city').value;
+  const status=document.getElementById('status').value;
+  let filtered=all.filter(c=>{
+    if(q && !(c.name.toLowerCase().includes(q)||c.city.toLowerCase().includes(q)||c.address.toLowerCase().includes(q))) return false;
+    if(city && c.city!==city) return false;
+    if(status && c.occupancy_status!==status) return false;
+    return true;
+  });
+  const grid=document.getElementById('grid');
+  const empty=document.getElementById('empty');
+  grid.innerHTML='';
+  if(filtered.length===0){ empty.style.display='block'; return; } else empty.style.display='none';
+  filtered.forEach(c=>{
+    const pct=c.occupancy_pct;
+    const color = pct>=100 ? '#D92D20' : pct>=80 ? '#F79009' : '#039855';
+    const card=document.createElement('div');
+    card.className='card';
+    card.innerHTML=`
+      <div style="display:flex; justify-content:space-between; gap:8px; align-items:start;">
+        <div style="font-weight:800;">${c.name}</div>
+        <span class="badge badge-${c.occupancy_status==='Available'?'available':c.occupancy_status==='Nearly Full'?'nearly':c.occupancy_status==='Full'?'full':'unknown'}">${c.occupancy_status}</span>
+      </div>
+      <div style="color:var(--text-secondary); font-size:13px;">${c.address}, ${c.city}</div>
+      <div style="font-size:13px; margin:6px 0;">Capacity ${c.capacity} • Occupancy ${c.current_occupancy} • <b>${c.available_slots} slots</b> • ${pct}%</div>
+      <div style="background:#F9FAFB; border:1px solid var(--border); border-radius:8px; height:10px; overflow:hidden; margin:6px 0;"><div style="width:${Math.min(pct,100)}%; background:${color}; height:100%;"></div></div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap; margin:6px 0;">
+        <span class="badge badge-unknown">Food ${c.food_status}</span><span class="badge badge-unknown">Water ${c.water_status}</span><span class="badge badge-unknown">Basic ${c.basic_needs_status}</span>
+      </div>
+      <div style="color:var(--text-secondary); font-size:12px;">Updated ${c.updated_at}</div>
+      <div style="display:flex; gap:8px; margin-top:8px;"><a href="/map" class="btn btn-secondary" style="flex:1; padding:6px;">Locate on Map</a><a href="/centers/${c.id}" class="btn btn-primary" style="flex:1; padding:6px;">View Details</a></div>
+    `;
+    grid.appendChild(card);
+  });
+}
+</script>
+{% endblock %}

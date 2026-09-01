@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block title %}{{ c['name'] }} — LigtasPH{% endblock %}
+{% block content %}
+<a href="{{ url_for('public.centers_page') }}" class="btn btn-secondary" style="margin-bottom:12px;">← Back to Centers</a>
+<div class="card" style="display:grid; gap:12px;">
+  <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:start;">
+    <div>
+      <h1 style="margin:0;">{{ c['name'] }}</h1>
+      <div style="color:var(--text-secondary);">{{ c['address'] }}, {{ c['barangay'] }}, {{ c['city'] }}, {{ c['province'] }}</div>
+      <div style="color:var(--text-secondary); font-size:13px;">Lat {{ c['lat'] }}, Lng {{ c['lng'] }} • {{ c['operational_status'] }}</div>
+    </div>
+    <span class="badge badge-{{ 'available' if status=='Available' else 'nearly' if status=='Nearly Full' else 'full' if status=='Full' else 'unknown' }}">{{ status }}</span>
+  </div>
+  <div class="grid-4">
+    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Capacity</div><div style="font-size:22px; font-weight:800;">{{ c['capacity'] }}</div></div>
+    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Occupancy</div><div style="font-size:22px; font-weight:800;">{{ c['current_occupancy'] }}</div></div>
+    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Available Slots</div><div style="font-size:22px; font-weight:800; color:var(--green);">{{ avail }}</div></div>
+    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Occupancy %</div><div style="font-size:22px; font-weight:800;">{{ pct }}%</div></div>
+  </div>
+  <div style="background:#F9FAFB; border:1px solid var(--border); border-radius:8px; height:14px; overflow:hidden;"><div style="width:{{ pct if pct<=100 else 100 }}%; background: {{ '#D92D20' if pct>=100 else '#F79009' if pct>=80 else '#039855' }}; height:100%;"></div></div>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <span class="badge badge-unknown">Food {{ c['food_status'] }}</span>
+    <span class="badge badge-unknown">Water {{ c['water_status'] }}</span>
+    <span class="badge badge-unknown">Medicine {{ c['medicine_status'] }}</span>
+    <span class="badge badge-unknown">Hygiene {{ c['hygiene_status'] }}</span>
+    <span class="badge badge-unknown">Basic Needs {{ c['basic_needs_status'] }}</span>
+  </div>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    {% if c['contact_number'] %}<a href="tel:{{ c['contact_number'] }}" class="btn btn-secondary">Call {{ c['contact_number'] }}</a>{% endif %}
+    <a href="https://www.google.com/maps/dir/?api=1&destination={{ c['lat'] }},{{ c['lng'] }}" target="_blank" rel="noopener" class="btn btn-primary">Get Directions</a>
+  </div>
+  {% if c['notes'] %}<div style="background:#FFFAEB; border:1px solid #FEDF89; padding:10px 12px; border-radius:8px; color:#7A4D07;">Notes: {{ c['notes'] }}</div>{% endif %}
+  <div style="color:var(--text-secondary); font-size:12px;">Last updated: {{ c['updated_at'] }} • Created: {{ c['created_at'] }}</div>
+  <div id="detailMap" style="height:280px; border:1px solid var(--border); border-radius:8px;"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+document.addEventListener('DOMContentLoaded', ()=>{
+  const map=L.map('detailMap').setView([{{ c['lat'] }}, {{ c['lng'] }}],14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);
+  L.marker([{{ c['lat'] }}, {{ c['lng'] }}]).addTo(map).bindPopup("{{ c['name'] }}");
+});
+</script>
+{% endblock %}

@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block title %}Home — LigtasPH{% endblock %}
+{% block content %}
+<section class="card" style="padding:24px; display:grid; gap:14px;">
+  <div style="display:flex; gap:12px; align-items:center;">
+    <span class="nav-brand-mark" style="width:36px;height:36px; font-size:14px;">LP</span>
+    <h1 style="margin:0; font-size:28px; line-height:1.1; color:var(--navy);">Find evacuation centers and emergency information near you</h1>
+  </div>
+  <p style="color:var(--text-secondary); margin:0; max-width:65ch;">LigtasPH is a centralized platform for locating official evacuation centers, checking occupancy and supply status, viewing current weather, and finding emergency hotlines for your city or municipality.</p>
+  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
+    <a href="{{ url_for('public.map_page') }}" class="btn btn-primary">Find an Evacuation Center</a>
+    <a href="{{ url_for('public.hotlines_page') }}" class="btn btn-secondary">View Emergency Hotlines</a>
+  </div>
+  <div style="background:#EFF8FF; border:1px solid #B2DDFF; padding:10px 12px; border-radius:8px; color:#1849A9; font-size:13px;">If you are in immediate danger, contact 911 or your local DRRMO. This site is for information only.</div>
+</section>
+
+<section style="margin-top:16px;">
+  <div class="grid-4">
+    <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Listed Centers</div><div style="font-size:28px; font-weight:800; color:var(--navy);">{{ total }}</div></div>
+    <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Available</div><div style="font-size:28px; font-weight:800; color:var(--green);">{{ available }}</div><span class="badge badge-available">Available < 80%</span></div>
+    <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Nearly Full</div><div style="font-size:28px; font-weight:800; color:var(--orange);">{{ nearly }}</div><span class="badge badge-nearly">80–99%</span></div>
+    <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Full</div><div style="font-size:28px; font-weight:800; color:var(--red);">{{ full }}</div><span class="badge badge-full">100%</span></div>
+  </div>
+  {% if last_updated %}
+    <p style="color:var(--text-secondary); font-size:12px; margin-top:8px;">Last updated: {{ last_updated }}</p>
+  {% endif %}
+</section>
+
+<section style="margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:16px;" class="map-layout">
+  <div class="card">
+    <h2 style="margin:0 0 8px; font-size:16px;">Map Preview</h2>
+    <div id="previewMap" style="height:280px; border-radius:8px; border:1px solid var(--border);"></div>
+    <p style="color:var(--text-secondary); font-size:12px; margin:8px 0 0;"><span class="badge badge-available">Available</span> <span class="badge badge-nearly">Nearly Full</span> <span class="badge badge-full">Full</span></p>
+  </div>
+  <div class="card">
+    <h2 style="margin:0 0 8px; font-size:16px;">Recently Updated Centers</h2>
+    {% if centers %}
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        {% for c in centers %}
+          {% set pct = (c['current_occupancy']/c['capacity']*100) if c['capacity'] else 0 %}
+          {% set avail = c['capacity']-c['current_occupancy'] %}
+          <div style="border:1px solid var(--border); border-radius:8px; padding:10px 12px; display:flex; justify-content:space-between; gap:12px; align-items:center;">
+            <div>
+              <div style="font-weight:700;">{{ c['name'] }}</div>
+              <div style="color:var(--text-secondary); font-size:13px;">{{ c['city'] }} • {{ avail }} slots • {{ "%.1f"|format(pct) }}%</div>
+            </div>
+            <a href="{{ url_for('public.center_detail', center_id=c['id']) }}" class="btn btn-secondary" style="padding:6px 10px; font-size:12px;">View</a>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p style="color:var(--text-secondary);">No centers yet. Run <code>flask seed</code>.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+  // Minimal preview map - load centers via API
+  document.addEventListener('DOMContentLoaded', async ()=>{
+    const el = document.getElementById('previewMap');
+    if(!el) return;
+    const map = L.map(el, {zoomControl:false}).setView([14.6308,121.0968], 11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);
+    try{
+      const res = await fetch('/api/centers');
+      const centers = await res.json();
+      centers.slice(0,6).forEach(c=>{
+        let color = '#039855';
+        if(c.occupancy_pct>=100) color='#D92D20';
+        else if(c.occupancy_pct>=80) color='#F79009';
+        const icon = L.divIcon({html:`<div style="background:${color};width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></div>`, className:'', iconSize:[14,14]});
+        L.marker([c.lat,c.lng], {icon}).addTo(map).bindPopup(`<b>${c.name}</b><br>${c.city}<br>${c.occupancy_status} • ${c.available_slots} slots`);
+      });
+      if(centers.length) {
+        const group = L.featureGroup(centers.slice(0,6).map(c=>L.marker([c.lat,c.lng])));
+        try{ map.fitBounds(group.getBounds().pad(0.2)); }catch(e){}
+      }
+    }catch(e){ console.warn(e); }
+    // weather summary fetch
+    try{
+      const w = await fetch('/api/weather?lat=14.6308&lon=121.0968');
+      if(w.ok){
+        const d=await w.json();
+        const sec=document.createElement('div');
+        sec.className='card';
+        sec.style.marginTop='12px';
+        sec.innerHTML=`<div style="font-weight:700; font-size:13px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.06em;">Weather — ${d.name||''}</div><div style="font-size:14px;">${d.weather?.[0]?.description||''} • ${d.main?.temp??''}°C • Humidity ${d.main?.humidity??''}% • Wind ${d.wind?.speed??''} m/s</div><div style="font-size:12px; color:var(--text-secondary);">${d.source||''} • ${d.fetched_at||''}</div>`;
+        document.querySelector('.map-layout').appendChild(sec);
+      }
+    }catch(e){}
+  });
+</script>
+{% endblock %}
