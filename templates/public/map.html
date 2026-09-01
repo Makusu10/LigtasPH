@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+{% block title %}Evacuation Map — LigtasPH{% endblock %}
+{% block content %}
+<h1 style="margin:0 0 8px;">Evacuation Map</h1>
+<p style="color:var(--text-secondary); margin:0 0 12px;">Search by name/city/address and filter by occupancy/supply. Use My Location or pick manually.</p>
+<div style="display:grid; grid-template-columns: 320px 1fr; gap:16px;" class="map-layout">
+  <div class="card">
+    <label for="q">Search</label>
+    <input id="q" placeholder="e.g. Marikina, Sports Center" style="margin-bottom:8px;">
+    <label for="cityFilter">City</label>
+    <select id="cityFilter" style="margin-bottom:8px;"><option value="">All cities</option></select>
+    <label for="statusFilter">Occupancy Status</label>
+    <select id="statusFilter" style="margin-bottom:8px;">
+      <option value="">All</option><option>Available</option><option>Nearly Full</option><option>Full</option><option>Status Unavailable</option>
+    </select>
+    <label for="supplyFilter">Supply Status</label>
+    <select id="supplyFilter" style="margin-bottom:8px;">
+      <option value="">All</option><option>Adequate</option><option>High</option><option>Low</option><option>Unknown</option>
+    </select>
+    <div style="display:flex; gap:8px; margin:8px 0;">
+      <button id="locBtn" class="btn btn-secondary" style="flex:1;">Use My Location</button>
+      <button id="clearBtn" class="btn btn-secondary">Clear</button>
+    </div>
+    <div id="list" style="max-height:50vh; overflow:auto; display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--border); padding-top:8px;"></div>
+  </div>
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div id="map" style="height:65vh; min-height:420px;"></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+let map, markers=[], allCenters=[];
+document.addEventListener('DOMContentLoaded', async ()=>{
+  map = L.map('map').setView([14.6308,121.0968],11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);
+  await load();
+  document.getElementById('q').addEventListener('input', render);
+  document.getElementById('cityFilter').addEventListener('change', render);
+  document.getElementById('statusFilter').addEventListener('change', render);
+  document.getElementById('supplyFilter').addEventListener('change', render);
+  document.getElementById('clearBtn').addEventListener('click', ()=>{ document.getElementById('q').value=''; document.getElementById('statusFilter').value=''; document.getElementById('supplyFilter').value=''; document.getElementById('cityFilter').value=''; render();});
+  document.getElementById('locBtn').addEventListener('click', useLocation);
+});
+async function load(){
+  const res = await fetch('/api/centers');
+  allCenters = await res.json();
+  const cities = [...new Set(allCenters.map(c=>c.city))].sort();
+  const sel=document.getElementById('cityFilter');
+  cities.forEach(ci=>{ const o=document.createElement('option'); o.textContent=ci; o.value=ci; sel.appendChild(o); });
+  render();
+}
+function render(){
+  const q=document.getElementById('q').value.toLowerCase();
+  const city=document.getElementById('cityFilter').value;
+  const status=document.getElementById('statusFilter').value;
+  const supply=document.getElementById('supplyFilter').value;
+  let filtered = allCenters.filter(c=>{
+    if(q && !(c.name.toLowerCase().includes(q) || c.city.toLowerCase().includes(q) || c.address.toLowerCase().includes(q))) return false;
+    if(city && c.city!==city) return false;
+    if(status && c.occupancy_status!==status) return false;
+    if(supply && ![c.food_status,c.water_status,c.medicine_status,c.hygiene_status,c.basic_needs_status].includes(supply)) return false;
+    return true;
+  });
+  markers.forEach(m=> map.removeLayer(m)); markers=[];
+  const list=document.getElementById('list'); list.innerHTML='';
+  if(filtered.length===0){ list.innerHTML='<div style="color:var(--text-secondary); font-size:13px; padding:8px;">No centers match. Clear filters or view all.</div>'; return; }
+  filtered.forEach(c=>{
+    let color='#667085';
+    if(c.occupancy_status==='Available') color='#039855';
+    else if(c.occupancy_status==='Nearly Full') color='#F79009';
+    else if(c.occupancy_status==='Full') color='#D92D20';
+    const icon=L.divIcon({html:`<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`, className:'', iconSize:[16,16]});
+    const m=L.marker([c.lat,c.lng], {icon}).addTo(map);
+    m.bindPopup(`<div style="min-width:220px">
+      <div style="font-weight:800;">${c.name}</div>
+      <div style="color:#667085; font-size:13px;">${c.address}, ${c.city}</div>
+      <div style="margin:8px 0; font-size:13px;">Capacity ${c.capacity} • Occupancy ${c.current_occupancy} • Available ${c.available_slots} • ${c.occupancy_pct}%<br><span class="badge badge-${c.occupancy_status==='Available'?'available':c.occupancy_status==='Nearly Full'?'nearly':c.occupancy_status==='Full'?'full':'unknown'}">${c.occupancy_status}</span></div>
+      <div style="font-size:12px;">Food ${c.food_status} • Water ${c.water_status} • Basic ${c.basic_needs_status}</div>
+      <div style="font-size:12px; color:#667085;">Updated ${c.updated_at}</div>
+      <div style="display:flex; gap:8px; margin-top:8px;"><a href="/centers/${c.id}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">View Details</a><a href="https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}" target="_blank" rel="noopener" class="btn btn-primary" style="padding:6px 8px; font-size:12px;">Get Directions</a></div>
+    </div>`);
+    markers.push(m);
+    // list entry
+    const row=document.createElement('div');
+    row.style.cssText='border:1px solid var(--border); border-radius:8px; padding:8px 10px; display:flex; justify-content:space-between; gap:8px; align-items:center;';
+    row.innerHTML=`<div><div style="font-weight:700; font-size:13px;">${c.name}</div><div style="color:var(--text-secondary); font-size:12px;">${c.city} • ${c.available_slots} slots • ${c.occupancy_pct}%</div><span class="badge badge-${c.occupancy_status==='Available'?'available':c.occupancy_status==='Nearly Full'?'nearly':c.occupancy_status==='Full'?'full':'unknown'}">${c.occupancy_status}</span></div><button class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">Locate</button>`;
+    row.querySelector('button').addEventListener('click', ()=>{ map.setView([c.lat,c.lng],14); m.openPopup();});
+    list.appendChild(row);
+  });
+  try{
+    const group=L.featureGroup(markers);
+    map.fitBounds(group.getBounds().pad(0.2));
+  }catch(e){}
+}
+function useLocation(){
+  if(!navigator.geolocation){ alert('Geolocation not supported. Please select manually.'); return; }
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const lat=pos.coords.latitude, lng=pos.coords.longitude;
+    L.marker([lat,lng], {icon: L.divIcon({html:'<div style="background:var(--primary); width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.4)"></div>', className:'', iconSize:[16,16]})}).addTo(map).bindPopup('Your location').openPopup();
+    map.setView([lat,lng],13);
+  }, err=>{ alert('Location denied. You can search by city or address.'); }, {enableHighAccuracy:true, timeout:8000});
+}
+</script>
+{% endblock %}

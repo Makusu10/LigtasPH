@@ -1,0 +1,1 @@
+{% extends 'base.html' %}{% block title %}Unauthorized — LigtasPH{% endblock %}{% block content %}<div class="card" style="text-align:center; padding:32px;"><h1>401 — Unauthorized</h1><p style="color:var(--text-secondary);">Please log in to access this page.</p><a href="{{ url_for('auth.admin_login') }}" class="btn btn-primary">Admin Login</a></div>{% endblock %}

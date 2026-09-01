@@ -1,0 +1,27 @@
+<nav class="nav" aria-label="Primary">
+  <div class="container nav-inner">
+    <a href="{{ url_for('public.home') }}" class="nav-brand" aria-label="LigtasPH home">
+      <span class="nav-brand-mark" aria-hidden="true">LP</span>
+      <span>LIGTAS<span style="color:var(--primary)">PH</span></span>
+    </a>
+    <div class="nav-links" role="navigation">
+      <a href="{{ url_for('public.home') }}" {% if request.endpoint=='public.home' %}aria-current="page"{% endif %}>Home</a>
+      <a href="{{ url_for('public.map_page') }}" {% if request.endpoint=='public.map_page' %}aria-current="page"{% endif %}>Evacuation Map</a>
+      <a href="{{ url_for('public.centers_page') }}" {% if request.endpoint=='public.centers_page' %}aria-current="page"{% endif %}>Evacuation Centers</a>
+      <a href="{{ url_for('public.weather_page') }}" {% if request.endpoint=='public.weather_page' %}aria-current="page"{% endif %}>Weather</a>
+      <a href="{{ url_for('public.hotlines_page') }}" {% if request.endpoint=='public.hotlines_page' %}aria-current="page"{% endif %}>Emergency Hotlines</a>
+      <a href="{{ url_for('auth.admin_login') }}">Admin Login</a>
+    </div>
+    <button id="navToggle" class="nav-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="mobileMenu">
+      <i data-lucide="menu" style="width:18px;height:18px"></i>
+    </button>
+  </div>
+  <div id="mobileMenu" class="container mobile-menu" role="navigation" aria-label="Mobile">
+    <a href="{{ url_for('public.home') }}">Home</a>
+    <a href="{{ url_for('public.map_page') }}">Evacuation Map</a>
+    <a href="{{ url_for('public.centers_page') }}">Evacuation Centers</a>
+    <a href="{{ url_for('public.weather_page') }}">Weather</a>
+    <a href="{{ url_for('public.hotlines_page') }}">Emergency Hotlines</a>
+    <a href="{{ url_for('auth.admin_login') }}">Admin Login</a>
+  </div>
+</nav>

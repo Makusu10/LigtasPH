@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin Login — LigtasPH</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <style>*{font-family:'Inter',system-ui,sans-serif !important}</style>
+</head>
+<body style="background:var(--bg); display:grid; place-items:center; min-height:100vh; padding:16px;">
+  <div class="card" style="max-width:420px; width:100%;">
+    <h1 style="margin:0 0 4px;">Admin Access</h1>
+    <p style="color:var(--text-secondary); margin:0 0 12px; font-size:13px;">LGU & DRRMO personnel only.</p>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}{% for cat,msg in messages %}<div class="flash flash-{{cat}}">{{msg}}</div>{% endfor %}{% endif %}
+    {% endwith %}
+    <form method="post" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div style="margin-bottom:10px;"><label for="username">Username</label><input id="username" name="username" required autocomplete="username"></div>
+      <div style="margin-bottom:12px;"><label for="password">Password</label><input id="password" name="password" type="password" required autocomplete="current-password"></div>
+      <button type="submit" class="btn btn-primary" style="width:100%;">Authenticate</button>
+    </form>
+    <p style="color:var(--text-secondary); font-size:12px; margin-top:10px;">Protected routes require login. Invalid credentials show generic error.</p>
+    <a href="{{ url_for('public.home') }}" class="btn btn-secondary" style="width:100%; margin-top:8px;">Back to Public Site</a>
+  </div>
+</body>
+</html>
