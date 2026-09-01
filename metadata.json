@@ -1,0 +1,6 @@
+{
+  "name": "Ligtas: Evacuation Center Management System",
+  "description": "A centralized application that maps publicly designated evacuation centers, monitors their capacities and supply inventories, and provides real-time weather updates and localized emergency contact information.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
