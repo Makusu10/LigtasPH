@@ -77,3 +77,24 @@ def test_login_valid_and_dashboard(client):
     # follow login
     client.post("/admin/login", data={"username": "admin", "password": "admin123"})
     assert client.get("/admin/dashboard").status_code == 200
+
+def test_login_lockout_after_5_fails(client):
+    for _ in range(5):
+        r = client.post("/admin/login", data={"username": "admin", "password": "wrong"})
+        assert r.status_code in (401, 403)
+    # 6th attempt should be locked (403)
+    r = client.post("/admin/login", data={"username": "admin", "password": "wrong"})
+    assert r.status_code == 403
+
+def test_api_weather_no_cache_503(client, app, monkeypatch):
+    # clear cache and force external fetches to fail → should return 503 with retry
+    with app.app_context():
+        from utils.db import get_db
+        db = get_db()
+        db.execute("DELETE FROM weather_cache")
+        db.commit()
+    monkeypatch.setattr("services.weather_service.fetch_open_meteo", lambda lat, lon: (_ for _ in ()).throw(Exception("offline")))
+    # ensure no OpenWeather key so it falls through to Open-Meteo
+    r = client.get("/api/weather?lat=14.6308&lon=121.0968")
+    assert r.status_code == 503
+    assert r.get_json().get("retry") is True

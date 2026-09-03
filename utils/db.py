@@ -114,14 +114,15 @@ def get_db():
 
 def close_db(e=None):
     db = g.pop("db", None)
-    # don't close shared memory db
-    if db is not None and getattr(db, "_is_memory_shared", False) is False:
-        # check if it's the shared one
-        if hasattr(current_app, "_memory_db") and db is current_app._memory_db:
-            return
-        try:
-            db.close()
-        except: pass
+    if db is None:
+        return
+    # don't close shared memory db (TestingConfig)
+    if hasattr(current_app, "_memory_db") and db is current_app._memory_db:
+        return
+    try:
+        db.close()
+    except Exception:
+        pass
 
 def init_db():
     db = get_db()

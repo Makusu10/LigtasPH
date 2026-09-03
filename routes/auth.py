@@ -15,10 +15,12 @@ def admin_login():
         if row and row["locked_until"]:
             try:
                 locked = datetime.datetime.fromisoformat(row["locked_until"])
-                if datetime.datetime.utcnow() < locked:
+                if locked.tzinfo is None:
+                    locked = locked.replace(tzinfo=datetime.timezone.utc)
+                if datetime.datetime.now(datetime.timezone.utc) < locked:
                     flash("Account temporarily locked. Try again later.", "danger")
                     return render_template("admin/login.html"), 403
-            except:
+            except Exception:
                 pass
         if row and check_password_hash(row["password_hash"], password):
             db.execute("UPDATE administrators SET failed_attempts=0, locked_until=NULL, last_login=datetime('now') WHERE id=?", (row["id"],))
@@ -33,7 +35,7 @@ def admin_login():
                 fails = (row["failed_attempts"] or 0) + 1
                 locked_until = None
                 if fails >= 5:
-                    locked_until = (datetime.datetime.utcnow() + datetime.timedelta(minutes=15)).isoformat()
+                    locked_until = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=15)).isoformat()
                 db.execute("UPDATE administrators SET failed_attempts=?, locked_until=? WHERE id=?", (fails, locked_until, row["id"]))
                 db.commit()
             flash("Invalid username or password.", "danger")

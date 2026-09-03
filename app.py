@@ -18,6 +18,9 @@ def create_app(env=None):
 
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(config_by_name[cfg_name])
+    # Validate production secrets eagerly — fail loud if SECRET_KEY not set
+    if cfg_name == "production":
+        config_by_name[cfg_name].validate()
     app.config["ADMIN_USERNAME"] = os.getenv("ADMIN_USERNAME", "admin")
     app.config["ADMIN_PASSWORD"] = os.getenv("ADMIN_PASSWORD", "admin123")
     app.config["OPENWEATHER_API_KEY"] = os.getenv("OPENWEATHER_API_KEY", app.config.get("OPENWEATHER_API_KEY",""))
@@ -33,7 +36,8 @@ def create_app(env=None):
         from flask_limiter.util import get_remote_address
         limiter = Limiter(get_remote_address, app=app, default_limits=[], storage_uri=app.config.get("RATELIMIT_STORAGE_URI","memory://"))
         app.limiter = limiter
-    except Exception:
+    except Exception as e:
+        app.logger.warning("Flask-Limiter init failed: %s", e)
         app.limiter = None
 
     app.teardown_appcontext(close_db)
@@ -66,7 +70,8 @@ def create_app(env=None):
     # CSRF exempt APIs
     try:
         csrf.exempt(api_bp)
-    except: pass
+    except Exception as e:
+        app.logger.warning("CSRF exempt failed: %s", e)
 
     # Error handlers
     @app.errorhandler(400)

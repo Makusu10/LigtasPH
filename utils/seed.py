@@ -6,13 +6,9 @@ from utils.db import get_db
 
 def seed_db():
     db = get_db()
-    # Admin
-    admin_user = current_app.config.get("ADMIN_USERNAME") or __import__("os").getenv("ADMIN_USERNAME", "admin")
-    admin_pass = current_app.config.get("ADMIN_PASSWORD") or __import__("os").getenv("ADMIN_PASSWORD", "admin123")
-    # also allow env ADMIN_USERNAME/PASSWORD directly
-    import os
-    admin_user = os.getenv("ADMIN_USERNAME", admin_user)
-    admin_pass = os.getenv("ADMIN_PASSWORD", admin_pass)
+    # Admin — use app config (already resolved from env with defaults in app.py:24-25)
+    admin_user = current_app.config.get("ADMIN_USERNAME", "admin")
+    admin_pass = current_app.config.get("ADMIN_PASSWORD", "admin123")
     if not db.execute("SELECT 1 FROM administrators LIMIT 1").fetchone():
         db.execute("INSERT INTO administrators (username, password_hash) VALUES (?,?)",
                    (admin_user, generate_password_hash(admin_pass)))

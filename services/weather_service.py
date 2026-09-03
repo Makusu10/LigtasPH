@@ -1,6 +1,6 @@
 """
 Free-API weather service interface for Sprint 1.
-Order: cache (<10min) -> OpenWeather (with key) -> Open-Meteo (no key) -> api.weather.gov (no key, optional)
+Order: cache (<10min) -> OpenWeather (with key) -> Open-Meteo (no key) -> stale cache (<1h) -> 503
 No fake data - returns None on double failure so route can return 503.
 """
 import json
@@ -11,7 +11,6 @@ from flask import current_app
 
 OPENWEATHER_URL = "https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={key}&units=metric"
 OPENMETEO_URL = "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code"
-WEATHER_GOV_ALERTS = "https://api.weather.gov/alerts?point={lat},{lon}"
 
 WMO_MAP = {
     0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
