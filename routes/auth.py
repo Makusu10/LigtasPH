@@ -2,10 +2,12 @@ import datetime
 from flask import Blueprint, request, render_template, redirect, url_for, flash, session
 from werkzeug.security import check_password_hash
 from utils.db import get_db
+from utils.ratelimit import limiter
 
 bp = Blueprint("auth", __name__)
 
 @bp.route("/admin/login", methods=["GET", "POST"])
+@limiter.limit("10 per minute", methods=["POST"])
 def admin_login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
@@ -42,7 +44,7 @@ def admin_login():
             return render_template("admin/login.html"), 401
     return render_template("admin/login.html")
 
-@bp.route("/admin/logout")
+@bp.route("/admin/logout", methods=["POST"])
 def admin_logout():
     session.clear()
     flash("Logged out.", "info")

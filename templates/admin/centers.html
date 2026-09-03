@@ -6,7 +6,7 @@
 <p style="color:var(--text-secondary); margin:0 0 12px;">Archive instead of delete. Supply statuses: Unknown/Low/Adequate/High. Occupancy validated.</p>
 <div style="overflow:auto; border:1px solid var(--border); border-radius:8px;">
 <table>
-  <thead><tr><th>Name</th><th>City</th><th>Capacity</th><th>Occupancy</th><th>Status</th><th>Updated</th><th>Archived</th></tr></thead>
+  <thead><tr><th>Name</th><th>City</th><th>Capacity</th><th>Occupancy</th><th>Status</th><th>Updated</th><th>Archived</th><th>Actions</th></tr></thead>
   <tbody>
     {% for c in centers %}
       <tr>
@@ -14,10 +14,25 @@
         <td>{{ c['city'] }}</td><td>{{ c['capacity'] }}</td><td>{{ c['current_occupancy'] }}</td>
         <td><span class="badge badge-unknown">{{ c['operational_status'] }}</span> Food {{ c['food_status'] }} Water {{ c['water_status'] }}</td>
         <td style="font-size:12px;">{{ c['updated_at'] }}</td><td>{{ 'Yes' if c['archived'] else 'No' }}</td>
+        <td>
+          <details><summary style="cursor:pointer; font-size:12px;">Edit</summary>
+          <form method="post" action="{{ url_for('admin.update_center', cid=c['id']) }}" style="display:flex; flex-direction:column; gap:4px; min-width:180px; margin-top:6px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label style="font-size:12px;">Occupancy <input type="number" name="current_occupancy" value="{{ c['current_occupancy'] }}" min="0" max="{{ c['capacity'] }}"></label>
+            <label style="font-size:12px;">Operational <select name="operational_status">{% for s in ['Open','Closed','Temporarily Unavailable'] %}<option {% if c['operational_status']==s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></label>
+            {% for f in ['food_status','water_status','medicine_status','hygiene_status','basic_needs_status'] %}
+            <label style="font-size:12px;">{{ f }} <select name="{{ f }}">{% for s in ['Unknown','Low','Adequate','High'] %}<option {% if c[f]==s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></label>
+            {% endfor %}
+            <label style="font-size:12px;">Contact <input type="text" name="contact_number" value="{{ c['contact_number'] or '' }}"></label>
+            <button type="submit" class="btn btn-primary" style="padding:6px 8px; font-size:12px;">Save</button>
+          </form>
+          <form method="post" action="{{ url_for('admin.archive_center', cid=c['id']) }}" style="margin-top:4px;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="{{ 'unarchive' if c['archived'] else 'archive' }}"><button type="submit" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">{{ 'Restore' if c['archived'] else 'Archive' }}</button></form>
+          </details>
+        </td>
       </tr>
-    {% else %}<tr><td colspan="7" style="color:var(--text-secondary);">No centers. Run flask seed.</td></tr>{% endfor %}
+    {% else %}<tr><td colspan="8" style="color:var(--text-secondary);">No centers. Run flask seed.</td></tr>{% endfor %}
   </tbody>
 </table>
 </div>
-<p style="color:var(--text-secondary); font-size:12px; margin-top:8px;">Full CRUD for capacity/occupancy/supply/coordinates/notes will be added in Sprint 2. This Sprint 1 view verifies DB + auth + archiving.</p>
+<p style="color:var(--text-secondary); font-size:12px; margin-top:8px;">Edits write an audit row to center_status_updates. Archiving hides centers from public/API without deleting.</p>
 {% endblock %}

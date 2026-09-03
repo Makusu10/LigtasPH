@@ -33,10 +33,9 @@ def create_app(env=None):
     csrf = CSRFProtect(app)
 
     try:
-        from flask_limiter import Limiter
-        from flask_limiter.util import get_remote_address
-        limiter = Limiter(get_remote_address, app=app, default_limits=[], storage_uri=app.config.get("RATELIMIT_STORAGE_URI","memory://"))
-        app.limiter = limiter
+        from utils.ratelimit import limiter as shared_limiter
+        shared_limiter.init_app(app)
+        app.limiter = shared_limiter
     except Exception as e:
         app.logger.warning("Flask-Limiter init failed: %s", e)
         app.limiter = None

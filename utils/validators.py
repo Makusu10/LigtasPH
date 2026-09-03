@@ -10,6 +10,10 @@ def validate_phone(phone: str) -> bool:
     phone = phone.strip()
     if PH_MOBILE.match(phone):
         return True
+    digits = re.sub(r"\D", "", phone)
+    # short emergency codes: 911, 143, 161, 122
+    if phone.isdigit() and 2 <= len(phone) <= 4:
+        return True
     if PH_LANDLINE_FLEX.match(phone) and any(c.isdigit() for c in phone):
         # at least 7 digits
         digits = re.sub(r"\D", "", phone)

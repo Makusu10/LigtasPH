@@ -61,7 +61,7 @@ def api_center_detail(cid):
     d=dict(c)
     pct= round(c["current_occupancy"]/c["capacity"]*100,1) if c["capacity"] else 0
     d["occupancy_pct"]=pct; d["available_slots"]=c["capacity"]-c["current_occupancy"]
-    d["occupancy_status"]="Full" if pct>=100 else "Nearly Full" if pct>=80 else "Available"
+    d["occupancy_status"]="Full" if pct>=100 else "Nearly Full" if pct>=80 else "Available" if c["operational_status"]=="Open" else "Status Unavailable"
     return jsonify(d)
 
 @bp.route("/api/hotlines")
@@ -98,7 +98,7 @@ def api_weather():
             lat_f=float(lat); lon_f=float(lon)
             if not (-90<=lat_f<=90 and -180<=lon_f<=180):
                 return jsonify({"error":"Invalid coordinates"}),400
-        except:
+        except (TypeError, ValueError):
             return jsonify({"error":"Invalid coordinates"}),400
         data, err = fetch_weather(db, lat_f, lon_f, city)
         if data:
@@ -119,7 +119,7 @@ def api_air_quality():
             lat_f=float(lat); lon_f=float(lon)
             if not (-90<=lat_f<=90 and -180<=lon_f<=180):
                 return jsonify({"error":"Invalid coordinates"}),400
-        except:
+        except (TypeError, ValueError):
             return jsonify({"error":"Invalid coordinates"}),400
         data, err = fetch_air_quality(db, lat_f, lon_f, city)
         if data:
@@ -142,7 +142,7 @@ def api_environment():
             lat_f=float(lat); lon_f=float(lon)
             if not (-90<=lat_f<=90 and -180<=lon_f<=180):
                 return jsonify({"error":"Invalid coordinates"}),400
-        except:
+        except (TypeError, ValueError):
             return jsonify({"error":"Invalid coordinates"}),400
         w_data, w_err = fetch_weather(db, lat_f, lon_f, city)
         aq_data, aq_err = fetch_air_quality(db, lat_f, lon_f, city)

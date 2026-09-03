@@ -98,3 +98,19 @@ def test_api_weather_no_cache_503(client, app, monkeypatch):
     r = client.get("/api/weather?lat=14.6308&lon=121.0968")
     assert r.status_code == 503
     assert r.get_json().get("retry") is True
+
+def test_api_center_detail_closed_status(client, app):
+    with app.app_context():
+        from utils.db import get_db
+        db = get_db()
+        db.execute(
+            "INSERT INTO evacuation_centers (name,address,city,lat,lng,capacity,"
+            "current_occupancy,operational_status) VALUES (?,?,?,?,?,?,?,?)",
+            ("Closed Test", "Addr", "Marikina", 14.6, 121.0, 100, 10, "Closed"),
+        )
+        db.commit()
+        row = db.execute(
+            "SELECT id FROM evacuation_centers WHERE name='Closed Test'"
+        ).fetchone()
+        cid = row["id"]
+    assert client.get(f"/api/centers/{cid}").get_json()["occupancy_status"] == "Status Unavailable"

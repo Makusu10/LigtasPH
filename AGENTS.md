@@ -12,7 +12,7 @@
 .venv/bin/python -m flask --app app run --debug  # :5000; or .venv/bin/python wsgi.py
 .venv/bin/python -m gunicorn wsgi:app         # prod — Procfile:1
 .venv/bin/python run_gui.py                   # demo launcher: re-execs into venv, init-db+seed if missing, opens :5000
-.venv/bin/python -m pytest -q                                    # 77 passed
+.venv/bin/python -m pytest -q                                    # 83 passed
 .venv/bin/python -m pytest -q tests/test_sprint1.py::test_api_centers_returns_6  # single test
 ```
 - Use `.venv/bin/python -m ...` (bare `.venv/bin/pytest` breaks imports; system python hits `externally-managed-environment`).
