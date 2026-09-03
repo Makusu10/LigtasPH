@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', async()=>{
   await load();
   document.getElementById('q').addEventListener('input', load);
   document.getElementById('city').addEventListener('change', load);
+  document.getElementById('city').addEventListener('change', (e)=>{ try{ localStorage.setItem('ligtasph_ann_city_v1', e.target.value || ''); }catch(_){} });
   document.getElementById('cat').addEventListener('change', load);
 });
 async function load(){

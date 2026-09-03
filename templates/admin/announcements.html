@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block title %}Announcements — LigtasPH{% endblock %}
+{% block content %}
+{% include 'partials/nav_admin.html' %}
+<h1 style="margin:12px 0 4px;">Mass Banner Announcements</h1>
+<p style="color:var(--text-secondary); margin:0 0 12px; font-size:13px;">Publish a popup banner to everyone, one city, or a radius. Users acknowledge to dismiss; the banner stays up only within its time range. Works offline via cached feed.</p>
+
+<div class="card" style="margin-bottom:16px;">
+  <h3 style="margin:0 0 10px;">New announcement</h3>
+  <form method="post" action="{{ url_for('admin.announcements') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;" class="map-layout">
+      <div><label for="title">Title</label><input id="title" name="title" maxlength="120" required placeholder="e.g. Scheduled maintenance"></div>
+      <div><label for="severity">Severity</label>
+        <select id="severity" name="severity">
+          <option value="info">Info (blue)</option>
+          <option value="warning">Warning (orange)</option>
+          <option value="critical">Critical (red, blocking popup)</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:10px;"><label for="message">Message</label><textarea id="message" name="message" rows="3" maxlength="2000" required placeholder="App will be offline for maintenance..."></textarea></div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;" class="map-layout">
+      <div><label for="starts_at">Show from</label><input id="starts_at" name="starts_at" type="datetime-local" required></div>
+      <div><label for="ends_at">Show until</label><input id="ends_at" name="ends_at" type="datetime-local" required></div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;" class="map-layout">
+      <div><label for="scope">Audience</label>
+        <select id="scope" name="scope">
+          <option value="all">Everyone (all users)</option>
+          <option value="city">Specific city</option>
+          <option value="radius">Radius around a point</option>
+        </select>
+      </div>
+      <div id="cityWrap" style="display:none;"><label for="city">City</label>
+        <select id="city" name="city">
+          <option value="">— select —</option>
+          {% for r in cities %}<option value="{{ r['city'] }}">{{ r['city'] }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div id="radiusWrap" style="display:none; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:10px;" class="map-layout">
+      <div><label for="center_lat">Center lat</label><input id="center_lat" name="center_lat" type="number" step="any" min="-90" max="90" placeholder="14.6308"></div>
+      <div><label for="center_lng">Center lng</label><input id="center_lng" name="center_lng" type="number" step="any" min="-180" max="180" placeholder="121.0968"></div>
+      <div><label for="radius_km">Radius (km)</label><input id="radius_km" name="radius_km" type="number" step="any" min="1" max="2000" placeholder="10"></div>
+    </div>
+    <button type="submit" class="btn btn-primary" style="margin-top:12px;">Publish announcement</button>
+  </form>
+</div>
+
+<div style="overflow:auto; border:1px solid var(--border); border-radius:8px;">
+<table>
+  <thead><tr><th>Title</th><th>Scope</th><th>Severity</th><th>Time range (UTC)</th><th>Active</th><th>Actions</th></tr></thead>
+  <tbody>
+    {% for a in announcements %}
+      <tr>
+        <td style="font-weight:700;">{{ a['title'] }}<div style="font-weight:400; font-size:12px; color:var(--text-secondary); max-width:40ch;">{{ a['message'] }}</div></td>
+        <td><span class="badge badge-unknown">{{ a['scope'] }}</span><div style="font-size:12px;">{% if a['scope']=='city' %}{{ a['city'] }}{% elif a['scope']=='radius' %}{{ a['center_lat'] }},{{ a['center_lng'] }} +{{ a['radius_km'] }}km{% else %}all{% endif %}</div></td>
+        <td><span class="badge badge-unknown">{{ a['severity'] }}</span></td>
+        <td style="font-size:12px;">{{ a['starts_at'] }} → {{ a['ends_at'] }}</td>
+        <td>{{ 'Yes' if a['is_active'] else 'No' }}</td>
+        <td style="white-space:nowrap;">
+          <form method="post" action="{{ url_for('admin.announcement_toggle', aid=a['id']) }}" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-secondary" style="padding:6px 10px; font-size:12px;" type="submit">{{ 'Disable' if a['is_active'] else 'Enable' }}</button>
+          </form>
+          <form method="post" action="{{ url_for('admin.announcement_delete', aid=a['id']) }}" style="display:inline;" onsubmit="return confirm('Delete this announcement?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-secondary" style="padding:6px 10px; font-size:12px;" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}<tr><td colspan="6" style="color:var(--text-secondary);">No announcements yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', ()=>{
+  const scope = document.getElementById('scope');
+  const cityWrap = document.getElementById('cityWrap');
+  const radiusWrap = document.getElementById('radiusWrap');
+  function sync(){
+    cityWrap.style.display = scope.value === 'city' ? '' : 'none';
+    radiusWrap.style.display = scope.value === 'radius' ? 'grid' : 'none';
+  }
+  scope.addEventListener('change', sync); sync();
+});
+</script>
+{% endblock %}

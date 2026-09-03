@@ -43,6 +43,17 @@ def create_app(env=None):
 
     app.teardown_appcontext(close_db)
 
+    # Self-heal stale DB files: SCHEMA is all CREATE TABLE/INDEX IF NOT
+    # EXISTS, so this safely adds tables missing from DBs created before a
+    # feature landed (e.g. announcements) without touching existing data.
+    # Skipped for :memory: (tests manage their own lifecycle).
+    if app.config["DATABASE"] != ":memory:":
+        try:
+            with app.app_context():
+                init_db()
+        except Exception as e:
+            app.logger.warning("Schema ensure failed for %s: %s", app.config["DATABASE"], e)
+
     # CLI
     @app.cli.command("init-db")
     def init_db_cmd():

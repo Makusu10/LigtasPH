@@ -3,6 +3,7 @@ from utils.db import get_db
 
 bp = Blueprint("api", __name__)
 
+import math
 import secrets
 import sqlite3
 import string
@@ -266,6 +267,77 @@ def api_group_locations(code):
         return jsonify(out)
     except Exception:
         return jsonify({"error": "Could not load locations", "retry": True}), 503
+
+
+def _haversine_km(lat1, lon1, lat2, lon2):
+    try:
+        r = 6371.0
+        p1, p2 = math.radians(lat1), math.radians(lat2)
+        dp = math.radians(lat2 - lat1)
+        dl = math.radians(lon2 - lon1)
+        a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+        return 2 * r * math.asin(math.sqrt(a))
+    except Exception:
+        return float("inf")
+
+
+@bp.route("/api/announcements")
+def api_announcements():
+    """Public feed of live announcements.
+
+    Query params (all optional):
+      city — exact city match for scope='city' rows
+      lat / lon — user coords for scope='radius' rows (haversine <= radius_km)
+
+    Always returns scope='all' rows. City/radius rows only match when the
+    corresponding param is supplied, so targeted messages don't leak to
+    everyone. Only rows with is_active=1 and now in [starts_at, ends_at].
+    """
+    try:
+        db = get_db()
+        city = (request.args.get("city", "") or "").strip()
+        lat = request.args.get("lat")
+        lon = request.args.get("lon", request.args.get("lng"))
+        try:
+            lat_f = float(lat) if lat not in (None, "") else None
+            lon_f = float(lon) if lon not in (None, "") else None
+            if lat_f is not None and not (-90 <= lat_f <= 90 and -180 <= lon_f <= 180):
+                return jsonify({"error": "Invalid coordinates"}), 400
+        except (TypeError, ValueError):
+            return jsonify({"error": "Invalid coordinates"}), 400
+        rows = db.execute(
+            """SELECT id, title, message, scope, city, center_lat, center_lng,
+                      radius_km, severity, starts_at, ends_at, created_at
+               FROM announcements
+               WHERE is_active=1
+                 AND datetime('now') >= datetime(starts_at)
+                 AND datetime('now') <= datetime(ends_at)
+               ORDER BY
+                 CASE severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END,
+                 starts_at DESC"""
+        ).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            scope = d.get("scope", "all")
+            if scope == "city":
+                if not city or (d.get("city") or "").strip().lower() != city.lower():
+                    continue
+            elif scope == "radius":
+                if lat_f is None or lon_f is None:
+                    continue
+                try:
+                    dist = _haversine_km(lat_f, lon_f, float(d["center_lat"]), float(d["center_lng"]))
+                except (TypeError, ValueError):
+                    continue
+                if dist > float(d["radius_km"] or 0):
+                    continue
+                d["distance_km"] = round(dist, 1)
+            # scope 'all' always included
+            out.append(d)
+        return jsonify(out)
+    except Exception:
+        return jsonify({"error": "Could not load announcements", "retry": True}), 503
 
 @bp.route("/api/earthquakes")
 def api_earthquakes():

@@ -118,6 +118,26 @@ CREATE TABLE IF NOT EXISTS hazards_cache (
     fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_hazards_key ON hazards_cache(cache_key);
+
+CREATE TABLE IF NOT EXISTS announcements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    scope TEXT NOT NULL DEFAULT 'all' CHECK (scope IN ('all','city','radius')),
+    city TEXT,
+    center_lat REAL CHECK (center_lat IS NULL OR (center_lat BETWEEN -90 AND 90)),
+    center_lng REAL CHECK (center_lng IS NULL OR (center_lng BETWEEN -180 AND 180)),
+    radius_km REAL CHECK (radius_km IS NULL OR radius_km > 0),
+    severity TEXT NOT NULL DEFAULT 'info' CHECK (severity IN ('info','warning','critical')),
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),
+    created_by INTEGER REFERENCES administrators(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    CHECK (datetime(starts_at) < datetime(ends_at))
+);
+CREATE INDEX IF NOT EXISTS idx_ann_active_time ON announcements(is_active, starts_at, ends_at);
+CREATE INDEX IF NOT EXISTS idx_ann_scope ON announcements(scope);
 """
 
 def get_db():

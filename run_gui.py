@@ -91,10 +91,15 @@ def ensure_venv():
     return False
 
 def ensure_db():
+    # Always run init_db(): SCHEMA is all CREATE TABLE/INDEX IF NOT EXISTS,
+    # so this safely migrates stale DB files (missing new tables) in place
+    # without touching existing data. Seed only fills empty tables.
     db_path = pathlib.Path("instance/ligtas.sqlite")
-    if db_path.exists():
-        return
-    print("[run_gui] DB not found — initializing and seeding...")
+    fresh = not db_path.exists()
+    if fresh:
+        print("[run_gui] DB not found — initializing and seeding...")
+    else:
+        print("[run_gui] DB found — ensuring schema is up to date...")
     try:
         from app import create_app
         from utils.db import init_db
