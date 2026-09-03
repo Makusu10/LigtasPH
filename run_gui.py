@@ -129,14 +129,18 @@ def main():
     print(f"[run_gui] venv active: {sys.prefix != sys.base_prefix} (prefix={sys.prefix})")
 
     ensure_db()
-    # start browser thread
-    t = threading.Thread(target=open_browser, daemon=True)
-    t.start()
+    # Only the parent process opens the browser — the Werkzeug reloader
+    # child (WERKZEUG_RUN_MAIN=true) must not, or tabs open twice.
+    if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        t = threading.Thread(target=open_browser, daemon=True)
+        t.start()
     try:
         from app import app
         print(f"[run_gui] Starting LigtasPH GUI at {URL} — Ctrl+C to stop")
-        # use_reloader False so browser doesn't open twice
-        app.run(host="0.0.0.0", port=5000)
+        # use_reloader=False: DevelopmentConfig has DEBUG=True, and
+        # Flask defaults use_reloader to self.debug, so omitting this
+        # spawns a reloader child that re-runs open_browser (double tab).
+        app.run(host="0.0.0.0", port=PORT, use_reloader=False)
     except ImportError as e:
         print(f"[run_gui] Import failed: {e}. Did you activate venv and pip install -r requirements.txt?", file=sys.stderr)
         sys.exit(1)
