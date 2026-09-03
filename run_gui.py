@@ -136,7 +136,7 @@ def main():
         from app import app
         print(f"[run_gui] Starting LigtasPH GUI at {URL} — Ctrl+C to stop")
         # use_reloader False so browser doesn't open twice
-        app.run(host=HOST, port=PORT, debug=False, use_reloader=False)
+        app.run(host="0.0.0.0", port=5000)
     except ImportError as e:
         print(f"[run_gui] Import failed: {e}. Did you activate venv and pip install -r requirements.txt?", file=sys.stderr)
         sys.exit(1)
