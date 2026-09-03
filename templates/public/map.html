@@ -21,6 +21,13 @@
       <button id="locBtn" class="btn btn-secondary" style="flex:1;">Use My Location</button>
       <button id="clearBtn" class="btn btn-secondary">Clear</button>
     </div>
+    <fieldset style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin:0 0 8px; font-size:13px;">
+      <legend style="font-size:12px; font-weight:700; padding:0 4px;">Hazards overlay</legend>
+      <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzQuake"> Earthquakes (USGS)</label>
+      <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzFire"> Active fires (FIRMS)</label>
+      <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="hzHeat"> Fire density heat</label>
+      <div id="hzStatus" role="status" style="color:var(--text-secondary); font-size:12px; margin-top:6px;"></div>
+    </fieldset>
     <div id="list" style="max-height:50vh; overflow:auto; display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--border); padding-top:8px;"></div>
   </div>
   <div class="card" style="padding:0; overflow:hidden;">
@@ -30,11 +37,15 @@
 {% endblock %}
 {% block scripts %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" crossorigin=""></script>
 <script>
 let map, markers=[], allCenters=[];
+let quakeLayer=null, fireLayer=null, heatLayer=null, lastFires=[];
+let hzAbort={quake:null, fire:null}, hzTimer=null;
 document.addEventListener('DOMContentLoaded', async ()=>{
   map = L.map('map').setView([14.6308,121.0968],11);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);
+  quakeLayer=L.layerGroup().addTo(map); fireLayer=L.layerGroup().addTo(map);
   await load();
   document.getElementById('q').addEventListener('input', render);
   document.getElementById('cityFilter').addEventListener('change', render);
@@ -42,6 +53,10 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   document.getElementById('supplyFilter').addEventListener('change', render);
   document.getElementById('clearBtn').addEventListener('click', ()=>{ document.getElementById('q').value=''; document.getElementById('statusFilter').value=''; document.getElementById('supplyFilter').value=''; document.getElementById('cityFilter').value=''; render();});
   document.getElementById('locBtn').addEventListener('click', useLocation);
+  document.getElementById('hzQuake').addEventListener('change', refreshHazards);
+  document.getElementById('hzFire').addEventListener('change', refreshHazards);
+  document.getElementById('hzHeat').addEventListener('change', refreshHazards);
+  map.on('moveend', ()=>{ clearTimeout(hzTimer); hzTimer=setTimeout(refreshHazards, 500); });
 });
 async function load(){
   const res = await fetch('/api/centers');
@@ -93,6 +108,58 @@ function render(){
     const group=L.featureGroup(markers);
     map.fitBounds(group.getBounds().pad(0.2));
   }catch(e){}
+}
+function hzStatus(msg){ const el=document.getElementById('hzStatus'); if(el) el.textContent=msg||''; }
+function hzCenter(){ const c=map.getCenter(); return {lat:+c.lat.toFixed(4), lon:+c.lng.toFixed(4)}; }
+async function refreshHazards(){
+  const showQ=document.getElementById('hzQuake').checked;
+  const showF=document.getElementById('hzFire').checked;
+  const showH=document.getElementById('hzHeat').checked;
+  quakeLayer.clearLayers(); fireLayer.clearLayers();
+  if(heatLayer){ map.removeLayer(heatLayer); heatLayer=null; }
+  if(!showQ && !showF && !showH){ hzStatus(''); return; }
+  const {lat, lon}=hzCenter();
+  const jobs=[];
+  if(showQ) jobs.push(loadQuakes(lat, lon));
+  if(showF || showH) jobs.push(loadFires(lat, lon, showH));
+  await Promise.all(jobs);
+}
+async function loadQuakes(lat, lon){
+  try{
+    if(hzAbort.quake) hzAbort.quake.abort();
+    hzAbort.quake=new AbortController();
+    hzStatus('Loading earthquakes…');
+    const res=await fetch(`/api/earthquakes?lat=${lat}&lon=${lon}&radius_km=500`, {signal:hzAbort.quake.signal});
+    if(!res.ok) throw new Error('quakes '+res.status);
+    const data=await res.json();
+    (data.quakes||[]).slice(0,200).forEach(q=>{
+      const size=10+Math.min(14,(q.mag||0)*2);
+      const m=L.marker([q.lat,q.lon], {icon:L.divIcon({html:`<div class="quake-pulse" style="width:${size}px;height:${size}px;"></div>`, className:'', iconSize:[size,size]}), title:`M${q.mag} ${q.place||''}`}).addTo(quakeLayer);
+      m.bindPopup(`<div style="min-width:200px"><div style="font-weight:800;">M${q.mag??'?'} — ${q.place||'Earthquake'}</div><div style="font-size:12px;color:#667085;">Depth ${q.depth_km??'?'} km • <a href="${q.url||'#'}" target="_blank" rel="noopener">USGS</a></div></div>`);
+    });
+    hzStatus(`Quakes: ${data.count??0} • Fires: ${lastFires.length}`);
+  }catch(e){ if(e.name!=='AbortError') hzStatus('Earthquakes unavailable — retry shortly.'); }
+}
+async function loadFires(lat, lon, showHeat){
+  try{
+    if(hzAbort.fire) hzAbort.fire.abort();
+    hzAbort.fire=new AbortController();
+    hzStatus('Loading fires…');
+    const res=await fetch(`/api/fires?lat=${lat}&lon=${lon}&days=1`, {signal:hzAbort.fire.signal});
+    if(res.status===503){ hzStatus('Fires unavailable — missing FIRMS key or provider down.'); lastFires=[]; return; }
+    if(!res.ok) throw new Error('fires '+res.status);
+    const data=await res.json();
+    lastFires=data.fires||[];
+    lastFires.slice(0,500).forEach(f=>{
+      const m=L.marker([f.lat,f.lon], {icon:L.divIcon({html:'<div class="fire-dot">🔥</div>', className:'', iconSize:[18,18]}), title:`Fire ${f.confidence||''}`}).addTo(fireLayer);
+      m.bindPopup(`<div style="font-size:12px;"><b>Active fire</b> (${f.confidence||'n/a'})<br>Brightness ${f.brightness} • ${f.date||''} ${f.time||''}</div>`);
+    });
+    if(showHeat && lastFires.length){
+      const pts=lastFires.map(f=>{ const b=+f.brightness||320; const i=Math.min(1,Math.max(0.25,(b-300)/150)); return [f.lat,f.lon,i]; });
+      heatLayer=L.heatLayer(pts, {radius:28, blur:18, maxZoom:11, minOpacity:0.45, gradient:{0.2:'#fef9c3',0.5:'#f97316',0.8:'#dc2626'}}).addTo(map);
+    }
+    hzStatus(`Fires: ${lastFires.length} • Heat ${showHeat?'on':'off'}`);
+  }catch(e){ if(e.name!=='AbortError') hzStatus('Fires unavailable — retry shortly.'); }
 }
 function useLocation(){
   if(!navigator.geolocation){ alert('Geolocation not supported. Please select manually.'); return; }

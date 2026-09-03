@@ -8,6 +8,7 @@ class BaseConfig:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-change-me-in-production-use-long-random-string-1234567890")
     DATABASE = os.getenv("DATABASE_URL", str(basedir / "instance" / "ligtas.sqlite"))
     OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
+    FIRMS_MAP_KEY = os.getenv("FIRMS_MAP_KEY", "")
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")  # reserved for Sprint 2 AI — unused in Sprint 1
     # Security
     SESSION_COOKIE_HTTPONLY = True

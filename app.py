@@ -24,6 +24,7 @@ def create_app(env=None):
     app.config["ADMIN_USERNAME"] = os.getenv("ADMIN_USERNAME", "admin")
     app.config["ADMIN_PASSWORD"] = os.getenv("ADMIN_PASSWORD", "admin123")
     app.config["OPENWEATHER_API_KEY"] = os.getenv("OPENWEATHER_API_KEY", app.config.get("OPENWEATHER_API_KEY",""))
+    app.config["FIRMS_MAP_KEY"] = os.getenv("FIRMS_MAP_KEY", app.config.get("FIRMS_MAP_KEY", ""))
 
     Path(app.config["DATABASE"]).parent.mkdir(parents=True, exist_ok=True)
 

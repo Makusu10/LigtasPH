@@ -89,6 +89,35 @@ CREATE TABLE IF NOT EXISTS weather_cache (
 CREATE INDEX IF NOT EXISTS idx_weather_city ON weather_cache(city);
 CREATE INDEX IF NOT EXISTS idx_weather_latlng ON weather_cache(lat, lng);
 CREATE INDEX IF NOT EXISTS idx_weather_source ON weather_cache(source);
+
+CREATE TABLE IF NOT EXISTS emergency_groups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invite_code TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL DEFAULT 'Group',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_group_invite ON emergency_groups(invite_code);
+
+CREATE TABLE IF NOT EXISTS live_locations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER NOT NULL REFERENCES emergency_groups(id) ON DELETE CASCADE,
+    display_name TEXT NOT NULL,
+    lat REAL NOT NULL CHECK (lat BETWEEN -90 AND 90),
+    lng REAL NOT NULL CHECK (lng BETWEEN -180 AND 180),
+    accuracy REAL CHECK (accuracy IS NULL OR accuracy >= 0),
+    shared_at TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_live_group ON live_locations(group_id);
+CREATE INDEX IF NOT EXISTS idx_live_expires ON live_locations(expires_at);
+
+CREATE TABLE IF NOT EXISTS hazards_cache (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cache_key TEXT UNIQUE NOT NULL,
+    payload TEXT NOT NULL,
+    fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_hazards_key ON hazards_cache(cache_key);
 """
 
 def get_db():

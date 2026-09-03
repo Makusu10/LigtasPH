@@ -7,25 +7,25 @@
 ## Commands (exact)
 ```bash
 .venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -m flask --app app init-db  # 5 tables per utils/db.py:5 SCHEMA
+.venv/bin/python -m flask --app app init-db  # 8 tables per utils/db.py:5 SCHEMA
 .venv/bin/python -m flask --app app seed     # idempotent, runs init_db() internally app.py:54-56
 .venv/bin/python -m flask --app app run --debug  # :5000; or .venv/bin/python wsgi.py
 .venv/bin/python -m gunicorn wsgi:app         # prod — Procfile:1
 .venv/bin/python run_gui.py                   # demo launcher: re-execs into venv, init-db+seed if missing, opens :5000
-.venv/bin/python -m pytest -q                                    # 66 passed
+.venv/bin/python -m pytest -q                                    # 77 passed
 .venv/bin/python -m pytest -q tests/test_sprint1.py::test_api_centers_returns_6  # single test
 ```
 - Use `.venv/bin/python -m ...` (bare `.venv/bin/pytest` breaks imports; system python hits `externally-managed-environment`).
 
 ## Architecture
-- 4 blueprints in `app.py:60-68`: `routes/public.py` (`/`, `/map`, `/centers`, `/centers/<id>`, `/weather`, `/hotlines`), `routes/auth.py` (`/admin/login|logout`), `routes/admin.py` (`/admin/*` + `utils/security.py:4` `login_required`), `routes/api.py` (`/api/centers`, `/api/centers/<id>`, `/api/hotlines`, `/api/weather`, `/api/air-quality`, `/api/environment`). API blueprint is CSRF-exempt `app.py:72`.
+- 4 blueprints in `app.py:60-68`: `routes/public.py` (`/`, `/map`, `/centers`, `/centers/<id>`, `/weather`, `/hotlines`), `routes/auth.py` (`/admin/login|logout`), `routes/admin.py` (`/admin/*` + `utils/security.py:4` `login_required`), `routes/api.py` (`/api/centers`, `/api/centers/<id>`, `/api/hotlines`, `/api/weather`, `/api/air-quality`, `/api/environment`, `/api/groups`, `/api/locations`, `/api/earthquakes`, `/api/fires`). API blueprint is CSRF-exempt `app.py:72`.
 - Occupancy computed in routes, not DB: `Full>=100 / Nearly Full>=80 / Available if Open else Status Unavailable` (`routes/api.py:29`, `routes/public.py:41`).
 - Weather `services/weather_service.py:164` `fetch_weather`: cache `<10min` → OpenWeather (if key set, not placeholder) → Open-Meteo (no key, `Asia/Manila` + `is_day`) → stale `<1h` → `503` with `retry:true`. Never fabricates; lat/lng validated `routes/api.py:88-92`.
 - Air quality `services/air_quality_service.py:553`: cache `10m` → Open-Meteo Air (`us_aqi,pm2_5`, no key) → OpenWeather Air (reuses key) → stale `1h` → `503`. PM2.5 classified by DENR DAO 2020-14, US AQI kept labeled separate (`utils/environment.py:28,104`). Heat via Rothfusz from `temp+humidity` (`utils/environment.py:52`); `overall_status()` = max severity.
 - `ProductionConfig.validate()` (`config.py:33`) fail-loud on default `SECRET_KEY`/`ADMIN_*`; called only when `FLASK_ENV=production` (`app.py:22`).
 
 ## DB & Seed
-- `utils/db.py:5` SCHEMA: 5 tables with CHECKs on lat/lng, capacity, status enums. `archived` = soft delete (all API/public queries filter `archived=0`).
+- `utils/db.py:5` SCHEMA: 8 tables with CHECKs on lat/lng, capacity, status enums. `archived` = soft delete (all API/public queries filter `archived=0`).
 - `utils/seed.py:7` `seed_db()`: 7 centers (6 open + 1 archived), 12 hotlines, 1 admin (hashed from `ADMIN_USERNAME/PASSWORD`, defaults `admin/admin123`), `weather_cache` demo + `air-quality` demo. Skips non-empty tables → safe to re-run.
 - `instance/` + `*.sqlite` gitignored; file DB uses `foreign_keys=ON` + `journal_mode=WAL`. Testing `:memory:` maps to shared `file:memdb_sprint1` (`utils/db.py:98-107`); `close_db` never closes it. Delete `instance/ligtas.sqlite` to reset.
 

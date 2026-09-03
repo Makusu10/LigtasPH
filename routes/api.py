@@ -3,6 +3,16 @@ from utils.db import get_db
 
 bp = Blueprint("api", __name__)
 
+import secrets
+import sqlite3
+import string
+
+_INVITE_ALPHABET = string.ascii_uppercase + string.digits
+
+
+def _new_invite_code(n=6):
+    return "".join(secrets.choice(_INVITE_ALPHABET) for _ in range(n))
+
 @bp.route("/api/centers")
 def api_centers():
     db = get_db()
@@ -149,3 +159,160 @@ def api_environment():
         })
     except Exception as e:
         return jsonify({"error":"Environment data unavailable", "retry": True}), 503
+
+@bp.route("/api/groups", methods=["POST"])
+def api_create_group():
+    try:
+        db = get_db()
+        body = request.get_json(silent=True) or {}
+        name = str(body.get("name", "Group") or "Group").strip()[:80] or "Group"
+        for _ in range(5):
+            code = _new_invite_code()
+            try:
+                cur = db.execute(
+                    "INSERT INTO emergency_groups (invite_code, name) VALUES (?, ?)",
+                    (code, name),
+                )
+                db.commit()
+                row = db.execute(
+                    "SELECT id, invite_code, name, created_at FROM emergency_groups WHERE id=?",
+                    (cur.lastrowid,),
+                ).fetchone()
+                return jsonify(dict(row)), 201
+            except sqlite3.IntegrityError:
+                continue
+        return jsonify({"error": "Could not create group", "retry": True}), 503
+    except Exception:
+        return jsonify({"error": "Could not create group", "retry": True}), 503
+
+@bp.route("/api/locations", methods=["POST"])
+def api_post_location():
+    try:
+        db = get_db()
+        body = request.get_json(silent=True) or {}
+        invite = str(body.get("invite_code", "")).strip()
+        display = str(body.get("display_name", "")).strip()[:40]
+        if not invite or not display:
+            return jsonify({"error": "invite_code and display_name are required"}), 400
+        try:
+            lat = float(body.get("lat"))
+            lng = float(body.get("lon", body.get("lng")))
+            if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+                return jsonify({"error": "Invalid coordinates"}), 400
+        except (TypeError, ValueError):
+            return jsonify({"error": "Invalid coordinates"}), 400
+        accuracy = body.get("accuracy")
+        if accuracy is not None:
+            try:
+                accuracy = float(accuracy)
+                if accuracy < 0:
+                    return jsonify({"error": "Invalid accuracy"}), 400
+            except (TypeError, ValueError):
+                return jsonify({"error": "Invalid accuracy"}), 400
+        group = db.execute(
+            "SELECT id FROM emergency_groups WHERE invite_code=? COLLATE NOCASE",
+            (invite,),
+        ).fetchone()
+        if not group:
+            return jsonify({"error": "Group not found"}), 404
+        try:
+            cur = db.execute(
+                """INSERT INTO live_locations
+                   (group_id, display_name, lat, lng, accuracy, expires_at)
+                   VALUES (?, ?, ?, ?, ?, datetime('now', '+2 hours'))""",
+                (group["id"], display, lat, lng, accuracy),
+            )
+            db.commit()
+        except sqlite3.IntegrityError:
+            return jsonify({"error": "Invalid coordinates"}), 400
+        row = db.execute(
+            "SELECT id, expires_at FROM live_locations WHERE id=?",
+            (cur.lastrowid,),
+        ).fetchone()
+        return jsonify(dict(row)), 201
+    except Exception:
+        return jsonify({"error": "Could not share location", "retry": True}), 503
+
+@bp.route("/api/groups/<code>/locations")
+def api_group_locations(code):
+    try:
+        db = get_db()
+        group = db.execute(
+            "SELECT id FROM emergency_groups WHERE invite_code=? COLLATE NOCASE",
+            ((code or "").strip(),),
+        ).fetchone()
+        if not group:
+            return jsonify({"error": "Group not found"}), 404
+        db.execute(
+            "DELETE FROM live_locations WHERE expires_at <= datetime('now')"
+        )
+        db.commit()
+        since = (request.args.get("since", "") or "").strip()
+        sql = """SELECT display_name, lat, lng, accuracy, shared_at
+                 FROM live_locations
+                 WHERE group_id=? AND expires_at > datetime('now')"""
+        params = [group["id"]]
+        if since:
+            norm = since.replace("T", " ").split("+")[0].split("Z")[0].strip()[:19]
+            sql += " AND shared_at > ?"
+            params.append(norm)
+        sql += " ORDER BY shared_at DESC LIMIT 100"
+        rows = db.execute(sql, params).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            d["lon"] = d["lng"]
+            out.append(d)
+        return jsonify(out)
+    except Exception:
+        return jsonify({"error": "Could not load locations", "retry": True}), 503
+
+@bp.route("/api/earthquakes")
+def api_earthquakes():
+    try:
+        from services.hazards_service import fetch_earthquakes
+        db = get_db()
+        lat = request.args.get("lat")
+        lon = request.args.get("lon")
+        radius = request.args.get("radius_km", "500")
+        try:
+            lat_f = float(lat) if lat not in (None, "") else None
+            lon_f = float(lon) if lon not in (None, "") else None
+            radius_f = float(radius)
+            if lat_f is not None and not (-90 <= lat_f <= 90 and -180 <= lon_f <= 180):
+                return jsonify({"error": "Invalid coordinates"}), 400
+            if not (10 <= radius_f <= 2000):
+                return jsonify({"error": "radius_km must be 10-2000"}), 400
+        except (TypeError, ValueError):
+            return jsonify({"error": "Invalid coordinates"}), 400
+        data, err = fetch_earthquakes(db, lat_f, lon_f, radius_f)
+        if data:
+            return jsonify(data)
+        return jsonify({"error": err or "Earthquake data unavailable", "retry": True}), 503
+    except Exception:
+        return jsonify({"error": "Earthquake data unavailable", "retry": True}), 503
+
+@bp.route("/api/fires")
+def api_fires():
+    try:
+        from services.hazards_service import fetch_fires
+        db = get_db()
+        lat = request.args.get("lat", "14.6308")
+        lon = request.args.get("lon", "121.0968")
+        days = request.args.get("days", "1")
+        try:
+            lat_f = float(lat); lon_f = float(lon)
+            if not (-90 <= lat_f <= 90 and -180 <= lon_f <= 180):
+                return jsonify({"error": "Invalid coordinates"}), 400
+            days_i = int(days)
+            if days_i not in (1, 2):
+                return jsonify({"error": "days must be 1 or 2"}), 400
+        except (TypeError, ValueError):
+            return jsonify({"error": "Invalid coordinates"}), 400
+        data, err = fetch_fires(db, lat_f, lon_f, days_i)
+        if data:
+            return jsonify(data)
+        status = 503
+        return jsonify({"error": err or "Fire data unavailable", "retry": True}), status
+    except Exception:
+        return jsonify({"error": "Fire data unavailable", "retry": True}), 503
