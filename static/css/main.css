@@ -77,3 +77,23 @@ input:focus, select:focus, textarea:focus { border-color:var(--primary); box-sha
 .grid-4 { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; }
 .stat-card { padding:16px; }
 .demo-banner { background:#FFFAEB; border:1px solid #FEDF89; color:#7A4D07; padding:10px 14px; border-radius:8px; text-align:center; font-size:13px; margin-bottom:16px; }
+
+/* Weather visuals */
+.weather-hero { display:grid; grid-template-columns:1.2fr 0.8fr; gap:16px; }
+@media (max-width: 768px){ .weather-hero{ grid-template-columns:1fr; } }
+.weather-icon-wrap { width:72px; height:72px; display:grid; place-items:center; border-radius:12px; background:#EFF8FF; border:1px solid #B2DDFF; color:var(--primary); }
+.weather-metric { position:relative; }
+.weather-bar { height:8px; background:#EAECF0; border-radius:999px; overflow:hidden; margin-top:8px; }
+.weather-bar-fill { height:8px; border-radius:999px; transition:width 0.6s ease; }
+.weather-bar-fill.temp { background: linear-gradient(90deg, #2E90FA 0%, #F79009 55%, #D92D20 100%); }
+.weather-bar-fill.humidity { background: var(--primary); }
+.weather-bar-fill.wind { background: #039855; }
+.weather-gauge-labels { display:flex; justify-content:space-between; font-size:11px; color:var(--text-secondary); margin-top:4px; }
+.hourly-strip { display:flex; gap:10px; overflow-x:auto; padding:8px 2px 12px; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; }
+.hourly-strip::-webkit-scrollbar{ height:6px; }
+.hourly-strip::-webkit-scrollbar-thumb{ background:#D0D5DD; border-radius:999px; }
+.hourly-card { min-width:88px; flex:0 0 auto; scroll-snap-align:start; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px 8px; text-align:center; }
+.hourly-card .h-time{ font-size:12px; font-weight:700; color:var(--text-secondary); }
+.hourly-card .h-temp{ font-size:16px; font-weight:800; margin-top:4px; }
+.skeleton{ background: linear-gradient(90deg, #EAECF0 25%, #F2F4F7 50%, #EAECF0 75%); background-size:200% 100%; animation: shimmer 1.2s infinite; border-radius:8px; }
+@keyframes shimmer{ 0%{background-position:200% 0} 100%{background-position:-200% 0} }

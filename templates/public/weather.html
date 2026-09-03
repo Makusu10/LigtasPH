@@ -1,37 +1,89 @@
 {% extends 'base.html' %}
 {% block title %}Weather — LigtasPH{% endblock %}
 {% block content %}
-<h1 style="margin:0 0 8px;">Weather</h1>
-<p style="color:var(--text-secondary); margin:0 0 12px;">Uses OpenWeather (primary, free key) → Open-Meteo (no key) → NOAA supplement. API key never exposed.</p>
+<h1 style="margin:0 0 4px;">Weather</h1>
+<p style="color:var(--text-secondary); margin:0 0 16px; font-size:14px;">OpenWeather (primary, free key) → Open-Meteo (no key, hourly visuals) — key never exposed. Visuals update with location.</p>
+
 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
-  <button id="locBtn" class="btn btn-secondary">Use My Location</button>
-  <input id="cityInput" placeholder="City (e.g. Marikina)" style="flex:1; min-width:160px;">
-  <button id="fetchBtn" class="btn btn-primary">Fetch Weather</button>
+  <button id="locBtn" class="btn btn-secondary" type="button"><i data-lucide="locate-fixed" style="width:16px;height:16px;"></i> Use My Location</button>
+  <input id="cityInput" placeholder="City (e.g. Marikina)" style="flex:1; min-width:160px;" aria-label="City">
+  <button id="fetchBtn" class="btn btn-primary" type="button"><i data-lucide="search" style="width:16px;height:16px;"></i> Fetch Weather</button>
 </div>
-<div id="status" style="color:var(--text-secondary); font-size:13px;"></div>
+
+<div id="status" role="status" aria-live="polite" style="color:var(--text-secondary); font-size:13px; min-height:18px;"></div>
+
+<!-- skeleton -->
+<div id="skeleton" class="card" style="display:none; margin-top:12px;">
+  <div class="weather-hero">
+    <div>
+      <div class="skeleton" style="height:72px; width:72px;"></div>
+      <div class="skeleton" style="height:18px; width:60%; margin-top:12px;"></div>
+      <div class="skeleton" style="height:14px; width:40%; margin-top:8px;"></div>
+    </div>
+    <div>
+      <div class="skeleton" style="height:56px;"></div>
+      <div class="skeleton" style="height:56px; margin-top:12px;"></div>
+    </div>
+  </div>
+</div>
+
 <div id="card" class="card" style="display:none; margin-top:12px;"></div>
-<div id="error" class="card" style="display:none; margin-top:12px; background:#FEF3F2; border-color:#FECDCA;"></div>
+<div id="error" class="card" style="display:none; margin-top:12px; background:#FEF3F2; border-color:#FECDCA;" role="alert"></div>
+
+<div id="hourlyWrap" class="card" style="display:none; margin-top:16px;">
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+    <h2 style="margin:0; font-size:14px; font-weight:800; letter-spacing:-0.01em;"><i data-lucide="clock-3" style="width:16px;height:16px; vertical-align:-3px;"></i> Next 24 hours</h2>
+    <span style="font-size:12px; color:var(--text-secondary);">Open-Meteo hourly • auto timezone</span>
+  </div>
+  <div id="hourlyStrip" class="hourly-strip" role="list"></div>
+</div>
 {% endblock %}
 {% block scripts %}
 <script>
+const statusEl = document.getElementById('status');
+const card = document.getElementById('card');
+const errEl = document.getElementById('error');
+const skeleton = document.getElementById('skeleton');
+const hourlyWrap = document.getElementById('hourlyWrap');
+const hourlyStrip = document.getElementById('hourlyStrip');
+
+function lucideIconFor(code, desc){
+  const d = (desc||'').toLowerCase();
+  if(code===0 || code===1) return 'sun';
+  if(code===2) return 'cloud-sun';
+  if(code===3) return 'cloud';
+  if([45,48].includes(code)) return 'cloud-fog';
+  if([51,61,63,65,80].includes(code)) return 'cloud-rain';
+  if(code===95) return 'cloud-lightning';
+  if(d.includes('thunder')) return 'cloud-lightning';
+  if(d.includes('rain') || d.includes('shower')) return 'cloud-rain';
+  if(d.includes('drizzle')) return 'cloud-drizzle';
+  if(d.includes('fog')) return 'cloud-fog';
+  if(d.includes('clear')) return 'sun';
+  if(d.includes('cloud')) return 'cloud';
+  return 'cloud-sun';
+}
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
 document.getElementById('locBtn').addEventListener('click', ()=>{
-  if(!navigator.geolocation){ document.getElementById('status').textContent='Geolocation not supported. Enter city manually.'; return; }
+  if(!navigator.geolocation){ statusEl.textContent='Geolocation not supported. Enter city manually.'; return; }
   navigator.geolocation.getCurrentPosition(async pos=>{
     await fetchWeather(pos.coords.latitude, pos.coords.longitude, null);
-  }, err=>{ document.getElementById('status').textContent='Location denied. Enter city manually.'; }, {timeout:8000});
+  }, ()=>{ statusEl.textContent='Location denied. Enter city manually.'; }, {timeout:8000});
 });
 document.getElementById('fetchBtn').addEventListener('click', ()=>{
   const city=document.getElementById('cityInput').value.trim();
   if(city) fetchWeather(null,null,city);
   else fetchWeather(14.6308,121.0968,null);
 });
+document.getElementById('cityInput').addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ document.getElementById('fetchBtn').click(); }
+});
 
 async function fetchWeather(lat, lon, city){
-  const status=document.getElementById('status');
-  const card=document.getElementById('card');
-  const err=document.getElementById('error');
-  card.style.display='none'; err.style.display='none';
-  status.textContent='Fetching weather...';
+  card.style.display='none'; errEl.style.display='none'; hourlyWrap.style.display='none';
+  skeleton.style.display='block';
+  statusEl.textContent='Fetching weather…';
   let url='/api/weather?';
   if(city) url+=`city=${encodeURIComponent(city)}&lat=14.6308&lon=121.0968`;
   else url+=`lat=${lat}&lon=${lon}`;
@@ -39,29 +91,128 @@ async function fetchWeather(lat, lon, city){
     const res=await fetch(url);
     const data=await res.json();
     if(!res.ok){ throw new Error(data.error || 'Weather unavailable'); }
-    status.textContent='';
-    card.style.display='block';
-    card.innerHTML=`
-      <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-        <div>
-          <div style="font-weight:800; font-size:18px;">${data.name || city || (lat+","+lon)}</div>
-          <div style="color:var(--text-secondary); font-size:13px;">Source: ${data.source || data._cache_source || 'weather'} • ${data.fetched_at || ''}</div>
-        </div>
-        <span class="badge badge-available">${data.weather?.[0]?.description || ''}</span>
-      </div>
-      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; margin-top:12px;">
-        <div><div style="color:var(--text-secondary); font-size:12px; text-transform:uppercase; font-weight:700;">Temperature</div><div style="font-size:22px; font-weight:800;">${data.main?.temp ?? ''}°C</div><div style="font-size:12px;">Feels like ${data.main?.feels_like ?? ''}°C</div></div>
-        <div><div style="color:var(--text-secondary); font-size:12px; text-transform:uppercase; font-weight:700;">Humidity</div><div style="font-size:22px; font-weight:800;">${data.main?.humidity ?? ''}%</div></div>
-        <div><div style="color:var(--text-secondary); font-size:12px; text-transform:uppercase; font-weight:700;">Wind</div><div style="font-size:22px; font-weight:800;">${data.wind?.speed ?? ''} m/s</div></div>
-      </div>
-      ${data._stale ? '<div style="color:var(--orange); font-size:12px; margin-top:8px;">Showing stale cached data.</div>' : ''}
-    `;
+    skeleton.style.display='none';
+    statusEl.textContent='';
+    renderCard(data, lat, lon, city);
+    renderHourly(data.hourly);
+    try{ lucide.createIcons(); }catch(e){}
   }catch(e){
-    status.textContent='';
-    err.style.display='block';
-    err.innerHTML=`<div style="font-weight:700; color:var(--red);">Weather unavailable</div><div style="color:var(--text-secondary);">${e.message}</div><button class="btn btn-secondary" style="margin-top:8px;" onclick="fetchWeather(${lat||14.6308},${lon||121.0968},${city?`'${city}'`: 'null'})">Retry</button>`;
+    skeleton.style.display='none';
+    statusEl.textContent='';
+    errEl.style.display='block';
+    errEl.innerHTML=`<div style="display:flex; gap:10px; align-items:start;">
+      <i data-lucide="triangle-alert" style="width:20px;height:20px;color:var(--red); flex:0 0 auto;"></i>
+      <div><div style="font-weight:800; color:var(--red);">Weather unavailable</div><div style="color:var(--text-secondary); font-size:13px; margin-top:4px;">${e.message}</div>
+      <button class="btn btn-secondary" style="margin-top:10px;" type="button" onclick="fetchWeather(${lat||14.6308},${lon||121.0968},${city?`'${city}'`: 'null'})">Retry</button></div></div>`;
+    try{ lucide.createIcons(); }catch(_){}
   }
 }
+
+function isCoordsName(s){ return typeof s==='string' && /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(s.trim()); }
+function renderCard(data, lat, lon, city){
+  // City name prominent — never show raw "lat,lon" as title
+  const rawName = data.name || "";
+  const cityFromData = data.city || "";
+  let displayName = city || cityFromData || rawName;
+  if(isCoordsName(displayName) || !displayName) displayName = city || cityFromData || "Your Location";
+  if(isCoordsName(rawName) && displayName==="Your Location" && data.lat!=null) {
+    // keep Your Location for geolocated — more honest than fake city
+    displayName = "Your Location";
+  }
+  if(!isCoordsName(rawName) && rawName && rawName !== displayName && rawName !== city) {
+    // OpenWeather returned a better name than city input — prefer it if not coords
+    if(!city) displayName = rawName;
+  }
+  const desc = data.weather?.[0]?.description || '—';
+  const code = data.weather?.[0]?.code ?? null;
+  const icon = lucideIconFor(code, desc);
+  const temp = data.main?.temp;
+  const feels = data.main?.feels_like;
+  const hum = data.main?.humidity;
+  const wind = data.wind?.speed;
+  const tempPct = temp!=null ? clamp(((temp - 15) / 25)*100, 4, 100) : 0;
+  const humPct = hum!=null ? clamp(hum, 0, 100) : 0;
+  const windPct = wind!=null ? clamp((wind/15)*100, 4, 100) : 0;
+  const source = data.source || data._cache_source || 'weather';
+  const fetched = data.fetched_at ? new Date(data.fetched_at).toLocaleString() : '';
+  // Exact coords always from payload (preferred) else from request
+  const plat = data.lat ?? lat;
+  const plon = data.lon ?? lon;
+  const coordsText = (plat!=null && plon!=null) ? `${Number(plat).toFixed(4)}, ${Number(plon).toFixed(4)}` : "";
+  card.style.display='block';
+  card.innerHTML=`
+    <div class="weather-hero">
+      <div style="display:flex; gap:14px; align-items:start;">
+        <div class="weather-icon-wrap" aria-hidden="true"><i data-lucide="${icon}" style="width:36px;height:36px;"></i></div>
+        <div style="min-width:0;">
+          <div style="font-weight:800; font-size:18px; line-height:1.2;">${displayName}</div>
+          <div class="badge" style="margin-top:6px; background:#EFF8FF; border-color:#B2DDFF; color:var(--primary); text-transform:capitalize; letter-spacing:0;">${desc}</div>
+          <div style="color:var(--text-secondary); font-size:12px; margin-top:8px;">Source: ${source} ${data._stale ? '• stale' : ''}</div>
+          <div style="color:var(--text-secondary); font-size:12px;">${fetched}</div>
+          ${data._demo ? '<div style="font-size:11px; color:var(--orange); margin-top:6px;">Demo cached data — connect for live.</div>' : ''}
+        </div>
+      </div>
+      <div style="display:grid; gap:12px;">
+        <div class="card" style="padding:12px; background:#F9FAFB;">
+          <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px;">
+            <span style="color:var(--text-secondary); font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Temperature</span>
+            <span style="font-size:12px; color:var(--text-secondary);">Feels ${feels!=null? feels+'°C' : '—'}</span>
+          </div>
+          <div style="font-size:30px; font-weight:800; letter-spacing:-0.02em; line-height:1;">${temp!=null? temp+'°' : '—'}<span style="font-size:16px; font-weight:600; color:var(--text-secondary);">C</span></div>
+          <div class="weather-bar" role="progressbar" aria-valuenow="${temp!=null? temp : 0}" aria-valuemin="15" aria-valuemax="40" aria-label="Temperature"><div class="weather-bar-fill temp" style="width:${tempPct}%"></div></div>
+          <div class="weather-gauge-labels"><span>15°C</span><span>27°C</span><span>40°C</span></div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="card weather-metric" style="padding:12px;">
+            <div style="color:var(--text-secondary); font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; display:flex; align-items:center; gap:6px;"><i data-lucide="droplets" style="width:14px;height:14px;"></i> Humidity</div>
+            <div style="font-size:22px; font-weight:800; margin-top:4px;">${hum!=null? hum+'%' : '—'}</div>
+            <div class="weather-bar" role="progressbar" aria-valuenow="${hum!=null? hum:0}" aria-valuemin="0" aria-valuemax="100" aria-label="Humidity"><div class="weather-bar-fill humidity" style="width:${humPct}%"></div></div>
+            <div class="weather-gauge-labels"><span>0%</span><span>100%</span></div>
+          </div>
+          <div class="card weather-metric" style="padding:12px;">
+            <div style="color:var(--text-secondary); font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; display:flex; align-items:center; gap:6px;"><i data-lucide="wind" style="width:14px;height:14px;"></i> Wind</div>
+            <div style="font-size:22px; font-weight:800; margin-top:4px;">${wind!=null? wind : '—'}<span style="font-size:13px; font-weight:600; color:var(--text-secondary);"> m/s</span></div>
+            <div class="weather-bar" role="progressbar" aria-valuenow="${wind!=null? wind:0}" aria-valuemin="0" aria-valuemax="15" aria-label="Wind speed"><div class="weather-bar-fill wind" style="width:${windPct}%"></div></div>
+            <div class="weather-gauge-labels"><span>0</span><span>15 m/s</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border); display:flex; align-items:center; gap:6px; color:var(--text-secondary); font-size:11px;" aria-label="Coordinates">
+      <i data-lucide="map-pin" style="width:12px;height:12px; flex:0 0 auto;"></i>
+      <span>${coordsText || '—'}</span>
+      ${coordsText ? `<span style="margin-left:4px; color:var(--text-secondary);">• exact location</span>` : ''}
+    </div>
+    ${data._stale ? '<div style="color:var(--orange); font-size:12px; margin-top:8px;" role="note">Showing stale cached data.</div>' : ''}
+  `;
+}
+
+function renderHourly(hourly){
+  if(!hourly || !hourly.length){ hourlyWrap.style.display='none'; return; }
+  hourlyWrap.style.display='block';
+  hourlyStrip.innerHTML='';
+  const now = new Date();
+  hourly.slice(0,24).forEach(h=>{
+    const dt = new Date(h.time);
+    const isNow = Math.abs(dt - now) < 3600000;
+    const label = dt.toLocaleTimeString([], {hour:'numeric'});
+    const icon = lucideIconFor(h.code, h.desc);
+    const temp = h.temp!=null ? Math.round(h.temp) : '—';
+    const cardEl = document.createElement('div');
+    cardEl.className='hourly-card';
+    cardEl.setAttribute('role','listitem');
+    if(isNow) cardEl.style.borderColor='var(--primary)';
+    cardEl.innerHTML=`
+      <div class="h-time">${label}</div>
+      <div style="margin:6px 0; color:var(--primary);"><i data-lucide="${icon}" style="width:20px;height:20px;"></i></div>
+      <div class="h-temp">${temp}°</div>
+      <div style="font-size:11px; color:var(--text-secondary);">${h.desc||''}</div>
+    `;
+    hourlyStrip.appendChild(cardEl);
+  });
+  try{ lucide.createIcons(); }catch(e){}
+}
+
 // auto fetch default
 fetchWeather(14.6308,121.0968,null);
 </script>

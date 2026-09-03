@@ -48,9 +48,17 @@ def seed_db():
         for h in hotlines:
             db.execute("INSERT INTO emergency_hotlines (agency, category, contact_number, city, address_area, verification_note, last_verified) VALUES (?,?,?,?,?,?,?)", h)
 
-    # weather_cache demo
+    # weather_cache demo — includes hourly for offline visuals
     if not db.execute("SELECT 1 FROM weather_cache LIMIT 1").fetchone():
-        demo = {"name":"Metro Manila Area","weather":[{"description":"Scattered clouds","icon":"02d"}],"main":{"temp":28,"humidity":82,"feels_like":31},"wind":{"speed":4.8},"fetched_at":"2024-12-01T00:00:00Z","_demo":True}
+        import datetime as _dt
+        base = _dt.datetime(2024,12,1,0,0, tzinfo=_dt.timezone.utc)
+        hourly_demo = []
+        descs = ["Clear sky","Mainly clear","Partly cloudy","Overcast","Light drizzle","Slight rain","Moderate rain"]
+        for i in range(24):
+            t = base + _dt.timedelta(hours=i)
+            code = [0,1,2,3,51,61,63][i % 7]
+            hourly_demo.append({"time": t.isoformat(), "temp": 26 + (i%5), "humidity": 78 + (i%10), "wind": round(3.5 + (i%4)*0.8,1), "code": code, "desc": descs[i%7]})
+        demo = {"name":"Metro Manila Area","city":"Metro Manila","lat":14.6308,"lon":121.0968,"weather":[{"description":"Scattered clouds","icon":"02d","code":2}],"main":{"temp":28,"humidity":82,"feels_like":31},"wind":{"speed":4.8},"fetched_at":"2024-12-01T00:00:00Z","_demo":True, "hourly": hourly_demo}
         db.execute("INSERT INTO weather_cache (city, lat, lng, source, payload) VALUES (?,?,?,?,?)",
                    ("Metro Manila",14.6308,121.0968,"cached", json.dumps(demo)))
     db.commit()
