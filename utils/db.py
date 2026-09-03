@@ -82,11 +82,13 @@ CREATE TABLE IF NOT EXISTS weather_cache (
     city TEXT,
     lat REAL,
     lng REAL,
-    source TEXT CHECK (source IN ('cached','openweather','open-meteo','noaa')) DEFAULT 'cached',
+    source TEXT CHECK (source IN ('cached','openweather','open-meteo','noaa','air-quality','open-meteo-air','openweather-air')) DEFAULT 'cached',
     payload TEXT NOT NULL,
     fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_weather_city ON weather_cache(city);
+CREATE INDEX IF NOT EXISTS idx_weather_latlng ON weather_cache(lat, lng);
+CREATE INDEX IF NOT EXISTS idx_weather_source ON weather_cache(source);
 """
 
 def get_db():

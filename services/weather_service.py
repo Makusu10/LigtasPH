@@ -10,8 +10,9 @@ import urllib.error
 from flask import current_app
 
 OPENWEATHER_URL = "https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={key}&units=metric"
-OPENMETEO_URL = "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code"
-OPENMETEO_HOURLY_URL = "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&forecast_days=1&timezone=auto"
+# Use Asia/Manila for PH-time background + is_day + high/low
+OPENMETEO_URL = "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,is_day&timezone=Asia%2FManila"
+OPENMETEO_HOURLY_URL = "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=Asia%2FManila"
 
 WMO_MAP = {
     0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
@@ -26,10 +27,16 @@ def _fetch_json(url, timeout=5):
 
 def get_cached(db, lat, lon, city=None, max_age_sec=600):
     try:
+        # Exclude air-quality rows — weather cache only
         if city:
-            row = db.execute("SELECT * FROM weather_cache WHERE city=? ORDER BY fetched_at DESC LIMIT 1", (city,)).fetchone()
+            row = db.execute("SELECT * FROM weather_cache WHERE city=? AND source IN ('cached','openweather','open-meteo','noaa') ORDER BY fetched_at DESC LIMIT 1", (city,)).fetchone()
+            if row is None:
+                row = db.execute("SELECT * FROM weather_cache WHERE city=? ORDER BY fetched_at DESC LIMIT 1", (city,)).fetchone()
+                # fallback if only air-quality exists — but filter to weather-like payload
+                if row and row["source"] == "air-quality":
+                    row = None
         else:
-            row = db.execute("SELECT * FROM weather_cache WHERE lat=? AND lng=? ORDER BY fetched_at DESC LIMIT 1", (lat, lon)).fetchone()
+            row = db.execute("SELECT * FROM weather_cache WHERE lat=? AND lng=? AND source IN ('cached','openweather','open-meteo','noaa') ORDER BY fetched_at DESC LIMIT 1", (lat, lon)).fetchone()
         if row:
             # check age
             age = db.execute("SELECT (julianday('now') - julianday(fetched_at))*86400 FROM weather_cache WHERE id=?", (row["id"],)).fetchone()[0]
@@ -49,15 +56,23 @@ def cache_payload(db, lat, lon, city, source, payload):
 
 def fetch_openweather(lat, lon, key, city=None):
     data = _fetch_json(OPENWEATHER_URL.format(lat=lat, lon=lon, key=key))
-    # normalize to common shape — include explicit coords + city for visuals
+    # PH time for day/night
+    try:
+        import datetime as _dt
+        ph_hour = _dt.datetime.now(_dt.timezone(_dt.timedelta(hours=8))).hour
+        is_day = 1 if 6 <= ph_hour < 18 else 0
+    except Exception:
+        is_day = 1
+    temp = data["main"]["temp"]
     return {
         "source": "openweather",
         "name": data.get("name", city or "Unknown"),
         "city": city or data.get("name", ""),
         "lat": lat,
         "lon": lon,
+        "is_day": is_day,
         "weather": [{"description": data["weather"][0]["description"], "icon": data["weather"][0].get("icon","01d")}],
-        "main": {"temp": data["main"]["temp"], "humidity": data["main"]["humidity"], "feels_like": data["main"].get("feels_like")},
+        "main": {"temp": temp, "humidity": data["main"]["humidity"], "feels_like": data["main"].get("feels_like"), "temp_max": data["main"].get("temp_max", temp+2), "temp_min": data["main"].get("temp_min", temp-1)},
         "wind": {"speed": data["wind"]["speed"]},
         "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     }
@@ -66,6 +81,7 @@ def fetch_open_meteo(lat, lon, city=None):
     data = _fetch_json(OPENMETEO_URL.format(lat=lat, lon=lon))
     cur = data.get("current", {})
     code = cur.get("weather_code", 0)
+    is_day = cur.get("is_day", 1)
     # Prefer city name when provided, else lat,lon string
     display_name = city if city else f"{lat},{lon}"
     payload = {
@@ -74,12 +90,13 @@ def fetch_open_meteo(lat, lon, city=None):
         "city": city or "",
         "lat": lat,
         "lon": lon,
+        "is_day": int(is_day) if is_day is not None else 1,
         "weather": [{"description": WMO_MAP.get(code, f"WMO {code}"), "icon": "02d", "code": code}],
         "main": {"temp": cur.get("temperature_2m"), "humidity": cur.get("relative_humidity_2m"), "feels_like": cur.get("temperature_2m")},
         "wind": {"speed": cur.get("wind_speed_10m")},
         "fetched_at": cur.get("time", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
     }
-    # Try to attach hourly for visuals — non-fatal
+    # Try to attach hourly + daily high/low for visuals — non-fatal
     try:
         hdata = _fetch_json(OPENMETEO_HOURLY_URL.format(lat=lat, lon=lon))
         hourly = hdata.get("hourly", {})
@@ -93,6 +110,53 @@ def fetch_open_meteo(lat, lon, city=None):
                 {"time": t, "temp": tp, "humidity": hm, "wind": w, "code": c, "desc": WMO_MAP.get(c, f"WMO {c}")}
                 for t, tp, hm, w, c in zip(times, temps, humids, winds, codes)
             ]
+            # High/Low from hourly if daily missing
+            try:
+                vals = [t for t in temps if t is not None]
+                if vals:
+                    payload["main"]["temp_max"] = max(vals)
+                    payload["main"]["temp_min"] = min(vals)
+            except Exception:
+                pass
+        daily = hdata.get("daily", {})
+        if daily.get("temperature_2m_max") and daily.get("temperature_2m_min"):
+            payload["main"]["temp_max"] = daily["temperature_2m_max"][0]
+            payload["main"]["temp_min"] = daily["temperature_2m_min"][0]
+        # Ensure is_day from hourly fetch if missing
+        if "is_day" not in payload and hourly:
+            pass
+    except Exception:
+        pass
+    # Fallback high/low if still missing
+    if payload["main"].get("temp_max") is None and payload["main"].get("temp") is not None:
+        payload["main"]["temp_max"] = payload["main"]["temp"] + 2
+        payload["main"]["temp_min"] = payload["main"]["temp"] - 1
+    return payload
+
+def _attach_heat_index(payload):
+    """Attach official Heat Index (not feels-like) using Rothfusz from temp+humidity."""
+    try:
+        from utils.environment import calculate_heat_index, classify_heat_index
+        temp = payload.get("main", {}).get("temp")
+        rh = payload.get("main", {}).get("humidity")
+        # Prefer provider's explicit heat index if they ever supply it — currently none do
+        hi = None
+        # Check if provider explicitly supplied heat_index
+        if payload.get("main", {}).get("heat_index") is not None:
+            hi = payload["main"]["heat_index"]
+        else:
+            hi = calculate_heat_index(temp, rh)
+        if hi is not None:
+            info = classify_heat_index(hi)
+            payload["heat_index"] = {
+                "value_c": hi,
+                "category": info["category"],
+                "color": info["color"],
+                "recommendation": info["recommendation"],
+                "severity": info["severity"],
+                "colors": info["colors"],
+                "method": "Rothfusz (NWS) from temp+humidity" if payload.get("main", {}).get("heat_index") is None else "provider explicit",
+            }
     except Exception:
         pass
     return payload
@@ -103,12 +167,15 @@ def fetch_weather(db, lat=14.6308, lon=121.0968, city=None):
     if cached:
         cached["_cache_source"] = src
         cached["source"] = src or cached.get("source", "cached")
+        # Ensure heat index present even for cached (old) payloads
+        _attach_heat_index(cached)
         return cached, None
     # 2. OpenWeather
     key = current_app.config.get("OPENWEATHER_API_KEY", "")
     if key and key != "YOUR_OPENWEATHER_API_KEY":
         try:
             payload = fetch_openweather(lat, lon, key, city)
+            _attach_heat_index(payload)
             cache_payload(db, lat, lon, city or payload.get("name"), "openweather", payload)
             return payload, None
         except Exception as e:
@@ -117,6 +184,7 @@ def fetch_weather(db, lat=14.6308, lon=121.0968, city=None):
     # 3. Open-Meteo (free, no key)
     try:
         payload = fetch_open_meteo(lat, lon, city)
+        _attach_heat_index(payload)
         cache_payload(db, lat, lon, city or payload.get("name") or f"{lat},{lon}", "open-meteo", payload)
         return payload, None
     except Exception as e:
@@ -126,5 +194,6 @@ def fetch_weather(db, lat=14.6308, lon=121.0968, city=None):
     if stale:
         stale["_stale"] = True
         stale["source"] = src or stale.get("source", "cached")
+        _attach_heat_index(stale)
         return stale, None
     return None, "Weather unavailable. Please check connection and retry."

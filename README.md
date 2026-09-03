@@ -31,7 +31,7 @@ pip install -r requirements.txt
 ```bash
 cp .env.example .env
 # edit .env: set SECRET_KEY (long random), OPENWEATHER_API_KEY (free 1000/day), ADMIN_USERNAME/PASSWORD
-# GEMINI_API_KEY optional, Open-Meteo + api.weather.gov need no key (free fallback)
+# GEMINI_API_KEY optional, Open-Meteo (weather+air) needs no key; OpenWeather Air Pollution reuses same key
 ```
 
 ### 4. Init DB & seed (sample centers/hotlines/weather_cache + admin hash)
@@ -99,9 +99,9 @@ deactivate
 | :--- | :--- |
 | `flask --app app run` | Flask dev server (auto reload) |
 | `flask --app app init-db` | Create 5 tables (FK ON, CHECKs, indexes) |
-| `flask --app app seed` | Seed 7 centers (Available/Nearly/Full/archived), 12 hotlines, 1 admin (hashed), weather_cache demo |
+| `flask --app app seed` | Seed 7 centers (Available/Nearly/Full/archived), 12 hotlines, 1 admin (hashed), weather_cache demo (incl. heat/AQI demo) |
 | `gunicorn wsgi:app` | Production server (Render/PythonAnywhere) |
-| `pytest -q` | Run 15 Sprint 1 tests (auth, API, weather, 404) |
+| `pytest -q` | Run 17+ Sprint 1+2 tests (auth, API, weather, env heat/AQI 503, 404) |
 | `pip install -r requirements.txt` | Install Flask, Flask-WTF, Flask-Limiter, gunicorn, whitenoise, pytest |
 
 ---
@@ -122,11 +122,12 @@ deactivate
 ---
 
 ## 🏗️ Tech Stack & Architecture
-- **Frontend**: HTML5, CSS3 (Inter font, tokens #155EEF/#102A43/#D92D20/#F79009/#039855/#F5F7FA), Vanilla JS, Leaflet 1.9 + OSM, Lucide icons
+- **Frontend**: HTML5, CSS3 (Material 3 liquid-glass matte, Inter/Roboto, tokens --primary/#3b6ef5), Vanilla JS, Leaflet 1.9 + OSM, Lucide + Material Symbols, Visual weather Now + hourly + environmental (Heat/AQI) cards
 - **Backend**: Flask 3.x, Flask-WTF (CSRF), Flask-Limiter (5/15min lockout), Werkzeug hash, python-dotenv, whitenoise
-- **DB**: SQLite (`instance/ligtas.sqlite`, `PRAGMA foreign_keys=ON`), 5 tables: `administrators`, `evacuation_centers`, `center_status_updates`, `emergency_hotlines`, `weather_cache`
-- **Weather**: `services/weather_service.py` → `cache<10min → OpenWeather (key) → Open-Meteo (no key) → api.weather.gov (no key, PH returns []) → 503+retry`, never fabricates
-- **Structure**: `app.py` (factory) + `wsgi.py`, `config.py`, `routes/{public,auth,admin,api}.py`, `models/`, `services/`, `utils/{db,seed,validators,security}`, `templates/{public,admin,errors,partials}`, `static/{css,js,images}`, `tests/`
+- **DB**: SQLite (`instance/ligtas.sqlite`, `PRAGMA foreign_keys=ON`), 5 tables: `administrators`, `evacuation_centers`, `center_status_updates`, `emergency_hotlines`, `weather_cache` (also caches `air-quality` 10m/1h)
+- **Weather**: `services/weather_service.py` → `cache<10min → OpenWeather (key, PH is_day) → Open-Meteo (no key, Asia/Manila + is_day + daily High/Low) → stale 1h →503`, never fabricates; Heat Index via Rothfusz (`utils/environment.py`)
+- **Air Quality**: `services/air_quality_service.py` → `cache10m → OpenWeather Air Pollution (if key) → Open-Meteo Air Quality (no key, PM2.5/US AQI) → stale 1h →503`; DENR DAO 2020-14 PM2.5 + US EPA AQI labeled separately
+- **Structure**: `app.py` (factory) + `wsgi.py`, `config.py`, `routes/{public,auth,admin,api}.py`, `models/`, `services/{weather_service,air_quality_service}`, `utils/{db,seed,validators,security,environment}`, `templates/{public,admin,errors,partials}`, `static/{css,js,images}`, `tests/`
 
 ---
 
@@ -135,9 +136,10 @@ deactivate
 2. **Evacuation Map** markers colored green/orange/red/gray + text label, search/filter city/status/supply, `fitBounds`, Use My Location, list view, popup with occupancy/supply/directions
 3. **Directory** searchable cards with progress bar + badges + sort (name/available/occupancy/recent) + empty state
 4. **Center Detail** computed `available_slots`, `occupancy_pct`, `occupancy_status` (Available<80/Nearly 80-99/Full), 5 supplies, notes, `tel:` + directions
-5. **Weather** proxy hides key, OpenWeather → Open-Meteo fallback, handles 400/503 + retry
-6. **Hotlines** filter city/category/q, `tel:` + Copy, empty per locality
-7. **Admin** hashed login, session, protected `/admin/*`, dashboard (total capacity/occupancy/low-supply/stale>7d), centers/hotlines tables
+5. **Weather** proxy hides key, OpenWeather → Open-Meteo (Asia/Manila, is_day, High/Low) fallback, handles 400/503 + retry; visuals: Now dark/light (PH time), gauges, hourly strip, Heat Index (PAGASA)
+6. **Environmental Safety** side-by-side Heat Index + AQI cards with overall status (max severity), PM2.5 µg/m³ (DENR) & US AQI labeled, tinted backgrounds, accessible badges/bars, skeletons
+7. **Hotlines** filter city/category/q, `tel:` + Copy, empty per locality
+8. **Admin** hashed login, session, protected `/admin/*`, dashboard (total capacity/occupancy/low-supply/stale>7d), centers/hotlines tables
 
 ---
 
@@ -149,7 +151,7 @@ deactivate
 
 ## 🧪 Testing
 ```bash
-pytest -q  # 15 passed: home/map/directory/weather/hotlines/admin pages, protected redirect, api centers/hotlines/weather (200+400), detail 200/404, login 401/302+dashboard
+pytest -q  # 17+ passed: home/map/directory/weather/hotlines/admin pages, protected redirect, api centers/hotlines/weather+env (200+400/503), detail 200/404, login 401/302+dashboard + lockout 403, plus utils/environment boundaries (heat 8 values, PM2.5 10 values, overall, unavailable, stale)
 ```
 
 ## Known MVP Limitations
@@ -159,7 +161,17 @@ pytest -q  # 15 passed: home/map/directory/weather/hotlines/admin pages, protect
 - No file uploads; archived flag instead of hard delete
 
 ## Environment Variables
-See `.env.example`: `SECRET_KEY`, `FLASK_ENV`, `DATABASE_URL`, `ADMIN_USERNAME/PASSWORD`, `OPENWEATHER_API_KEY`, `GEMINI_API_KEY` (optional), Open-Meteo & NOAA no key.
+See `.env.example`: `SECRET_KEY`, `FLASK_ENV`, `DATABASE_URL`, `ADMIN_USERNAME/PASSWORD`, `OPENWEATHER_API_KEY`, `GEMINI_API_KEY` (optional), Open-Meteo weather & air-quality need no key (air fallback reuses `OPENWEATHER_API_KEY` for `/air_pollution`).
+
+## Environmental Indicators
+
+**Heat Index** `utils/environment.py:29` — NWS Rothfusz regression `F` → `C` from `temp`+`humidity` (provider never supplies explicit heat index; OpenWeather `feels_like` is not labeled as Heat Index). PAGASA categories `<27 Not Hazardous | 27-32 Caution | 33-41 Extreme Caution | 42-51 Danger | ≥52 Extreme Danger` with green/yellow/orange/red-orange/dark-red badges + tinted card + bar (gradual, WCAG contrast, not whole-page red).
+
+**Air Quality** `services/air_quality_service.py:12` — Primary `https://air-quality-api.open-meteo.com/v1/air-quality` (no key, PH) `pm2_5, us_aqi` + fallback `https://api.openweathermap.org/data/2.5/air_pollution` (reuses key). DENR DAO 2020-14 PM2.5 `0-25 Good |25.1-35 Fair |35.1-45 Sensitive |45.1-55 Very Unhealthy |55.1-90 Acutely | >91 Emergency` (µg/m³) plus US EPA AQI numeric labeled `US EPA` — never confused. Overall = max severity of heat vs air.
+
+**Cache** `weather_cache` 10m live /1h stale `utils/db.py:80` shared `source` `air-quality`; never fabricates — shows Unavailable + retry. PH timezone `Asia/Manila`, `is_day` for Now card day/night.
+
+Limitations: heat index needs `temp`+`humidity` (unavailable → Unavailable badge); AQI offline/rate-limit → Unavailable (not 0); some rural coords have sparse AQI; feels_like ≠ heat index.
 
 ## License
 Demo for academic use. Sample data flagged "Development — not verified live."

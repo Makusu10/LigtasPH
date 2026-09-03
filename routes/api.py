@@ -96,3 +96,56 @@ def api_weather():
         return jsonify({"error": err or "Weather unavailable", "retry": True}), 503
     except Exception:
         return jsonify({"error":"Weather unavailable", "retry": True}), 503
+
+@bp.route("/api/air-quality")
+def api_air_quality():
+    try:
+        from services.air_quality_service import fetch_air_quality
+        db=get_db()
+        lat=request.args.get("lat", "14.6308")
+        lon=request.args.get("lon", "121.0968")
+        city=request.args.get("city")
+        try:
+            lat_f=float(lat); lon_f=float(lon)
+            if not (-90<=lat_f<=90 and -180<=lon_f<=180):
+                return jsonify({"error":"Invalid coordinates"}),400
+        except:
+            return jsonify({"error":"Invalid coordinates"}),400
+        data, err = fetch_air_quality(db, lat_f, lon_f, city)
+        if data:
+            return jsonify(data)
+        return jsonify({"error": err or "Air quality unavailable", "retry": True}), 503
+    except Exception:
+        return jsonify({"error":"Air quality unavailable", "retry": True}), 503
+
+@bp.route("/api/environment")
+def api_environment():
+    try:
+        from services.weather_service import fetch_weather
+        from services.air_quality_service import fetch_air_quality
+        from utils.environment import overall_status
+        db=get_db()
+        lat=request.args.get("lat", "14.6308")
+        lon=request.args.get("lon", "121.0968")
+        city=request.args.get("city")
+        try:
+            lat_f=float(lat); lon_f=float(lon)
+            if not (-90<=lat_f<=90 and -180<=lon_f<=180):
+                return jsonify({"error":"Invalid coordinates"}),400
+        except:
+            return jsonify({"error":"Invalid coordinates"}),400
+        w_data, w_err = fetch_weather(db, lat_f, lon_f, city)
+        aq_data, aq_err = fetch_air_quality(db, lat_f, lon_f, city)
+        # Do not fabricate — return what we have, unavailable otherwise
+        heat_cat = (w_data or {}).get("heat_index", {}).get("category") if w_data else None
+        aqi_cat = (aq_data or {}).get("category") if aq_data else None
+        overall = overall_status(heat_cat, aqi_cat)
+        # Shared coords + source stamps
+        return jsonify({
+            "weather": w_data,
+            "air_quality": aq_data,
+            "overall": overall,
+            "errors": {"weather": w_err, "air_quality": aq_err},
+        })
+    except Exception as e:
+        return jsonify({"error":"Environment data unavailable", "retry": True}), 503

@@ -58,7 +58,21 @@ def seed_db():
             t = base + _dt.timedelta(hours=i)
             code = [0,1,2,3,51,61,63][i % 7]
             hourly_demo.append({"time": t.isoformat(), "temp": 26 + (i%5), "humidity": 78 + (i%10), "wind": round(3.5 + (i%4)*0.8,1), "code": code, "desc": descs[i%7]})
-        demo = {"name":"Metro Manila Area","city":"Metro Manila","lat":14.6308,"lon":121.0968,"weather":[{"description":"Scattered clouds","icon":"02d","code":2}],"main":{"temp":28,"humidity":82,"feels_like":31},"wind":{"speed":4.8},"fetched_at":"2024-12-01T00:00:00Z","_demo":True, "hourly": hourly_demo}
+        demo = {"name":"Metro Manila Area","city":"Metro Manila","lat":14.6308,"lon":121.0968,"weather":[{"description":"Scattered clouds","icon":"02d","code":2}],"main":{"temp":27,"humidity":82,"feels_like":31,"temp_max":31,"temp_min":27},"wind":{"speed":4.8},"fetched_at":"2024-12-01T00:00:00Z","_demo":True, "hourly": hourly_demo}
+        # attach heat index for demo via same calc
+        try:
+            from utils.environment import calculate_heat_index, classify_heat_index
+            hi = calculate_heat_index(demo["main"]["temp"], demo["main"]["humidity"])
+            info = classify_heat_index(hi)
+            demo["heat_index"] = {"value_c": hi, "category": info["category"], "color": info["color"], "recommendation": info["recommendation"], "severity": info["severity"], "colors": info["colors"], "method": "Rothfusz (NWS) from temp+humidity"}
+        except Exception:
+            pass
         db.execute("INSERT INTO weather_cache (city, lat, lng, source, payload) VALUES (?,?,?,?,?)",
                    ("Metro Manila",14.6308,121.0968,"cached", json.dumps(demo)))
+    # air-quality demo — offline Good (match image 7.1 µg/m³ PM2.5 • US AQI 50)
+    if not db.execute("SELECT 1 FROM weather_cache WHERE source='air-quality' LIMIT 1").fetchone():
+        import time as _time
+        aq_demo = {"source":"open-meteo-air","scale":"DENR PM2.5 + US EPA AQI (separate)","city":"Metro Manila","lat":14.6308,"lon":121.0968,"aqi":50,"aqi_scale":"US EPA","pm25":7.1,"pm10":14.2,"dominant_pollutant":"PM2.5","category":"Good","color":"green","recommendation":"Air quality is satisfactory. Enjoy outdoor activities.","severity":0,"colors":{"badge":"#ECFDF3","border":"#A6F4C5","text":"#054F31","bar":"#10b981","tint":"rgba(236,253,243,0.45)"},"details":{"carbon_monoxide": 220, "nitrogen_dioxide": 10, "ozone": 42, "sulphur_dioxide": 4},"fetched_at": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()), "_demo": True}
+        db.execute("INSERT INTO weather_cache (city, lat, lng, source, payload) VALUES (?,?,?,?,?)",
+                   ("Metro Manila",14.6308,121.0968,"air-quality", json.dumps(aq_demo)))
     db.commit()

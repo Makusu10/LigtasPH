@@ -30,6 +30,16 @@
 <div id="card" class="card" style="display:none; margin-top:12px;"></div>
 <div id="error" class="card" style="display:none; margin-top:12px; background:#FEF3F2; border-color:#FECDCA;" role="alert"></div>
 
+<!-- Environmental Safety — Heat Index & AQI (PAGASA/DENR) -->
+<div id="envSkeleton" class="card" style="display:none; margin-top:16px;">
+  <div style="height:14px; width:40%;" class="skeleton"></div>
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px;">
+    <div class="skeleton" style="height:140px;"></div>
+    <div class="skeleton" style="height:140px;"></div>
+  </div>
+</div>
+<div id="envSection" style="display:none; margin-top:16px;" aria-live="polite"></div>
+
 <div id="hourlyWrap" class="card" style="display:none; margin-top:16px;">
   <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
     <h2 style="margin:0; font-size:14px; font-weight:800; letter-spacing:-0.01em;"><i data-lucide="clock-3" style="width:16px;height:16px; vertical-align:-3px;"></i> Next 24 hours</h2>
@@ -46,6 +56,8 @@ const errEl = document.getElementById('error');
 const skeleton = document.getElementById('skeleton');
 const hourlyWrap = document.getElementById('hourlyWrap');
 const hourlyStrip = document.getElementById('hourlyStrip');
+const envSection = document.getElementById('envSection');
+const envSkeleton = document.getElementById('envSkeleton');
 
 function lucideIconFor(code, desc){
   const d = (desc||'').toLowerCase();
@@ -82,33 +94,63 @@ document.getElementById('cityInput').addEventListener('keydown', e=>{
 
 async function fetchWeather(lat, lon, city){
   card.style.display='none'; errEl.style.display='none'; hourlyWrap.style.display='none';
+  envSection.style.display='none'; envSkeleton.style.display='block';
   skeleton.style.display='block';
   statusEl.textContent='Fetching weather…';
-  let url='/api/weather?';
+  let url='/api/environment?';
   if(city) url+=`city=${encodeURIComponent(city)}&lat=14.6308&lon=121.0968`;
   else url+=`lat=${lat}&lon=${lon}`;
   try{
     const res=await fetch(url);
-    const data=await res.json();
-    if(!res.ok){ throw new Error(data.error || 'Weather unavailable'); }
+    const env=await res.json();
+    if(!res.ok || (!env.weather && !env.air_quality)){ throw new Error((env.error||env.errors?.weather) || 'Weather unavailable'); }
+    const data = env.weather;
+    const aq = env.air_quality;
+    const overall = env.overall;
     skeleton.style.display='none';
+    envSkeleton.style.display='none';
     statusEl.textContent='';
-    renderCard(data, lat, lon, city);
-    renderHourly(data.hourly);
+    if(data){
+      renderCard(data, lat, lon, city);
+      renderHourly(data.hourly);
+    } else {
+      card.style.display='none';
+      errEl.style.display='block';
+      errEl.innerHTML=`<div style="display:flex; gap:10px; align-items:start;"><i data-lucide="triangle-alert" style="width:20px;height:20px;color:var(--red);"></i><div><div style="font-weight:800; color:var(--red);">Weather unavailable</div><div style="font-size:13px; color:var(--text-secondary);">${env.errors?.weather || 'No data'}</div></div></div>`;
+    }
+    renderEnvironment(data, aq, overall, lat, lon);
     try{ lucide.createIcons(); }catch(e){}
   }catch(e){
     skeleton.style.display='none';
+    envSkeleton.style.display='none';
     statusEl.textContent='';
     errEl.style.display='block';
     errEl.innerHTML=`<div style="display:flex; gap:10px; align-items:start;">
       <i data-lucide="triangle-alert" style="width:20px;height:20px;color:var(--red); flex:0 0 auto;"></i>
-      <div><div style="font-weight:800; color:var(--red);">Weather unavailable</div><div style="color:var(--text-secondary); font-size:13px; margin-top:4px;">${e.message}</div>
+      <div><div style="font-weight:800; color:var(--red);">Environment data unavailable</div><div style="color:var(--text-secondary); font-size:13px; margin-top:4px;">${e.message}</div>
       <button class="btn btn-secondary" style="margin-top:10px;" type="button" onclick="fetchWeather(${lat||14.6308},${lon||121.0968},${city?`'${city}'`: 'null'})">Retry</button></div></div>`;
+    // Fallback: try to show cached weather even if environment failed
+    try{
+      const r2=await fetch(url.replace('environment','weather'));
+      if(r2.ok){ const d2=await r2.json(); renderCard(d2, lat, lon, city); renderHourly(d2.hourly); }
+    }catch(_){}
     try{ lucide.createIcons(); }catch(_){}
   }
 }
 
 function isCoordsName(s){ return typeof s==='string' && /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(s.trim()); }
+function phIsNight(data){
+  if(data.is_day===0) return true;
+  if(data.is_day===1) return false;
+  // fallback: PH time hour (Asia/Manila UTC+8)
+  try{
+    const hr = Number(new Date().toLocaleString('en-US',{timeZone:'Asia/Manila', hour:'numeric', hour12:false}));
+    return hr < 6 || hr >= 18;
+  }catch(e){
+    const h = new Date().getUTCHours()+8;
+    return (h%24) < 6 || (h%24) >= 18;
+  }
+}
 function renderCard(data, lat, lon, city){
   // City name prominent — never show raw "lat,lon" as title
   const rawName = data.name || "";
@@ -116,74 +158,93 @@ function renderCard(data, lat, lon, city){
   let displayName = city || cityFromData || rawName;
   if(isCoordsName(displayName) || !displayName) displayName = city || cityFromData || "Your Location";
   if(isCoordsName(rawName) && displayName==="Your Location" && data.lat!=null) {
-    // keep Your Location for geolocated — more honest than fake city
     displayName = "Your Location";
   }
   if(!isCoordsName(rawName) && rawName && rawName !== displayName && rawName !== city) {
-    // OpenWeather returned a better name than city input — prefer it if not coords
     if(!city) displayName = rawName;
   }
-  const desc = data.weather?.[0]?.description || '—';
+  const desc = (data.weather?.[0]?.description || '—');
+  const descCap = desc.charAt(0).toUpperCase()+desc.slice(1);
   const code = data.weather?.[0]?.code ?? null;
   const icon = lucideIconFor(code, desc);
   const temp = data.main?.temp;
   const feels = data.main?.feels_like;
   const hum = data.main?.humidity;
   const wind = data.wind?.speed;
+  const hi = data.main?.temp_max;
+  const lo = data.main?.temp_min;
   const tempPct = temp!=null ? clamp(((temp - 15) / 25)*100, 4, 100) : 0;
   const humPct = hum!=null ? clamp(hum, 0, 100) : 0;
   const windPct = wind!=null ? clamp((wind/15)*100, 4, 100) : 0;
   const source = data.source || data._cache_source || 'weather';
-  const fetched = data.fetched_at ? new Date(data.fetched_at).toLocaleString() : '';
-  // Exact coords always from payload (preferred) else from request
+  const fetched = data.fetched_at ? new Date(data.fetched_at).toLocaleString('en-PH',{timeZone:'Asia/Manila'}) : '';
   const plat = data.lat ?? lat;
   const plon = data.lon ?? lon;
   const coordsText = (plat!=null && plon!=null) ? `${Number(plat).toFixed(4)}, ${Number(plon).toFixed(4)}` : "";
+  const isNight = phIsNight(data);
   card.style.display='block';
   card.innerHTML=`
-    <div class="weather-hero">
-      <div style="display:flex; gap:14px; align-items:start;">
-        <div class="weather-icon-wrap" aria-hidden="true"><i data-lucide="${icon}" style="width:36px;height:36px;"></i></div>
-        <div style="min-width:0;">
-          <div style="font-weight:800; font-size:18px; line-height:1.2;">${displayName}</div>
-          <div class="badge" style="margin-top:6px; background:#EFF8FF; border-color:#B2DDFF; color:var(--primary); text-transform:capitalize; letter-spacing:0;">${desc}</div>
-          <div style="color:var(--text-secondary); font-size:12px; margin-top:8px;">Source: ${source} ${data._stale ? '• stale' : ''}</div>
-          <div style="color:var(--text-secondary); font-size:12px;">${fetched}</div>
-          ${data._demo ? '<div style="font-size:11px; color:var(--orange); margin-top:6px;">Demo cached data — connect for live.</div>' : ''}
+    <div style="font-size:13px; color:var(--text-secondary); margin-bottom:10px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+      <i data-lucide="map-pin" style="width:14px;height:14px;"></i>
+      <span style="font-weight:600; color:var(--text);">${displayName}</span>
+      ${coordsText ? `<span style="color:var(--text-secondary);">• ${coordsText}</span>` : ''}
+      <span style="margin-left:auto; font-size:11px;">${fetched}</span>
+    </div>
+
+    <div class="weather-now ${isNight ? 'night' : 'day'}" role="region" aria-label="Current weather">
+      <div>
+        <div class="now-label">Now</div>
+        <div class="weather-now-temp">${temp!=null? Math.round(temp) : '—'}°<span class="weather-now-icon" aria-hidden="true"><i data-lucide="${icon}" style="width:22px;height:22px;"></i></span></div>
+        <div class="weather-now-hilo">High: ${hi!=null? Math.round(hi)+'°' : '—'} • Low: ${lo!=null? Math.round(lo)+'°' : '—'}</div>
+      </div>
+      <div style="text-align:right; display:flex; flex-direction:column; justify-content:center; gap:2px;">
+        <div class="weather-now-desc">${descCap}</div>
+        <div class="weather-now-feels">Feels like ${feels!=null? Math.round(feels)+'°' : '—'}</div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px; color:var(--text-secondary); font-size:11px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+      <span>Source: ${source} ${data._stale ? '• stale' : ''}</span>
+      ${data._demo ? '<span style="color:var(--orange);">• demo cached — connect for live</span>' : ''}
+    </div>
+
+    <div style="display:grid; gap:12px; margin-top:12px;">
+      <div class="weather-hero" style="margin-top:4px;">
+        <div class="card" style="display:flex; gap:14px; align-items:start; padding:12px;">
+          <div class="weather-icon-wrap" aria-hidden="true"><i data-lucide="${icon}" style="width:36px;height:36px;"></i></div>
+          <div style="min-width:0;">
+            <div style="font-weight:700; font-size:13px; color:var(--text-secondary); letter-spacing:0.06em; text-transform:uppercase;">Condition</div>
+            <div class="badge" style="margin-top:6px; background:#EFF8FF; border-color:#B2DDFF; color:var(--primary); text-transform:capitalize; letter-spacing:0;">${desc}</div>
+          </div>
+        </div>
+        <div style="display:grid; gap:12px;">
+          <div class="card" style="padding:12px; background:#F9FAFB;">
+            <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px;">
+              <span style="color:var(--text-secondary); font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Temperature</span>
+              <span style="font-size:12px; color:var(--text-secondary);">Feels ${feels!=null? feels+'°C' : '—'}</span>
+            </div>
+            <div style="font-size:30px; font-weight:800; letter-spacing:-0.02em; line-height:1;">${temp!=null? temp+'°' : '—'}<span style="font-size:16px; font-weight:600; color:var(--text-secondary);">C</span></div>
+            <div class="weather-bar" role="progressbar" aria-valuenow="${temp!=null? temp : 0}" aria-valuemin="15" aria-valuemax="40" aria-label="Temperature"><div class="weather-bar-fill temp" style="width:${tempPct}%"></div></div>
+            <div class="weather-gauge-labels"><span>15°C</span><span>27°C</span><span>40°C</span></div>
+          </div>
         </div>
       </div>
-      <div style="display:grid; gap:12px;">
-        <div class="card" style="padding:12px; background:#F9FAFB;">
-          <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px;">
-            <span style="color:var(--text-secondary); font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Temperature</span>
-            <span style="font-size:12px; color:var(--text-secondary);">Feels ${feels!=null? feels+'°C' : '—'}</span>
-          </div>
-          <div style="font-size:30px; font-weight:800; letter-spacing:-0.02em; line-height:1;">${temp!=null? temp+'°' : '—'}<span style="font-size:16px; font-weight:600; color:var(--text-secondary);">C</span></div>
-          <div class="weather-bar" role="progressbar" aria-valuenow="${temp!=null? temp : 0}" aria-valuemin="15" aria-valuemax="40" aria-label="Temperature"><div class="weather-bar-fill temp" style="width:${tempPct}%"></div></div>
-          <div class="weather-gauge-labels"><span>15°C</span><span>27°C</span><span>40°C</span></div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="card weather-metric" style="padding:12px;">
+          <div style="color:var(--text-secondary); font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; display:flex; align-items:center; gap:6px;"><i data-lucide="droplets" style="width:14px;height:14px;"></i> Humidity</div>
+          <div style="font-size:22px; font-weight:800; margin-top:4px;">${hum!=null? hum+'%' : '—'}</div>
+          <div class="weather-bar" role="progressbar" aria-valuenow="${hum!=null? hum:0}" aria-valuemin="0" aria-valuemax="100" aria-label="Humidity"><div class="weather-bar-fill humidity" style="width:${humPct}%"></div></div>
+          <div class="weather-gauge-labels"><span>0%</span><span>100%</span></div>
         </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-          <div class="card weather-metric" style="padding:12px;">
-            <div style="color:var(--text-secondary); font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; display:flex; align-items:center; gap:6px;"><i data-lucide="droplets" style="width:14px;height:14px;"></i> Humidity</div>
-            <div style="font-size:22px; font-weight:800; margin-top:4px;">${hum!=null? hum+'%' : '—'}</div>
-            <div class="weather-bar" role="progressbar" aria-valuenow="${hum!=null? hum:0}" aria-valuemin="0" aria-valuemax="100" aria-label="Humidity"><div class="weather-bar-fill humidity" style="width:${humPct}%"></div></div>
-            <div class="weather-gauge-labels"><span>0%</span><span>100%</span></div>
-          </div>
-          <div class="card weather-metric" style="padding:12px;">
-            <div style="color:var(--text-secondary); font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; display:flex; align-items:center; gap:6px;"><i data-lucide="wind" style="width:14px;height:14px;"></i> Wind</div>
-            <div style="font-size:22px; font-weight:800; margin-top:4px;">${wind!=null? wind : '—'}<span style="font-size:13px; font-weight:600; color:var(--text-secondary);"> m/s</span></div>
-            <div class="weather-bar" role="progressbar" aria-valuenow="${wind!=null? wind:0}" aria-valuemin="0" aria-valuemax="15" aria-label="Wind speed"><div class="weather-bar-fill wind" style="width:${windPct}%"></div></div>
-            <div class="weather-gauge-labels"><span>0</span><span>15 m/s</span></div>
-          </div>
+        <div class="card weather-metric" style="padding:12px;">
+          <div style="color:var(--text-secondary); font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; display:flex; align-items:center; gap:6px;"><i data-lucide="wind" style="width:14px;height:14px;"></i> Wind</div>
+          <div style="font-size:22px; font-weight:800; margin-top:4px;">${wind!=null? wind : '—'}<span style="font-size:13px; font-weight:600; color:var(--text-secondary);"> m/s</span></div>
+          <div class="weather-bar" role="progressbar" aria-valuenow="${wind!=null? wind:0}" aria-valuemin="0" aria-valuemax="15" aria-label="Wind speed"><div class="weather-bar-fill wind" style="width:${windPct}%"></div></div>
+          <div class="weather-gauge-labels"><span>0</span><span>15 m/s</span></div>
         </div>
       </div>
     </div>
-    <div style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border); display:flex; align-items:center; gap:6px; color:var(--text-secondary); font-size:11px;" aria-label="Coordinates">
-      <i data-lucide="map-pin" style="width:12px;height:12px; flex:0 0 auto;"></i>
-      <span>${coordsText || '—'}</span>
-      ${coordsText ? `<span style="margin-left:4px; color:var(--text-secondary);">• exact location</span>` : ''}
-    </div>
-    ${data._stale ? '<div style="color:var(--orange); font-size:12px; margin-top:8px;" role="note">Showing stale cached data.</div>' : ''}
+    ${data._stale ? '<div style="color:var(--orange); font-size:12px; margin-top:10px;" role="note">Showing stale cached data.</div>' : ''}
   `;
 }
 
@@ -211,6 +272,88 @@ function renderHourly(hourly){
     hourlyStrip.appendChild(cardEl);
   });
   try{ lucide.createIcons(); }catch(e){}
+}
+
+function heatTintClass(cat){
+  const m={ "Not Hazardous":"env-tint-green", "Caution":"env-tint-yellow", "Extreme Caution":"env-tint-orange", "Danger":"env-tint-red", "Extreme Danger":"env-tint-maroon", "Unavailable":"" };
+  return m[cat]||"";
+}
+function aqiTintClass(cat){
+  const m={ "Good":"env-tint-green","Fair":"env-tint-yellow","Unhealthy for Sensitive Groups":"env-tint-orange","Very Unhealthy":"env-tint-red","Acutely Unhealthy":"env-tint-purple","Emergency":"env-tint-maroon","Unavailable":"" };
+  return m[cat]||"";
+}
+
+function renderEnvironment(weatherData, aqData, overall, lat, lon){
+  const hasHeat = !!(weatherData && weatherData.heat_index);
+  const hasAqi = !!(aqData && aqData.category);
+  if(!hasHeat && !hasAqi){ envSection.style.display='none'; return; }
+  envSection.style.display='block';
+  // overall tint = more severe of two
+  let tint = "env-tint-green";
+  const oc = overall?.category;
+  if(overall?.source==="air") tint = aqiTintClass(oc);
+  else if(overall?.source==="heat") tint = heatTintClass(oc);
+  else if(oc) tint = heatTintClass(oc) || aqiTintClass(oc);
+
+  // Heat card (secondary — smaller)
+  let heatCard = "";
+  if(hasHeat){
+    const hi = weatherData.heat_index;
+    const pct = hi.value_c!=null ? Math.max(4, Math.min(100, ((hi.value_c - 20)/35)*100)) : 0;
+    const c = hi.colors || {};
+    heatCard = `<div class="card env-card" style="background:${c.tint || 'var(--glass)'}; border-color:${c.border || 'var(--glass-border)'}">
+      <div class="env-card-head"><div class="env-card-icon" style="color:#d93d2a;"><i data-lucide="thermometer-sun" style="width:18px;height:18px;"></i></div><span style="font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-secondary);">Heat Index</span><span class="env-badge" style="margin-left:auto; background:${c.badge}; border-color:${c.border}; color:${c.text};">${hi.category}</span></div>
+      <div class="env-measure" aria-label="Heat index ${hi.value_c} degrees Celsius">${hi.value_c!=null? hi.value_c.toFixed(1):'—'}<span class="env-unit">°C</span></div>
+      <div class="env-bar" role="progressbar" aria-valuenow="${hi.value_c||0}" aria-valuemin="20" aria-valuemax="55" aria-label="Heat index"><div class="env-bar-fill" style="width:${pct}%; background:${c.bar};"></div></div>
+      <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); margin-top:3px;"><span>20°C</span><span>55°C</span></div>
+      <div class="env-reco">${hi.recommendation}</div>
+      <div class="env-meta"><span>Source: ${hi.method||'—'}</span><span>• ${weatherData.source||''}</span><span>• ${weatherData.fetched_at? new Date(weatherData.fetched_at).toLocaleString('en-PH',{timeZone:'Asia/Manila'}) : ''}</span></div>
+      <details class="env-expand"><summary>Details</summary><div style="font-size:12px; color:var(--text-secondary); line-height:1.5;">Heat Index is the apparent temperature felt by the body. Calculated from air temperature ${weatherData.main?.temp??'—'}°C and humidity ${weatherData.main?.humidity??'—'}% using the Rothfusz regression (NWS). PAGASA categories: &lt;27 Not Hazardous, 27–32 Caution, 33–41 Extreme Caution, 42–51 Danger, ≥52 Extreme Danger. Not a substitute for official PAGASA/medical advice.</div></details>
+    </div>`;
+  } else {
+    heatCard = `<div class="card env-card" style="opacity:0.9;"><div class="env-card-head"><div class="env-card-icon"><i data-lucide="thermometer" style="width:18px;height:18px;"></i></div><span style="font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-secondary);">Heat Index</span><span class="env-badge" style="background:#F9FAFB; border-color:#D0D5DD; color:#667085;">Unavailable</span></div><div style="font-size:13px; color:var(--text-secondary);">Heat index unavailable — temperature or humidity missing. Try again or check connection.</div></div>`;
+  }
+  // AQI card — primary, mainly shown (AQI numeric is main, PM2.5 secondary)
+  let aqiCard="";
+  if(hasAqi){
+    const c = aqData.colors || {};
+    const pm25 = aqData.pm25;
+    const aqiVal = aqData.aqi;
+    // AQI (US EPA 0-300) is primary measure — PM2.5 is secondary context
+    const pct = aqiVal!=null ? Math.max(4, Math.min(100, (aqiVal/300)*100)) : (pm25!=null? Math.max(4, Math.min(100, (pm25/90)*100)) : 0);
+    aqiCard = `<div class="card env-card env-card--aqi" style="background:${c.tint}; border-color:${c.border};">
+      <div class="env-card-head"><div class="env-card-icon" style="color:#0e7490;"><i data-lucide="wind" style="width:20px;height:20px;"></i></div><span style="font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-secondary);">Air Quality — Primary</span><span class="env-badge" style="margin-left:auto; background:${c.badge}; border-color:${c.border}; color:${c.text};">${aqData.category}</span></div>
+      ${aqiVal!=null ? `<div class="env-measure" aria-label="AQI ${aqiVal}">${aqiVal}<span class="env-unit"> US AQI</span></div>` : (pm25!=null? `<div class="env-measure">${Number(pm25).toFixed(1)}<span class="env-unit">µg/m³ PM2.5</span></div>` : `<div class="env-measure">—</div>`)}
+      ${aqiVal!=null && pm25!=null ? `<div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">${Number(pm25).toFixed(1)} µg/m³ PM2.5 • ${aqData.dominant_pollutant||'PM2.5'}</div>` : (pm25!=null? `<div style="font-size:11px; color:var(--text-muted);">${Number(pm25).toFixed(1)} µg/m³ PM2.5 • ${aqData.dominant_pollutant||''}</div>` : ``)}
+      ${aqiVal!=null ? `<div style="font-size:11px; color:var(--text-muted);">${aqData.aqi_scale||'US EPA'} • DENR PM2.5 category shown</div>` : ``}
+      <div class="env-bar" role="progressbar" aria-valuenow="${aqiVal||pm25||0}" aria-label="Air quality"><div class="env-bar-fill" style="width:${pct}%; background:${c.bar};"></div></div>
+      <div class="env-reco" style="font-size:13px;">${aqData.recommendation}</div>
+      <div class="env-meta"><span>Source: ${aqData.source} (${aqData.scale})</span><span>• ${aqData.fetched_at? new Date(aqData.fetched_at).toLocaleString('en-PH',{timeZone:'Asia/Manila'}) : ''}</span></div>
+      <details class="env-expand"><summary>Details</summary><div style="font-size:12px; color:var(--text-secondary); line-height:1.5;">DENR DAO 2020-14 PM2.5: 0–25 Good, 25.1–35 Fair, 35.1–45 Unhealthy for Sensitive Groups, 45.1–55 Very Unhealthy, 55.1–90 Acutely Unhealthy, &gt;91 Emergency. US AQI (0–500 EPA) shown as main value — PM2.5 µg/m³ is secondary with DENR category. Separate scales, correct units.</div></details>
+    </div>`;
+  } else {
+    aqiCard = `<div class="card env-card env-card--aqi" style="opacity:0.9;"><div class="env-card-head"><div class="env-card-icon"><i data-lucide="wind" style="width:20px;height:20px;"></i></div><span style="font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-secondary);">Air Quality — Primary</span><span class="env-badge" style="background:#F9FAFB; border-color:#D0D5DD; color:#667085;">Unavailable</span></div><div style="font-size:13px; color:var(--text-secondary);">Air quality unavailable for this location — API limit, offline, or unsupported area. Try again later.</div><div style="font-size:11px; color:var(--text-muted); margin-top:6px;">Provider: Open-Meteo Air Quality (no key, PH) → OpenWeather Air Pollution fallback. No fake data.</div></div>`;
+  }
+  const overallIcon = overall?.source==="air" ? "wind" : (overall?.source==="heat" ? "thermometer-sun" : "shield-check");
+  const overallText = overall?.category && overall.category!=="Unavailable" ? overall.category : "No risk data";
+  const overallReco = overall?.recommendation || "";
+  envSection.className = `env-section ${tint} card`;
+  envSection.innerHTML = `
+    <div class="env-overall" role="status" aria-label="Overall outdoor safety ${overallText}">
+      <div class="env-overall-icon" style="background:${overall && overall.severity>=3 ? 'rgba(217,61,42,0.12)' : 'rgba(59,110,245,0.12)'}; color:${overall && overall.severity>=3 ? 'var(--red)' : 'var(--primary)'};"><i data-lucide="${overallIcon}" style="width:18px;height:18px;"></i></div>
+      <div style="min-width:0; flex:1;">
+        <div style="font-size:12px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; color:var(--text-secondary);">Overall outdoor safety</div>
+        <div style="font-weight:800; font-size:15px; line-height:1.2;">${overallText}</div>
+        <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">${overallReco}</div>
+      </div>
+      <span class="env-badge" style="background:${overall && hasHeat && overall.source==='heat' ? (document.createElement('div').innerHTML='', '') : ''}; display:none;"></span>
+    </div>
+    <div class="env-grid" role="list">
+      <div role="listitem">${aqiCard}</div>
+      <div role="listitem">${heatCard}</div>
+    </div>
+    <div style="font-size:11px; color:var(--text-muted); margin-top:10px; text-align:center;">Heat index ≠ temperature. AQI and PM2.5 have separate scales. Not a substitute for PAGASA/DENR or medical advice.</div>
+  `;
 }
 
 // auto fetch default
