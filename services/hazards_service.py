@@ -25,12 +25,17 @@ FIRMS_AREA_TMPL = (
 )
 FIRMS_VERSION = "1"
 FIRMS_SOURCE = "VIIRS_SNPP_NRT"
+# Allowlisted CORS relay (PythonAnywhere free tier allowlists
+# api.allorigins.win but not firms.modaps.eosdis.nasa.gov). Used ONLY when
+# the direct FIRMS request fails — local/dev traffic never touches it.
+ALLOWLIST_RELAY_TMPL = "https://api.allorigins.win/raw?url={url}"
 
 QUAKE_TTL = 5 * 60
 QUAKE_STALE_TTL = 60 * 60
 FIRE_TTL = 30 * 60
 FIRE_STALE_TTL = 3 * 60 * 60
 REQ_TIMEOUT = 8
+RELAY_TIMEOUT = REQ_TIMEOUT + 7  # allowlisted relay is slower than direct
 MAX_BYTES = 2_000_000
 
 # PH bounding box fallback when no center given
@@ -158,6 +163,26 @@ def fetch_earthquakes(db, lat: float | None = None, lon: float | None = None,
         return None, "Earthquake data is currently unavailable for this location."
 
 
+def _fetch_firms_text(url: str) -> str:
+    """Fetch the FIRMS CSV direct, else via the allowlisted relay.
+
+    Restricted egress (e.g. PythonAnywhere free allowlist) blocks
+    firms.modaps.eosdis.nasa.gov — the allowlisted AllOrigins relay returns
+    the identical raw body. A 4xx from FIRMS itself (bad key/params) fails
+    fast with no relay attempt, since the relay would fail identically.
+    """
+    try:
+        return _fetch_text(url)
+    except urllib.error.HTTPError as http_exc:
+        if 400 <= http_exc.code < 500:
+            raise ValueError(f"FIRMS rejected the request (HTTP {http_exc.code})")
+        current_app.logger.warning("FIRMS direct failed, trying relay: %s", http_exc)
+    except Exception as first_exc:
+        current_app.logger.warning("FIRMS direct failed, trying relay: %s", first_exc)
+    relay = ALLOWLIST_RELAY_TMPL.format(url=urllib.parse.quote(url, safe=""))
+    return _fetch_text(relay, timeout=RELAY_TIMEOUT)
+
+
 def _parse_firms_csv(text: str, limit: int = 500) -> list[dict]:
     reader = csv.DictReader(io.StringIO(text))
     out: list[dict] = []
@@ -197,7 +222,7 @@ def fetch_fires(db, lat: float = 14.6308, lon: float = 121.0968,
             src=FIRMS_SOURCE, west=west, south=south, east=east,
             north=north, days=days,
         )
-        text = _fetch_text(url)
+        text = _fetch_firms_text(url)
         if text.lstrip().startswith(("Invalid", "Error", "<")):
             raise ValueError("FIRMS rejected the request")
         fires = _parse_firms_csv(text)
