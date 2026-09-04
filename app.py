@@ -30,6 +30,8 @@ def create_app(env=None):
         # A developer .env key must not leak into the suite: tests such as
         # test_api_weather_no_cache_503 expect a 503 when providers fail.
         app.config["OPENWEATHER_API_KEY"] = ""
+        # Same for FIRMS: test_fires_requires_key expects 503 with no key.
+        app.config["FIRMS_MAP_KEY"] = ""
 
     Path(app.config["DATABASE"]).parent.mkdir(parents=True, exist_ok=True)
 

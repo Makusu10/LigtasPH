@@ -19,11 +19,12 @@ from typing import Any
 from flask import current_app
 
 USGS_FEED = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson"
+# Modern FIRMS area format (API v4.x): no version segment, bbox is one
+# comma-separated segment: /api/area/csv/[MAP_KEY]/[SOURCE]/[w,s,e,n]/[days]
 FIRMS_AREA_TMPL = (
-    "https://firms.modaps.eosdis.nasa.gov/api/area/csv/{ver}/{key}/{src}/"
-    "{west}/{south}/{east}/{north}/{days}"
+    "https://firms.modaps.eosdis.nasa.gov/api/area/csv/{key}/{src}/"
+    "{west},{south},{east},{north}/{days}"
 )
-FIRMS_VERSION = "1"
 FIRMS_SOURCE = "VIIRS_SNPP_NRT"
 # Allowlisted CORS relay (PythonAnywhere free tier allowlists
 # api.allorigins.win but not firms.modaps.eosdis.nasa.gov). Used ONLY when
@@ -218,7 +219,7 @@ def fetch_fires(db, lat: float = 14.6308, lon: float = 121.0968,
         return fresh, None
     try:
         url = FIRMS_AREA_TMPL.format(
-            ver=FIRMS_VERSION, key=urllib.parse.quote(map_key, safe=""),
+            key=urllib.parse.quote(map_key, safe=""),
             src=FIRMS_SOURCE, west=west, south=south, east=east,
             north=north, days=days,
         )
