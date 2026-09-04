@@ -112,21 +112,50 @@ def api_ncr_lgus():
         {"name": "Valenzuela", "lat": 14.7008, "lon": 120.9830},
     ])
 
+_DEFAULT_LAT, _DEFAULT_LON = 14.6308, 121.0968
+
+def _resolve_place(lat, lon, city):
+    """Resolve query params to (lat_f, lon_f, label).
+
+    Explicit coordinates win. A bare city name is geocoded (keyless
+    Open-Meteo lookup) so typed places get their own grid. Returns
+    (None, None, None, (body, status)) on 400/404 — callers return it
+    directly. No silent default-grid substitution: serving Marikina data
+    labeled "Masbate" is worse than a clear 404.
+    """
+    has_lat = lat not in (None, "")
+    has_lon = lon not in (None, "")
+    label = (city or "").strip() or None
+    if has_lat or has_lon:
+        try:
+            lat_f, lon_f = float(lat), float(lon)
+            if not (-90 <= lat_f <= 90 and -180 <= lon_f <= 180):
+                return None, None, None, (jsonify({"error": "Invalid coordinates"}), 400)
+            return lat_f, lon_f, label, None
+        except (TypeError, ValueError):
+            return None, None, None, (jsonify({"error": "Invalid coordinates"}), 400)
+    if label:
+        from services.weather_service import geocode_city
+        hit = geocode_city(label)
+        if not hit:
+            return None, None, None, (jsonify(
+                {"error": f"Place not found: {label}. Check spelling or pick an NCR LGU."}), 404)
+        glat, glon, _gname = hit
+        return glat, glon, label, None
+    return _DEFAULT_LAT, _DEFAULT_LON, None, None
+
 @bp.route("/api/weather")
 def api_weather():
     try:
         from services.weather_service import fetch_weather
         db=get_db()
-        lat=request.args.get("lat", "14.6308")
-        lon=request.args.get("lon", "121.0968")
+        lat=request.args.get("lat")
+        lon=request.args.get("lon")
         city=request.args.get("city")
-        try:
-            lat_f=float(lat); lon_f=float(lon)
-            if not (-90<=lat_f<=90 and -180<=lon_f<=180):
-                return jsonify({"error":"Invalid coordinates"}),400
-        except (TypeError, ValueError):
-            return jsonify({"error":"Invalid coordinates"}),400
-        data, err = fetch_weather(db, lat_f, lon_f, city)
+        lat_f, lon_f, label, err = _resolve_place(lat, lon, city)
+        if err:
+            return err
+        data, err = fetch_weather(db, lat_f, lon_f, label)
         if data:
             return jsonify(data)
         return jsonify({"error": err or "Weather unavailable", "retry": True}), 503
@@ -138,16 +167,13 @@ def api_air_quality():
     try:
         from services.air_quality_service import fetch_air_quality
         db=get_db()
-        lat=request.args.get("lat", "14.6308")
-        lon=request.args.get("lon", "121.0968")
+        lat=request.args.get("lat")
+        lon=request.args.get("lon")
         city=request.args.get("city")
-        try:
-            lat_f=float(lat); lon_f=float(lon)
-            if not (-90<=lat_f<=90 and -180<=lon_f<=180):
-                return jsonify({"error":"Invalid coordinates"}),400
-        except (TypeError, ValueError):
-            return jsonify({"error":"Invalid coordinates"}),400
-        data, err = fetch_air_quality(db, lat_f, lon_f, city)
+        lat_f, lon_f, label, err = _resolve_place(lat, lon, city)
+        if err:
+            return err
+        data, err = fetch_air_quality(db, lat_f, lon_f, label)
         if data:
             return jsonify(data)
         return jsonify({"error": err or "Air quality unavailable", "retry": True}), 503
@@ -161,17 +187,14 @@ def api_environment():
         from services.air_quality_service import fetch_air_quality
         from utils.environment import overall_status
         db=get_db()
-        lat=request.args.get("lat", "14.6308")
-        lon=request.args.get("lon", "121.0968")
+        lat=request.args.get("lat")
+        lon=request.args.get("lon")
         city=request.args.get("city")
-        try:
-            lat_f=float(lat); lon_f=float(lon)
-            if not (-90<=lat_f<=90 and -180<=lon_f<=180):
-                return jsonify({"error":"Invalid coordinates"}),400
-        except (TypeError, ValueError):
-            return jsonify({"error":"Invalid coordinates"}),400
-        w_data, w_err = fetch_weather(db, lat_f, lon_f, city)
-        aq_data, aq_err = fetch_air_quality(db, lat_f, lon_f, city)
+        lat_f, lon_f, label, err = _resolve_place(lat, lon, city)
+        if err:
+            return err
+        w_data, w_err = fetch_weather(db, lat_f, lon_f, label)
+        aq_data, aq_err = fetch_air_quality(db, lat_f, lon_f, label)
         # Do not fabricate — return what we have, unavailable otherwise
         heat_cat = (w_data or {}).get("heat_index", {}).get("category") if w_data else None
         aqi_cat = (aq_data or {}).get("category") if aq_data else None
@@ -326,8 +349,11 @@ def api_announcements():
         try:
             lat_f = float(lat) if lat not in (None, "") else None
             lon_f = float(lon) if lon not in (None, "") else None
-            if lat_f is not None and not (-90 <= lat_f <= 90 and -180 <= lon_f <= 180):
-                return jsonify({"error": "Invalid coordinates"}), 400
+            if (lat_f is not None and lon_f is None) or (lat_f is None and lon_f is not None):
+                return jsonify({"error": "Both lat and lon are required"}), 400
+            if lat_f is not None and lon_f is not None:
+                if not (-90 <= lat_f <= 90 and -180 <= lon_f <= 180):
+                    return jsonify({"error": "Invalid coordinates"}), 400
         except (TypeError, ValueError):
             return jsonify({"error": "Invalid coordinates"}), 400
         rows = db.execute(
@@ -376,8 +402,11 @@ def api_earthquakes():
             lat_f = float(lat) if lat not in (None, "") else None
             lon_f = float(lon) if lon not in (None, "") else None
             radius_f = float(radius)
-            if lat_f is not None and not (-90 <= lat_f <= 90 and -180 <= lon_f <= 180):
-                return jsonify({"error": "Invalid coordinates"}), 400
+            if (lat_f is None) != (lon_f is None):
+                return jsonify({"error": "Both lat and lon are required"}), 400
+            if lat_f is not None and lon_f is not None:
+                if not (-90 <= lat_f <= 90 and -180 <= lon_f <= 180):
+                    return jsonify({"error": "Invalid coordinates"}), 400
             if not (10 <= radius_f <= 2000):
                 return jsonify({"error": "radius_km must be 10-2000"}), 400
         except (TypeError, ValueError):

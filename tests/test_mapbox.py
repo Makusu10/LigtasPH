@@ -23,6 +23,7 @@ def test_map_without_token_uses_osm_fallback(client, app):
     assert "unpkg.com/leaflet" in html
     assert "mapbox-gl.js" not in html
     assert 'id="gpsBox"' not in html  # GPS panel only rendered with token
+    assert "isolation:isolate" in html or "isolation: isolate" in html
 
 def test_map_with_token_uses_mapbox(client, app):
     app.config["MAPBOX_TOKEN"] = "pk.test-token"

@@ -175,7 +175,34 @@ def close_db(e=None):
     except Exception:
         pass
 
+def _migrate_weather_cache(db):
+    try:
+        row = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='weather_cache'").fetchone()
+        if row and row["sql"] and "open-meteo-air" not in row["sql"]:
+            db.executescript("""
+                ALTER TABLE weather_cache RENAME TO weather_cache_old;
+                CREATE TABLE weather_cache (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    city TEXT,
+                    lat REAL,
+                    lng REAL,
+                    source TEXT CHECK (source IN ('cached','openweather','open-meteo','noaa','air-quality','open-meteo-air','openweather-air')) DEFAULT 'cached',
+                    payload TEXT NOT NULL,
+                    fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_weather_city ON weather_cache(city);
+                CREATE INDEX IF NOT EXISTS idx_weather_latlng ON weather_cache(lat, lng);
+                CREATE INDEX IF NOT EXISTS idx_weather_source ON weather_cache(source);
+                INSERT INTO weather_cache (id, city, lat, lng, source, payload, fetched_at)
+                SELECT id, city, lat, lng, source, payload, fetched_at FROM weather_cache_old;
+                DROP TABLE weather_cache_old;
+            """)
+            db.commit()
+    except Exception:
+        pass
+
 def init_db():
     db = get_db()
+    _migrate_weather_cache(db)
     db.executescript(SCHEMA)
     db.commit()

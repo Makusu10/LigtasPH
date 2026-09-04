@@ -4,7 +4,7 @@
 <div class="map-fullbleed">
   <div class="map-shell">
     <div id="map"></div>
-    <button id="panelOpen" class="btn btn-secondary" style="display:none; position:absolute; top:12px; left:12px; z-index:11; padding:8px 12px; font-size:13px;" aria-label="Show details panel">☰ Details</button>
+    <button id="panelOpen" class="btn btn-secondary" style="display:none; position:absolute; top:12px; left:12px; z-index:1001; padding:8px 12px; font-size:13px;" aria-label="Show details panel">☰ Details</button>
     <aside id="sidePanel" class="card" aria-label="Map details and filters">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <div style="display:flex; align-items:center; gap:8px;">
@@ -115,15 +115,15 @@
   /* Truly full-screen map: break out of .container, nav + banner float over the map */
   .map-fullbleed{ width:100vw; margin-left:calc(-50vw + 50%); margin-top:-16px; margin-bottom:-32px; }
   .map-shell{ position:relative; height:100dvh; min-height:520px; overflow:hidden; background:#e8edf3; }
-  #map{ height:100%; }
-  #sidePanel{ position:absolute; top:76px; left:12px; bottom:12px; width:min(360px, calc(100% - 24px)); overflow-y:auto; z-index:10; margin:0; }
+  #map{ height:100%; position:relative; z-index:1; isolation:isolate; }
+  #sidePanel{ position:absolute; top:76px; left:12px; bottom:12px; width:min(360px, calc(100% - 24px)); overflow-y:auto; z-index:1000; margin:0; }
   #sidePanel.collapsed{ display:none; }
-  #panelOpen{ top:76px !important; }
+  #panelOpen{ top:76px !important; z-index:1001 !important; }
   /* map controls clear the floating nav */
   #map .mapboxgl-ctrl-top-right{ top:70px; }
   #map .leaflet-top.leaflet-right{ margin-top:70px; }
   /* top nav becomes a hoverable overlay (map page only) */
-  body:has(.map-shell) .nav{ position:absolute; top:0; left:0; right:0; z-index:30;
+  body:has(.map-shell) .nav{ position:absolute; top:0; left:0; right:0; z-index:1100;
     background:linear-gradient(180deg, rgba(255,255,255,0.88), rgba(255,255,255,0));
     border-bottom:none; box-shadow:none; }
   body:has(.map-shell) .nav:hover,
@@ -133,7 +133,7 @@
     box-shadow:0 4px 20px rgba(16,42,67,0.08); }
   /* demo banner becomes a small floating pill; footer hidden for full height */
   body:has(.map-shell) .demo-banner{ position:absolute; top:74px; left:50%; transform:translateX(-50%);
-    z-index:15; width:max-content; max-width:min(620px, 92vw); margin:0; padding:8px 14px;
+    z-index:1050; width:max-content; max-width:min(620px, 92vw); margin:0; padding:8px 14px;
     pointer-events:none; white-space:normal; text-align:center; }
   body:has(.map-shell) footer{ display:none; }
   @media (max-width: 768px){

@@ -7,6 +7,7 @@ import json
 import time
 import urllib.request
 import urllib.error
+import urllib.parse
 from flask import current_app
 
 OPENWEATHER_URL = "https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={key}&units=metric"
@@ -35,6 +36,29 @@ def _fetch_json(url, timeout=5):
     req = urllib.request.Request(url, headers={"User-Agent": "LigtasPH/1.0 (free-tier)"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode())
+
+GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search?name={q}&count=1&language=en&format=json"
+
+def geocode_city(city, timeout=5):
+    """Resolve free-text place to (lat, lon, resolved_name) via Open-Meteo
+    geocoding (keyless, same provider family as the forecast fallback).
+
+    Returns None when the place is unresolvable or the lookup fails, so
+    callers can answer 404 instead of serving a default grid's weather
+    under the requested label.
+    """
+    q = (city or "").strip()
+    if not q:
+        return None
+    try:
+        data = _fetch_json(GEOCODE_URL.format(q=urllib.parse.quote(q)), timeout=timeout)
+    except Exception:
+        return None
+    try:
+        top = (data.get("results") or [])[0]
+        return float(top["latitude"]), float(top["longitude"]), top.get("name") or q
+    except (IndexError, KeyError, TypeError, ValueError):
+        return None
 
 def get_cached(db, lat, lon, city=None, max_age_sec=600):
     try:

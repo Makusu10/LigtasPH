@@ -56,6 +56,20 @@ DEFAULT_STALE_MAX_AGE_SECONDS = 60 * 60
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 5
 MAX_RESPONSE_BYTES = 1_000_000
 
+# Generous Metro Manila bounding box (west, south, east, north). Seed demo
+# rows describe NCR air and must not answer queries outside this box.
+NCR_BBOX = (120.85, 14.30, 121.20, 14.85)
+
+
+def _in_ncr(lat: Any, lon: Any) -> bool:
+    """Check whether coordinates fall inside the NCR bounding box."""
+
+    try:
+        west, south, east, north = NCR_BBOX
+        return south <= float(lat) <= north and west <= float(lon) <= east
+    except (TypeError, ValueError):
+        return False
+
 
 class AirQualityServiceError(Exception):
     """Base exception for air-quality service failures."""
@@ -275,6 +289,10 @@ def get_cached_aq(
         result = dict(payload)
         result["_cached"] = True
         result["_cache_age_seconds"] = round(float(age_seconds))
+        # Demo seed rows describe Metro Manila. Never serve one for a query
+        # outside NCR — a Masbate request must not answer with Manila air.
+        if result.get("_demo") and not _in_ncr(lat, lon):
+            return None
         return result
 
     except (

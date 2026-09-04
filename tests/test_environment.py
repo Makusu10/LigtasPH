@@ -145,7 +145,7 @@ def test_weather_page_sends_coords_with_city_and_links_officials(client):
     html = client.get("/weather").get_data(as_text=True)
     # City branch must carry the real lat/lon, not a hardcoded grid.
     assert "city=${encodeURIComponent(city)}&lat=14.6308" not in html
-    assert "&city=${encodeURIComponent(city)}" in html
+    assert "params.push(`city=${encodeURIComponent(city)}`)" in html
     # Official cross-check card (external links, not scraped content:
     # ligtas.cair.ph robots.txt disallows /api/).
     assert "https://www.pagasa.dost.gov.ph/" in html
@@ -153,6 +153,73 @@ def test_weather_page_sends_coords_with_city_and_links_officials(client):
     assert 'target="_blank"' in html
     # Per-city proof: provider-resolved station name shown next to the label.
     assert "• via ${esc(rawName)}" in html
+    # esc() must exist: user-typed city names flow into card markup.
+    assert "function esc(s)" in html
+    assert "${esc(displayName)}" in html
+
+def test_geocode_city_hit_miss_and_failure(monkeypatch):
+    import services.weather_service as ws
+    def fake_ok(url, timeout=5):
+        return {"results": [{"latitude": 12.3700, "longitude": 123.6200, "name": "Masbate"}]}
+    monkeypatch.setattr(ws, "_fetch_json", fake_ok)
+    assert ws.geocode_city("masbate") == (12.37, 123.62, "Masbate")
+    monkeypatch.setattr(ws, "_fetch_json", lambda url, timeout=5: {"results": []})
+    assert ws.geocode_city("xyzzynonsense") is None
+    def boom(url, timeout=5):
+        raise Exception("offline")
+    monkeypatch.setattr(ws, "_fetch_json", boom)
+    assert ws.geocode_city("Manila") is None
+    assert ws.geocode_city("  ") is None
+
+def test_weather_city_only_geocodes_to_own_grid(client, monkeypatch):
+    # Regression: typed cities used to receive Marikina's grid (14.6308,
+    # 121.0968) under their own label. A bare city must resolve to its
+    # own coordinates via geocoding.
+    import services.weather_service as ws
+    real_fetch = ws._fetch_json
+    def fake_fetch(url, timeout=5):
+        if "geocoding-api" in url:
+            return {"results": [{"latitude": 12.3700, "longitude": 123.6200, "name": "Masbate"}]}
+        if "hourly=" in url:
+            return {"hourly": {"time": [], "temperature_2m": []}, "daily": {}}
+        return {"current": {"temperature_2m": 29.0, "relative_humidity_2m": 75,
+                            "apparent_temperature": 33.0, "precipitation": 0.0,
+                            "precipitation_probability": 20,
+                            "wind_speed_10m": 4.0, "weather_code": 2,
+                            "is_day": 0, "time": "2026-09-04T14:00"}}
+    monkeypatch.setattr(ws, "_fetch_json", fake_fetch)
+    r = client.get("/api/weather?city=masbate")
+    assert r.status_code == 200
+    j = r.get_json()
+    assert (j["lat"], j["lon"]) == (12.37, 123.62)
+    assert j["city"] == "masbate"
+    assert j["name"] != "City of Marikina"
+
+def test_weather_unknown_city_404(client, monkeypatch):
+    import services.weather_service as ws
+    monkeypatch.setattr(ws, "geocode_city", lambda city, timeout=5: None)
+    r = client.get("/api/weather?city=xyzzynonsense")
+    assert r.status_code == 404
+    assert "not found" in r.get_json()["error"].lower()
+    r2 = client.get("/api/environment?city=xyzzynonsense")
+    assert r2.status_code == 404
+
+def test_air_quality_demo_not_served_outside_ncr(client, app, monkeypatch):
+    # Seed AQ demo row describes Metro Manila; a far-away query with dead
+    # providers must 503, not answer with Manila air.
+    import services.air_quality_service as aq
+    monkeypatch.setattr(aq, "fetch_open_meteo_aq",
+                        lambda *a, **k: (_ for _ in ()).throw(Exception("offline")))
+    monkeypatch.setattr(aq, "fetch_openweather_aq",
+                        lambda *a, **k: (_ for _ in ()).throw(Exception("offline")))
+    r = client.get("/api/air-quality?lat=12.37&lon=123.62")
+    assert r.status_code == 503
+    assert r.get_json().get("retry") is True
+
+def test_weather_page_omits_coords_for_unknown_text(client):
+    html = client.get("/weather").get_data(as_text=True)
+    assert "if(lat!=null && lon!=null) params.push(`lat=${lat}&lon=${lon}`)" in html
+    assert "Place not found" in html
 
 def test_api_weather_has_heat_index(client):
     r = client.get("/api/weather?lat=14.6308&lon=121.0968")
