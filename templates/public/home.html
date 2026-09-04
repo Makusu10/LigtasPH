@@ -4,19 +4,19 @@
 <section class="card" style="padding:24px; display:grid; gap:14px;">
   <div style="display:flex; gap:12px; align-items:center;">
     <span class="nav-brand-mark" style="width:36px;height:36px; font-size:14px;">LP</span>
-    <h1 style="margin:0; font-size:28px; line-height:1.1; color:var(--navy);">Find evacuation centers and emergency information near you</h1>
+    <h1 style="margin:0; font-size:28px; line-height:1.1;">Find your evacuation center now</h1>
   </div>
-  <p style="color:var(--text-secondary); margin:0; max-width:65ch;">LigtasPH is a centralized platform for locating official evacuation centers, checking occupancy and supply status, viewing current weather, and finding emergency hotlines for your city or municipality.</p>
+  <p style="color:var(--text-secondary); margin:0; max-width:65ch;">Locate official evacuation centers, check occupancy and supplies, and get weather and hotlines for your city or municipality.</p>
   <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
-    <a href="{{ url_for('public.map_page') }}" class="btn btn-primary">Find an Evacuation Center</a>
-    <a href="{{ url_for('public.hotlines_page') }}" class="btn btn-secondary">View Emergency Hotlines</a>
+    <a href="{{ url_for('public.map_page') }}" class="btn btn-primary btn-lg">Find Nearest Evacuation Center</a>
+    <a href="{{ url_for('public.hotlines_page') }}" class="btn btn-secondary btn-lg">Emergency Hotlines</a>
   </div>
   <div style="background:#f9e6e4; border:2px solid var(--red); border-left:8px solid var(--red); padding:10px 12px; border-radius:2px; color:#5e0a0e; font-weight:600; font-family:var(--font-display); font-size:14px; letter-spacing:0.04em; text-transform:uppercase;">If you are in immediate danger, contact 911 or your local DRRMO. This site is for information only.</div>
 </section>
 
 <section style="margin-top:16px;">
   <div class="grid-4">
-    <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Listed Centers</div><div style="font-size:28px; font-weight:800; color:var(--navy);">{{ total }}</div></div>
+    <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Listed Centers</div><div class="stat-num" style="font-size:28px; font-weight:800;">{{ total }}</div></div>
     <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Available</div><div style="font-size:28px; font-weight:800; color:var(--green);">{{ available }}</div><span class="badge badge-available">Available < 80%</span></div>
     <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Nearly Full</div><div style="font-size:28px; font-weight:800; color:var(--orange);">{{ nearly }}</div><span class="badge badge-nearly">80–99%</span></div>
     <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Full</div><div style="font-size:28px; font-weight:800; color:var(--red);">{{ full }}</div><span class="badge badge-full">100%</span></div>

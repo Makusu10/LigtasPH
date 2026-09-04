@@ -2,6 +2,13 @@
 {% block title %}Evacuation Centers — LigtasPH{% endblock %}
 {% block content %}
 <h1 style="margin:0 0 8px;">Evacuation Centers</h1>
+<div class="emergency-strip">
+  <div>
+    <span class="strip-tag">Need shelter now?</span>
+    <span class="strip-copy">Open the map to find your nearest center</span>
+  </div>
+  <a href="{{ url_for('public.map_page') }}" class="btn btn-primary btn-lg">Open Evacuation Map</a>
+</div>
 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; align-items:center;">
   <input id="q" placeholder="Search name, city, address" style="flex:1; min-width:220px;">
   <select id="city"><option value="">All cities</option></select>
