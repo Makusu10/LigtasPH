@@ -15,6 +15,39 @@
   </style>
 </head>
 <body>
+  {% if request.endpoint == 'public.home' %}
+  <div id="splash" role="status" aria-label="LigtasPH loading">
+    <div class="splash-inner">
+      <div class="splash-mark" aria-hidden="true"><span class="material-symbols-rounded">shield</span></div>
+      <div class="splash-word">LIGTAS<span>PH</span></div>
+      <div class="splash-tag">Calamity Response &amp; Evacuation Mapping</div>
+      <div class="splash-bar" aria-hidden="true"><span></span></div>
+    </div>
+  </div>
+  <script>
+  (function(){
+    // Logo cover: once per tab session, auto-advances, tap/key skips.
+    var KEY='ligtasph_splash_seen';
+    var el=document.getElementById('splash');
+    if(!el) return;
+    try{ if(sessionStorage.getItem(KEY)){ el.remove(); return; } }catch(e){}
+    var done=false;
+    function hide(){
+      if(done) return; done=true;
+      try{ sessionStorage.setItem(KEY,'1'); }catch(e){}
+      el.classList.add('splash-hide');
+      setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, 450);
+    }
+    var reduce=false;
+    try{ reduce=window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
+    setTimeout(hide, reduce ? 400 : 1800);
+    el.addEventListener('click', hide);
+    document.addEventListener('keydown', function onKey(e){
+      if(e.key==='Enter'||e.key==='Escape'||e.key===' '){ hide(); document.removeEventListener('keydown', onKey); }
+    });
+  })();
+  </script>
+  {% endif %}
   {% include 'partials/nav_public.html' %}
   {% if config.get('IS_DEMO') %}
     <div class="container"><div class="demo-banner" role="status">Development sample data — not verified live. <small>For demo only.</small></div></div>
