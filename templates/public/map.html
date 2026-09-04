@@ -18,6 +18,7 @@
       <button id="tabBtnCenters" role="tab" aria-selected="true" aria-controls="tabCenters" class="btn btn-primary" style="flex:1; padding:6px 4px; font-size:12px;">Centers</button>
       <button id="tabBtnHazards" role="tab" aria-selected="false" aria-controls="tabHazards" class="btn btn-secondary" style="flex:1; padding:6px 4px; font-size:12px;">Hazards<span id="hzBadge"></span></button>
       <button id="tabBtnRoutes" role="tab" aria-selected="false" aria-controls="tabRoutes" class="btn btn-secondary" style="flex:1; padding:6px 4px; font-size:12px;">Routes</button>
+      <button id="tabBtnGroup" role="tab" aria-selected="false" aria-controls="tabGroup" class="btn btn-secondary" style="flex:1; padding:6px 4px; font-size:12px;">Group<span id="groupBadge"></span></button>
     </div>
     <div id="tabCenters" role="tabpanel" aria-labelledby="tabBtnCenters">
     <label for="q">Search</label>
@@ -76,6 +77,34 @@
       <div id="routeStatus" role="status" style="color:var(--text-secondary); font-size:12px; margin-top:6px;"></div>
     </fieldset>
     {% endif %}
+    </div>
+    <div id="tabGroup" role="tabpanel" aria-labelledby="tabBtnGroup" hidden>
+    <fieldset style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin:0 0 8px; font-size:13px;">
+      <legend style="font-size:12px; font-weight:700; padding:0 4px;">Emergency group</legend>
+      <div style="font-size:12px; color:var(--text-secondary); margin-bottom:6px;">Create a group, share the code with family/friends, and see each other's live pins in an emergency. Pins expire after 2 hours.</div>
+      <label for="gName" style="font-size:12px;">New group name</label>
+      <div style="display:flex; gap:6px; margin:4px 0;">
+        <input id="gName" placeholder="e.g. Dela Cruz Family" maxlength="80" style="flex:1; margin:0;">
+        <button id="gCreateBtn" class="btn btn-secondary" style="padding:6px 10px; font-size:12px;">Create</button>
+      </div>
+      <div id="gCodeOut" style="display:none; align-items:center; gap:6px; margin:4px 0; background:rgba(27,35,48,0.05); border:1px dashed var(--border); border-radius:8px; padding:8px 10px;">
+        <span style="font-size:12px;">Invite code:</span>
+        <strong id="gCodeVal" style="font-size:16px; letter-spacing:0.1em;"></strong>
+        <button id="gCopyBtn" class="btn btn-secondary" style="padding:4px 8px; font-size:12px; margin-left:auto;">Copy</button>
+      </div>
+      <div style="border-top:1px solid var(--border); margin:8px 0 6px; padding-top:6px; font-weight:700; font-size:12px;">Join &amp; share</div>
+      <label for="gJoinCode" style="font-size:12px;">Invite code</label>
+      <input id="gJoinCode" placeholder="e.g. A1B2C3" maxlength="12" style="margin:4px 0; text-transform:uppercase;">
+      <label for="gMyName" style="font-size:12px;">Your display name</label>
+      <input id="gMyName" placeholder="e.g. Ana" maxlength="40" style="margin:4px 0;">
+      <div style="display:flex; gap:6px; margin:4px 0;">
+        <button id="gJoinBtn" class="btn btn-secondary" style="flex:1; padding:6px 8px; font-size:12px;">Join &amp; show</button>
+        <button id="gShareBtn" class="btn btn-primary" style="flex:1; padding:6px 8px; font-size:12px;" aria-pressed="false">Share: off</button>
+      </div>
+      <div id="groupStatus" role="status" style="color:var(--text-secondary); font-size:12px; margin-top:4px;"></div>
+    </fieldset>
+    <div style="font-weight:700; font-size:12px; margin:2px 0 4px;">Live locations <span id="groupCount" style="font-weight:400; color:var(--text-secondary);"></span></div>
+    <div id="groupList" style="max-height:30vh; overflow:auto; display:flex; flex-direction:column; gap:6px;"></div>
     </div>
     <div id="tabHazards" role="tabpanel" aria-labelledby="tabBtnHazards" hidden>
     <fieldset style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin:0 0 8px; font-size:13px;">
@@ -222,6 +251,138 @@ function renderList(filtered, onLocate){
 }
 function hzStatus(msg){ setStatus('hzStatus', msg); }
 function setStatus(id, msg){ const el=document.getElementById(id); if(el) el.textContent=msg||''; }
+// ---------- emergency group location sharing (engine-agnostic) ----------
+// groupState.draw is set by whichever map engine booted (Mapbox or Leaflet).
+const groupState={code:'', name:'', myName:'', sharing:false, shareTimer:null, refreshTimer:null, draw:null, rows:[]};
+function groupStatusMsg(m){ setStatus('groupStatus', m); }
+function timeAgo(s){
+  try{
+    const t=new Date(String(s||'').replace(' ','T')+'Z').getTime();
+    if(isNaN(t)) return '';
+    const mins=Math.max(0, Math.round((Date.now()-t)/60000));
+    if(mins<1) return 'just now';
+    if(mins<60) return mins+' min ago';
+    const h=Math.floor(mins/60);
+    return h+(h===1?' hr ago':' hrs ago');
+  }catch(e){ return ''; }
+}
+function renderGroupList(){
+  const list=document.getElementById('groupList'); if(!list) return;
+  const badge=document.getElementById('groupBadge');
+  const count=document.getElementById('groupCount');
+  const rows=groupState.rows||[];
+  if(badge) badge.textContent=rows.length?` • ${rows.length}`:'';
+  if(count) count.textContent=groupState.code?`(${rows.length} in ${groupState.name||groupState.code})`:'';
+  list.innerHTML='';
+  if(!groupState.code){ list.innerHTML='<div style="color:var(--text-secondary); font-size:12px;">Join a group with an invite code to see live locations.</div>'; return; }
+  if(!rows.length){ list.innerHTML='<div style="color:var(--text-secondary); font-size:12px;">No live locations yet — share yours or ask members to join with the code.</div>'; return; }
+  rows.forEach(r=>{
+    const mine=groupState.myName && r.display_name && r.display_name.toLowerCase()===groupState.myName.toLowerCase();
+    const row=document.createElement('div');
+    row.style.cssText='border:1px solid var(--border); border-radius:8px; padding:6px 8px; font-size:12px; display:flex; justify-content:space-between; gap:8px; align-items:center;'+(mine?' border-color:var(--primary); background:rgba(59,110,245,0.06);':'');
+    const acc=(r.accuracy!==null && r.accuracy!==undefined && r.accuracy!=='')?` • ±${Math.round(+r.accuracy)} m`:'';
+    row.innerHTML=`<div style="min-width:0;"><div style="font-weight:700;">${esc(r.display_name)}${mine?' • you':''}</div><div style="color:var(--text-secondary);">${esc(timeAgo(r.shared_at))}${esc(acc)}</div></div><button class="btn btn-secondary" style="padding:4px 8px; font-size:11px; flex-shrink:0;">Locate</button>`;
+    row.querySelector('button').addEventListener('click', ()=>{ if(groupState.locate) groupState.locate(r); });
+    list.appendChild(row);
+  });
+}
+async function groupRefresh(announce){
+  if(!groupState.code) return;
+  try{
+    const res=await fetch(`/api/groups/${encodeURIComponent(groupState.code)}/locations`);
+    if(res.status===404){ groupStatusMsg('Group not found — check the invite code.'); return; }
+    if(!res.ok) throw new Error('group '+res.status);
+    groupState.rows=await res.json();
+    renderGroupList();
+    try{ if(groupState.draw) groupState.draw(groupState.rows); }catch(e){}
+    if(announce) groupStatusMsg(`Group ${groupState.name||groupState.code}: ${groupState.rows.length} live location(s). Pins expire after 2 hours.`);
+  }catch(e){ if(announce) groupStatusMsg('Group locations unavailable — retry shortly.'); }
+}
+async function setActiveGroup(code, opts){
+  code=(code||'').trim().toUpperCase();
+  if(groupState.refreshTimer){ clearInterval(groupState.refreshTimer); groupState.refreshTimer=null; }
+  groupState.rows=[]; renderGroupList();
+  try{ if(groupState.draw) groupState.draw([]); }catch(e){}
+  if(!code) return;
+  groupState.code=code; groupState.name='';
+  const jc=document.getElementById('gJoinCode'); if(jc) jc.value=code;
+  const oc=document.getElementById('groupCode'); if(oc) oc.value=code;
+  try{
+    const res=await fetch(`/api/groups/${encodeURIComponent(code)}`);
+    if(res.status===404){ groupStatusMsg('Group not found — check the invite code.'); groupState.code=''; return; }
+    if(res.ok){ const g=await res.json(); groupState.name=g.name||''; }
+  }catch(e){}
+  await groupRefresh(!(opts&&opts.quiet));
+  groupState.refreshTimer=setInterval(()=>groupRefresh(false), 30000);
+}
+function postMyLocation(silent){
+  return new Promise((resolve)=>{
+    if(!navigator.geolocation){ if(!silent) groupStatusMsg('Geolocation not supported on this device.'); resolve(false); return; }
+    navigator.geolocation.getCurrentPosition(async (pos)=>{
+      try{
+        const res=await fetch('/api/locations', {method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({invite_code:groupState.code, display_name:groupState.myName,
+            lat:pos.coords.latitude, lng:pos.coords.longitude, accuracy:pos.coords.accuracy})});
+        if(res.status===404){ if(!silent) groupStatusMsg('Group not found — rejoin with a valid code.'); resolve(false); return; }
+        if(!res.ok) throw new Error('share '+res.status);
+        await groupRefresh(true);
+        resolve(true);
+      }catch(e){ if(!silent) groupStatusMsg('Could not share location — retry shortly.'); resolve(false); }
+    }, ()=>{ if(!silent) groupStatusMsg('Location denied — allow GPS permission to share.'); resolve(false); },
+    {enableHighAccuracy:true, timeout:10000});
+  });
+}
+function setSharing(on){
+  const btn=document.getElementById('gShareBtn');
+  if(on){
+    const code=(document.getElementById('gJoinCode').value||'').trim().toUpperCase();
+    const name=(document.getElementById('gMyName').value||'').trim();
+    if(!code){ groupStatusMsg('Enter an invite code first.'); return; }
+    if(!name){ groupStatusMsg('Enter your display name first.'); return; }
+    groupState.myName=name;
+    if(groupState.code!==code){ setActiveGroup(code, {quiet:true}); }
+    groupState.sharing=true;
+    if(btn){ btn.textContent='Share: on'; btn.setAttribute('aria-pressed','true'); }
+    groupStatusMsg('Sharing your live location…');
+    postMyLocation(false).then(()=>{ if(groupState.sharing) groupState.shareTimer=setInterval(()=>postMyLocation(true), 60000); });
+  }else{
+    groupState.sharing=false;
+    if(groupState.shareTimer){ clearInterval(groupState.shareTimer); groupState.shareTimer=null; }
+    if(btn){ btn.textContent='Share: off'; btn.setAttribute('aria-pressed','false'); }
+    groupStatusMsg('Stopped sharing. Your last pin expires after 2 hours.');
+  }
+}
+function bindGroupTab(){
+  const create=document.getElementById('gCreateBtn');
+  if(create) create.addEventListener('click', async ()=>{
+    const name=(document.getElementById('gName').value||'').trim()||'Group';
+    try{
+      const res=await fetch('/api/groups', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
+      if(!res.ok) throw new Error('create '+res.status);
+      const g=await res.json();
+      const out=document.getElementById('gCodeOut'); if(out) out.style.display='flex';
+      const val=document.getElementById('gCodeVal'); if(val) val.textContent=g.invite_code;
+      const jc=document.getElementById('gJoinCode'); if(jc) jc.value=g.invite_code;
+      groupStatusMsg(`Group “${g.name}” created — share the code, then Join & show.`);
+    }catch(e){ groupStatusMsg('Could not create group — retry shortly.'); }
+  });
+  const copy=document.getElementById('gCopyBtn');
+  if(copy) copy.addEventListener('click', ()=>{
+    const v=(document.getElementById('gCodeVal').textContent||'').trim();
+    if(!v) return;
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(v).then(()=>groupStatusMsg('Invite code copied.')).catch(()=>groupStatusMsg('Copy failed — long-press the code.')); }
+    else groupStatusMsg('Copy the code: '+v);
+  });
+  const join=document.getElementById('gJoinBtn');
+  if(join) join.addEventListener('click', ()=>{
+    const name=(document.getElementById('gMyName').value||'').trim();
+    if(name) groupState.myName=name;
+    setActiveGroup(document.getElementById('gJoinCode').value, {});
+  });
+  const share=document.getElementById('gShareBtn');
+  if(share) share.addEventListener('click', ()=>setSharing(!groupState.sharing));
+  renderGroupList();
+}
 // Single reader for all hazard toggles — both map engines share it so the
 // checkbox set can't drift between Mapbox and Leaflet behavior.
 function hazardSelection(){
@@ -237,9 +398,9 @@ function noahStatusText(id, data){
   const n=(data.features||[]).reduce((a,f)=>a+((f.geometry||{}).coordinates||[]).length,0);
   return `NOAH ${id}: ${n} zones`;
 }
-// ---------- side-panel tabs (Centers / Hazards / Routes) ----------
+// ---------- side-panel tabs (Centers / Hazards / Routes / Group) ----------
 function switchPanelTab(name){
-  const tabs={centers:['tabBtnCenters','tabCenters'], hazards:['tabBtnHazards','tabHazards'], routes:['tabBtnRoutes','tabRoutes']};
+  const tabs={centers:['tabBtnCenters','tabCenters'], hazards:['tabBtnHazards','tabHazards'], routes:['tabBtnRoutes','tabRoutes'], group:['tabBtnGroup','tabGroup']};
   Object.entries(tabs).forEach(([key,[btnId,panelId]])=>{
     const b=document.getElementById(btnId), p=document.getElementById(panelId);
     if(!b||!p) return;
@@ -260,7 +421,7 @@ function updateHazardsBadge(){
   if(sh) sh.disabled=!n;
 }
 function bindPanelTabs(){
-  [['tabBtnCenters','centers'],['tabBtnHazards','hazards'],['tabBtnRoutes','routes']].forEach(([id,name])=>{
+  [['tabBtnCenters','centers'],['tabBtnHazards','hazards'],['tabBtnRoutes','routes'],['tabBtnGroup','group']].forEach(([id,name])=>{
     const b=document.getElementById(id);
     if(b) b.addEventListener('click', ()=>switchPanelTab(name));
   });
@@ -499,7 +660,7 @@ async function initMapbox(){
 
   let markers = []; // {id, marker}
   let groupMarkers = [];
-  let groupTimer = null;
+  // NB: group refresh timing lives in shared groupState.refreshTimer.
   const quakeSrcId='hz-quakes', fireSrcId='hz-fires';
   const quakeAreaSrcId='hz-quake-area', fireAreaSrcId='hz-fire-area';
 
@@ -892,34 +1053,22 @@ async function initMapbox(){
       ).addTo(map);
     }catch(err){ /* style not ready — ignore tap */ }
   });
-  // ---- group live locations ----
-  async function loadGroup(){
-    const code=(document.getElementById('groupCode').value||'').trim();
+  // ---- group live locations (shared Group tab drives this; Routes box delegates) ----
+  function drawGroupMapbox(rows){
     groupMarkers.forEach(m=>m.remove()); groupMarkers=[];
-    if(groupTimer){ clearInterval(groupTimer); groupTimer=null; }
-    if(!code){ return; }
-    const draw=async ()=>{
-      try{
-        const res=await fetch(`/api/groups/${encodeURIComponent(code)}/locations`);
-        if(res.status===404){ routeStatus('Group not found — check the invite code.'); return; }
-        if(!res.ok) throw new Error('group '+res.status);
-        const rows=await res.json();
-        groupMarkers.forEach(m=>m.remove()); groupMarkers=[];
-        rows.forEach(r=>{
-          const el=document.createElement('div');
-          el.title=r.display_name;
-          el.style.cssText='background:#175CD3;width:16px;height:16px;border-radius:50%;border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.5);cursor:pointer;';
-          const m=new mapboxgl.Marker({element:el}).setLngLat([r.lon??r.lng, r.lat])
-            .setPopup(new mapboxgl.Popup({offset:10}).setHTML(`<b>${esc(r.display_name)}</b><br><span style="font-size:12px;color:#667085;">${esc(r.shared_at||'')}</span>`))
-            .addTo(map);
-          groupMarkers.push(m);
-        });
-        routeStatus(`Group ${code}: ${rows.length} live location(s).`);
-      }catch(e){ routeStatus('Group locations unavailable — retry shortly.'); }
-    };
-    await draw();
-    groupTimer=setInterval(draw, 30000);
+    (rows||[]).forEach(r=>{
+      const mine=groupState.myName && r.display_name && r.display_name.toLowerCase()===groupState.myName.toLowerCase();
+      const el=document.createElement('div');
+      el.title=r.display_name;
+      el.style.cssText=`background:${mine?'#039855':'#175CD3'};width:${mine?'18px':'16px'};height:${mine?'18px':'16px'};border-radius:50%;border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.5);cursor:pointer;`;
+      const m=new mapboxgl.Marker({element:el}).setLngLat([r.lon??r.lng, r.lat])
+        .setPopup(new mapboxgl.Popup({offset:10}).setHTML(`<b>${esc(r.display_name)}${mine?' (you)':''}</b><br><span style="font-size:12px;color:#667085;">${esc(timeAgo(r.shared_at))} • shared ${esc(r.shared_at||'')}</span>`))
+        .addTo(map);
+      m._grow=r; groupMarkers.push(m);
+    });
   }
+  groupState.draw=drawGroupMapbox;
+  groupState.locate=(r)=>{ try{ map.flyTo({center:[r.lon??r.lng, r.lat], zoom:14}); const m=groupMarkers.find(m=>m._grow===r); if(m) m.togglePopup(); }catch(e){} };
   // ---- 2D / 3D ----
   let terrainOn=false;
   function set3D(on){
@@ -955,7 +1104,8 @@ async function initMapbox(){
   map.on('moveend', ()=>{ clearTimeout(hzTimer); hzTimer=setTimeout(refreshHazards, 500); });
   document.getElementById('btn2d').addEventListener('click', ()=>set3D(false));
   document.getElementById('btn3d').addEventListener('click', ()=>set3D(true));
-  document.getElementById('groupBtn').addEventListener('click', loadGroup);
+  const _groupBtn=document.getElementById('groupBtn');
+  if(_groupBtn) _groupBtn.addEventListener('click', ()=>{ setActiveGroup(document.getElementById('groupCode').value, {}); });
   bindNavSearch();
   bindNavControls();
   map.on('load', ()=>{ render(); });
@@ -964,7 +1114,7 @@ async function initMapbox(){
 }
 
 // ================= LEAFLET/OSM FALLBACK (unchanged behavior) =================
-let _map, _markers=[], _quakeLayer=null, _fireLayer=null, _heatLayer=null;
+let _map, _markers=[], _quakeLayer=null, _fireLayer=null, _heatLayer=null, _groupLayer=null;
 let _noahLayers={flood:null, slide:null, surge:null};
 function noahStyle(feat){
   const lv=(feat && feat.properties && feat.properties.level)||'moderate';
@@ -1027,6 +1177,19 @@ function initFallback(){
     debounceHazards(refreshHazardsFb);
   document.getElementById('showHazardsBtn').addEventListener('click', zoomToHazardsFb);
     _map.on('moveend', ()=>{ clearTimeout(hzTimer); hzTimer=setTimeout(refreshHazardsFb, 500); });
+    // ---- group live locations (same shared Group tab drives this engine too) ----
+    _groupLayer=L.layerGroup().addTo(_map);
+    groupState.draw=(rows)=>{
+      _groupLayer.clearLayers();
+      (rows||[]).forEach(r=>{
+        const mine=groupState.myName && r.display_name && r.display_name.toLowerCase()===groupState.myName.toLowerCase();
+        const m=L.marker([r.lat, r.lon??r.lng], {icon:L.divIcon({html:`<div style="background:${mine?'#039855':'#175CD3'};width:${mine?'18px':'16px'};height:${mine?'18px':'16px'};border-radius:50%;border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.5);"></div>`, className:'', iconSize:[18,18]}), title:r.display_name});
+        m._grow=r;
+        m.bindPopup(`<b>${esc(r.display_name)}${mine?' (you)':''}</b><br><span style="font-size:12px;color:#667085;">${esc(timeAgo(r.shared_at))} • shared ${esc(r.shared_at||'')}</span>`);
+        m.addTo(_groupLayer);
+      });
+    };
+    groupState.locate=(r)=>{ try{ _map.setView([r.lat, r.lon??r.lng], 14); let found=null; _groupLayer.eachLayer(l=>{ if(l._grow===r) found=l; }); if(found) found.openPopup(); }catch(e){} };
   }).catch(()=>{ hzStatus('Map failed to load — check your connection and reload.'); });
 }
 function renderFb(){
@@ -1141,6 +1304,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   bindPanelToggle();
   bindPanelTabs();
   try{ bindRouteDock(); }catch(e){}
+  bindGroupTab();
   if(USE_MAPBOX){ initMapbox().catch(e=>{ console.warn('Mapbox failed, falling back to OSM:', e); initFallback(); }); }
   else { initFallback(); }
 });

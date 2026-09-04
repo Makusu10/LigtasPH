@@ -93,3 +93,68 @@ def test_expired_locations_hidden(client, app):
         db.commit()
     rows = client.get(f"/api/groups/{group['invite_code']}/locations").get_json()
     assert rows == []
+
+
+def test_group_info_roundtrip(client):
+    group = _create_group(client, name="Rescue Buddies")
+    r = client.get(f"/api/groups/{group['invite_code']}")
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["invite_code"] == group["invite_code"]
+    assert body["name"] == "Rescue Buddies"
+    assert body["live_count"] == 0
+
+    client.post("/api/locations", json={
+        "invite_code": group["invite_code"],
+        "display_name": "Ana",
+        "lat": 14.6,
+        "lon": 121.0,
+    })
+    body = client.get(f"/api/groups/{group['invite_code']}").get_json()
+    assert body["live_count"] == 1
+
+
+def test_group_info_unknown_group(client):
+    assert client.get("/api/groups/NOPE01").status_code == 404
+
+
+def test_post_location_updates_same_name(client):
+    # Re-sharing replaces the sender's previous pin (one live row per person).
+    group = _create_group(client)
+    payload = {
+        "invite_code": group["invite_code"],
+        "display_name": "Ana",
+        "lat": 14.6,
+        "lon": 121.0,
+    }
+    assert client.post("/api/locations", json=payload).status_code == 201
+    payload["lat"] = 14.7
+    assert client.post("/api/locations", json=payload).status_code == 201
+    # Different casing still collapses to one row, keeping latest casing.
+    payload["display_name"] = "ANA"
+    payload["lat"] = 14.8
+    assert client.post("/api/locations", json=payload).status_code == 201
+
+    rows = client.get(f"/api/groups/{group['invite_code']}/locations").get_json()
+    assert len(rows) == 1
+    assert rows[0]["display_name"] == "ANA"
+    assert rows[0]["lat"] == pytest.approx(14.8)
+
+
+def test_post_location_update_keeps_others(client):
+    group = _create_group(client)
+    for name in ("Ana", "Ben"):
+        client.post("/api/locations", json={
+            "invite_code": group["invite_code"],
+            "display_name": name,
+            "lat": 14.6,
+            "lon": 121.0,
+        })
+    client.post("/api/locations", json={
+        "invite_code": group["invite_code"],
+        "display_name": "Ana",
+        "lat": 14.9,
+        "lon": 121.1,
+    })
+    rows = client.get(f"/api/groups/{group['invite_code']}/locations").get_json()
+    assert {r["display_name"] for r in rows} == {"Ana", "Ben"}
