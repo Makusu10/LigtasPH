@@ -114,6 +114,20 @@ a { color: var(--blue); }
 .btn-primary:hover { background:#cf2a32; }
 .btn-secondary { background: var(--panel); color: var(--text); border-color: var(--line); }
 .btn-secondary:hover { background:#e3e9e1; }
+/* Dominant emergency action — big, obvious, tappable one-handed */
+.btn-lg { padding:16px 22px; font-size:17px; letter-spacing:0.1em; }
+.btn-lg .btn-icon { font-family:var(--font-mono); font-size:20px; line-height:1; }
+
+/* Emergency action band — printed-form strip that dominates before lists/filters */
+.emergency-strip {
+  display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+  background: var(--night); border:2px solid var(--line); border-left:10px solid var(--red);
+  color:#fff; padding:12px 14px; margin:0 0 14px; border-radius:var(--radius);
+  box-shadow: var(--hard-shadow);
+}
+.emergency-strip .strip-tag { font-family:var(--font-mono); font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--amber-bright); display:block; }
+.emergency-strip .strip-copy { font-family:var(--font-display); font-weight:600; font-size:20px; text-transform:uppercase; letter-spacing:0.03em; line-height:1.15; }
+.emergency-strip .btn { flex:0 0 auto; }
 
 /* Nav — dark ops bar with siren top edge */
 .nav {
@@ -210,8 +224,8 @@ input:focus, select:focus, textarea:focus { outline:none; border-color:var(--red
 
 /* Now card — day/night, hard-edged */
 .weather-now { border-radius:var(--radius); padding:20px; display:flex; justify-content:space-between; gap:16px; border:2px solid var(--line); box-shadow:var(--hard-shadow); }
-.weather-now.day { background: linear-gradient(180deg, #fff 0%, #dce9f4 100%); color:var(--ink); }
-.weather-now.night { background: linear-gradient(180deg, #0d1b22 0%, #1b303b 100%); border-color:var(--night); color:#c9d6da; }
+.weather-now.day { background: #dde6ea; color:var(--ink); }
+.weather-now.night { background: var(--night); color:#c9d6da; }
 .weather-now .now-label{ font-family:var(--font-display); font-size:13px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; }
 .weather-now.day .now-label{ color:#3d4a52; }
 .weather-now.night .now-label{ color:#9fb2b9; }
@@ -270,12 +284,12 @@ input:focus, select:focus, textarea:focus { outline:none; border-color:var(--red
 #splash{ position:fixed; inset:0; z-index:2000; display:grid; place-items:center; cursor:pointer;
   background:
     repeating-linear-gradient(45deg, rgba(193,18,31,0.35) 0 6px, transparent 6px 14px),
-    linear-gradient(160deg, #0d1b22 0%, #142127 60%, #25384a 100%); }
+    var(--night); }
 #splash.splash-hide{ opacity:0; pointer-events:none; transition:opacity .25s ease; }
 .splash-inner{ display:grid; justify-items:center; gap:12px; text-align:center; padding:24px; }
 .splash-mark{ width:96px; height:96px; border:4px solid #fff; border-radius:var(--radius); display:grid; place-items:center; color:#fff;
   background: var(--red);
-  box-shadow:0 6px 0 rgba(0,0,0,0.35); animation:splash-pop .5s cubic-bezier(.2,1.4,.4,1) both; }
+  box-shadow:0 6px 0 rgba(0,0,0,0.35); animation:splash-pop .5s ease-out both; }
 .splash-mark .material-symbols-rounded{ font-size:52px; }
 .splash-word{ color:#fff; font-family:var(--font-display); font-weight:600; font-size:40px; letter-spacing:.06em; text-transform:uppercase; animation:splash-rise .5s .25s ease both; }
 .splash-word span{ color:var(--amber-bright); }
@@ -288,4 +302,37 @@ input:focus, select:focus, textarea:focus { outline:none; border-color:var(--red
 @media (prefers-reduced-motion: reduce){
   .splash-mark,.splash-word,.splash-tag,.splash-bar{ animation:none; }
   #splash.splash-hide{ transition-duration:.15s; }
+}
+
+/* --------------------------------------------------------------------------
+   DARK MODE — default for `prefers-color-scheme: dark`, no toggle, no JS.
+   Low-light field use (brownouts, nights) without forcing surface colours to
+   glow. Text-on-light surfaces get explicit light text; white pictogram tiles
+   (weather icon, env icons) stay white so the glyphs keep contrast.
+   -------------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper:#0f1a20; --panel:#14252e; --panel-2:#1b2e39;
+    --line:#2c404a; --line-soft:#43555e;
+    --red:#d33b44; --red-dark:#8f141b;
+    --blue:#3b82d8; --green:#3f9c5b;
+    --text:#e2e7e4; --text-secondary:#a7b4b8; --text-muted:#7c8a90;
+    --hard-shadow:4px 4px 0 rgba(0,0,0,0.55);
+    --hard-shadow-lg:6px 6px 0 rgba(0,0,0,0.6);
+  }
+  h1,h2,h3,h4 { color:#e8edeb; }
+  input,select,textarea { color:#162229; }
+  a { color:#7fb4e0; }
+  .btn-secondary:hover { background:#2a3e49; }
+  .weather-now.day { background:#17262f; color:#c9d6da; }
+  .weather-now.day .now-label, .weather-now.day .weather-now-feels, .weather-now.day .weather-now-hilo { color:#9fb2b9; }
+  .weather-now.day .weather-now-temp, .weather-now.day .weather-now-desc { color:#eef3f4; }
+  .hourly-card { background:#111e26; color:#eef3f4; }
+  .hourly-card .h-temp { color:#eef3f4; }
+  .env-tint-green { background:#1d2b20; }
+  .env-tint-yellow { background:#2e2818; }
+  .env-tint-orange { background:#33251a; }
+  .env-tint-red { background:#331b1a; }
+  .env-tint-purple { background:#241d2e; }
+  .stat-num { color:#e8edeb; }
 }
