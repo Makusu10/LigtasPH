@@ -31,6 +31,8 @@ def create_app(env=None):
         # A developer .env key must not leak into the suite: tests such as
         # test_api_weather_no_cache_503 expect a 503 when providers fail.
         app.config["OPENWEATHER_API_KEY"] = ""
+        # Same for FIRMS: test_fires_requires_key expects 503 with no key.
+        app.config["FIRMS_MAP_KEY"] = ""
 
     Path(app.config["DATABASE"]).parent.mkdir(parents=True, exist_ok=True)
 
@@ -56,6 +58,12 @@ def create_app(env=None):
         try:
             with app.app_context():
                 init_db()
+                # Ephemeral disks (Render free tier) boot with an empty DB after
+                # every deploy/restart — seed demo data when no centers exist yet.
+                # seed_db() only fills empty tables, so this is a no-op otherwise.
+                row = get_db().execute("SELECT COUNT(*) AS n FROM evacuation_centers").fetchone()
+                if (row["n"] if row else 0) == 0:
+                    seed_db()
         except Exception as e:
             app.logger.warning("Schema ensure failed for %s: %s", app.config["DATABASE"], e)
 

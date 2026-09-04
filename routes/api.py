@@ -263,6 +263,26 @@ def api_create_group():
     except Exception:
         return jsonify({"error": "Could not create group", "retry": True}), 503
 
+@bp.route("/api/groups/<code>")
+def api_group_info(code):
+    try:
+        db = get_db()
+        group = db.execute(
+            "SELECT id, invite_code, name, created_at FROM emergency_groups WHERE invite_code=? COLLATE NOCASE",
+            ((code or "").strip(),),
+        ).fetchone()
+        if not group:
+            return jsonify({"error": "Group not found"}), 404
+        live = db.execute(
+            "SELECT COUNT(*) AS n FROM live_locations WHERE group_id=? AND expires_at > datetime('now')",
+            (group["id"],),
+        ).fetchone()
+        out = dict(group)
+        out["live_count"] = live["n"] if live else 0
+        return jsonify(out)
+    except Exception:
+        return jsonify({"error": "Could not load group", "retry": True}), 503
+
 @bp.route("/api/locations", methods=["POST"])
 def api_post_location():
     try:
@@ -294,6 +314,12 @@ def api_post_location():
         if not group:
             return jsonify({"error": "Group not found"}), 404
         try:
+            # Upsert per person: re-sharing replaces the sender's previous pin
+            # so the live list stays one row per display_name (case-insensitive).
+            db.execute(
+                "DELETE FROM live_locations WHERE group_id=? AND display_name=? COLLATE NOCASE",
+                (group["id"], display),
+            )
             cur = db.execute(
                 """INSERT INTO live_locations
                    (group_id, display_name, lat, lng, accuracy, expires_at)
