@@ -4,7 +4,7 @@
 <div class="map-fullbleed">
   <div class="map-shell">
     <div id="map"></div>
-    <div id="tileFallback" role="status" aria-live="polite" style="display:none; position:absolute; bottom:16px; left:50%; transform:translateX(-50%); z-index:1002; background:var(--panel); border:2px solid var(--line); border-radius:var(--radius); padding:8px 14px; font-size:12px; max-width:380px; text-align:center; box-shadow:var(--hard-shadow); pointer-events:none;">Map background blocked — try hotspot or disable adblocker. Center dots still work.</div>
+    <div id="tileFallback" role="status" aria-live="polite" style="display:none; position:absolute; bottom:16px; left:50%; transform:translateX(-50%); z-index:1002; background:rgba(244,246,248,0.90); border:1px solid rgba(20,40,63,0.16); border-radius:var(--radius); padding:8px 14px; font-size:12px; max-width:380px; text-align:center; box-shadow:var(--hard-shadow); pointer-events:none; -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);">Map background blocked — try hotspot or disable adblocker. Center dots still work.</div>
     <button id="panelOpen" class="btn btn-secondary" style="display:none; position:absolute; top:12px; left:12px; z-index:1001; padding:8px 12px; font-size:13px;" aria-label="Show details panel">☰ Details</button>
     <aside id="sidePanel" class="card" aria-label="Map details and filters">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -174,13 +174,25 @@
   /* map controls clear the floating nav */
   #map .mapboxgl-ctrl-top-right{ top:70px; }
   #map .leaflet-top.leaflet-right{ margin-top:70px; }
-  /* top nav becomes a hoverable overlay (map page only) */
+  /* top nav becomes a hoverable overlay (map page only) — glass, not opaque */
   body:has(.map-shell) .nav{ position:absolute; top:0; left:0; right:0; z-index:1100;
-    background:rgba(13,27,34,0.92); border-bottom:2px solid var(--line); box-shadow:none; }
+    background:rgba(18,40,63,0.80); border-bottom:1px solid rgba(255,255,255,0.12); box-shadow:none; }
   body:has(.map-shell) .nav:hover,
   body:has(.map-shell) .nav:focus-within,
-  body:has(.map-shell) .nav:has(.mobile-menu.open){ background:var(--night);
-    border-bottom:2px solid var(--line); box-shadow:0 4px 0 rgba(13,27,34,0.2); }
+  body:has(.map-shell) .nav:has(.mobile-menu.open){ background:rgba(18,40,63,0.95);
+    border-bottom:1px solid rgba(255,255,255,0.12); box-shadow:var(--hard-shadow); }
+  /* Turn-by-turn dock floats over the map: the second glass surface (light glass). */
+  #routeDock{
+    background:rgba(244,246,248,0.90);
+    -webkit-backdrop-filter:blur(10px) saturate(1.05);
+    backdrop-filter:blur(10px) saturate(1.05);
+    border:1px solid rgba(20,40,63,0.16);
+  }
+  @supports not (backdrop-filter: blur(1px)){ #routeDock{ background:rgba(244,246,248,0.98); } }
+  @media (prefers-color-scheme: dark){
+    #routeDock{ background:rgba(18,40,63,0.88); border-color:rgba(255,255,255,0.14); }
+    #tileFallback{ background:rgba(18,40,63,0.90); border-color:var(--line-soft); }
+  }
   /* demo banner becomes a small floating pill; footer hidden for full height */
   body:has(.map-shell) .demo-banner{ position:absolute; top:74px; left:50%; transform:translateX(-50%);
     z-index:1050; width:max-content; max-width:min(620px, 92vw); margin:0; padding:8px 14px;

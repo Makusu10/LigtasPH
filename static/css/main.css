@@ -132,13 +132,19 @@ a { color: var(--blue); }
 .emergency-strip .strip-copy { font-family:var(--font-display); font-weight:600; font-size:19px; letter-spacing:0.01em; line-height:1.2; }
 .emergency-strip .btn { flex:0 0 auto; }
 
-/* Nav — dark navy bar, amber top edge (no red), glass applied on elevated surfaces */
+/* Nav — dark navy bar, amber top edge (no red). Glass: sole elevated surface
+   that floats above page content, so it gets subtle blur + translucency. */
 .nav {
-  background: rgba(18,40,63,0.94);
+  background: rgba(18,40,63,0.86);
   border-bottom: 1px solid rgba(255,255,255,0.12);
   border-top: 3px solid var(--amber);
   position: sticky; top:0; z-index:20;
   box-shadow: var(--hard-shadow);
+  -webkit-backdrop-filter: blur(10px) saturate(1.1);
+  backdrop-filter: blur(10px) saturate(1.1);
+}
+@supports not (backdrop-filter: blur(1px)){
+  .nav{ background: rgba(18,40,63,0.97); }
 }
 .nav-inner { display:flex; align-items:center; justify-content:space-between; height:62px; gap:16px; }
 .nav-brand { display:flex; align-items:center; gap:10px; font-family: var(--font-display); font-weight:600; letter-spacing:0.03em; font-size:19px; color:#fff; text-decoration:none; text-transform:uppercase; }
