@@ -20,11 +20,11 @@ def home():
             available += 1
     recent = db.execute("SELECT * FROM evacuation_centers WHERE archived=0 ORDER BY updated_at DESC LIMIT 4").fetchall()
     last_updated = db.execute("SELECT MAX(updated_at) as m FROM evacuation_centers").fetchone()
-    return render_template("public/home.html", total=total, available=available, nearly=nearly, full=full, centers=recent, last_updated=last_updated["m"] if last_updated else None, is_demo=current_app.config.get("IS_DEMO", True))
+    return render_template("public/home.html", total=total, available=available, nearly=nearly, full=full, centers=recent, last_updated=last_updated["m"] if last_updated else None, is_demo=current_app.config.get("IS_DEMO", True), mapbox_token=current_app.config.get("MAPBOX_TOKEN", ""))
 
 @bp.route("/map")
 def map_page():
-    return render_template("public/map.html")
+    return render_template("public/map.html", mapbox_token=current_app.config.get("MAPBOX_TOKEN", ""))
 
 @bp.route("/centers")
 def centers_page():
@@ -39,7 +39,7 @@ def center_detail(center_id):
     pct = round(c["current_occupancy"]/c["capacity"]*100,1) if c["capacity"] else 0
     avail = c["capacity"] - c["current_occupancy"]
     status = "Full" if pct>=100 else "Nearly Full" if pct>=80 else "Available" if c["operational_status"]=="Open" else "Status Unavailable"
-    return render_template("public/center_detail.html", c=c, pct=pct, avail=avail, status=status)
+    return render_template("public/center_detail.html", c=c, pct=pct, avail=avail, status=status, mapbox_token=current_app.config.get("MAPBOX_TOKEN", ""))
 
 @bp.route("/weather")
 def weather_page():

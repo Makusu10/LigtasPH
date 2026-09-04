@@ -37,14 +37,31 @@ def test_admin_protected_redirect(client):
     assert client.get("/admin/dashboard").status_code == 302
     assert client.get("/admin/centers").status_code == 302
 
-def test_api_centers_returns_6(client):
+def test_api_centers_cover_all_ncr_lgus(client):
+    # Seed spans the whole NCR province: 20 open centers (archived
+    # excluded) across all 17 LGUs. Replaces the old returns_6 assertion.
     r = client.get("/api/centers")
     assert r.status_code == 200
     data = r.get_json()
-    assert len(data) == 6  # archived excluded
+    assert len(data) == 20  # archived excluded
     assert "occupancy_pct" in data[0]
     assert "occupancy_status" in data[0]
     assert "available_slots" in data[0]
+    cities = {c["city"] for c in data}
+    assert len(cities) == 17
+    for lgu in ("Manila", "Caloocan", "Pateros", "Marikina", "Quezon City", "Pasig"):
+        assert lgu in cities
+
+def test_api_ncr_lgus(client):
+    r = client.get("/api/ncr-lgus")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert len(data) == 17
+    names = {l["name"] for l in data}
+    assert names == {c for c in names}  # unique
+    assert {"Manila", "Pateros", "Navotas", "Muntinlupa"} <= names
+    for l in data:
+        assert -90 <= l["lat"] <= 90 and -180 <= l["lon"] <= 180
 
 def test_api_hotlines_filter(client):
     r = client.get("/api/hotlines?city=Marikina")
@@ -98,3 +115,19 @@ def test_api_weather_no_cache_503(client, app, monkeypatch):
     r = client.get("/api/weather?lat=14.6308&lon=121.0968")
     assert r.status_code == 503
     assert r.get_json().get("retry") is True
+
+def test_api_center_detail_closed_status(client, app):
+    with app.app_context():
+        from utils.db import get_db
+        db = get_db()
+        db.execute(
+            "INSERT INTO evacuation_centers (name,address,city,lat,lng,capacity,"
+            "current_occupancy,operational_status) VALUES (?,?,?,?,?,?,?,?)",
+            ("Closed Test", "Addr", "Marikina", 14.6, 121.0, 100, 10, "Closed"),
+        )
+        db.commit()
+        row = db.execute(
+            "SELECT id FROM evacuation_centers WHERE name='Closed Test'"
+        ).fetchone()
+        cid = row["id"]
+    assert client.get(f"/api/centers/{cid}").get_json()["occupancy_status"] == "Status Unavailable"

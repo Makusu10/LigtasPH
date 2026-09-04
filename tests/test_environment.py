@@ -89,6 +89,71 @@ def test_overall_more_severe_wins():
     o5 = overall_status("Unavailable", "Good")
     assert o5["category"] == "Good"
 
+def test_wmo_map_covers_all_documented_codes():
+    # Every WMO weather code per open-meteo docs must render a real label —
+    # never a raw "WMO 96". Guards the cross-reference accuracy fix.
+    from services.weather_service import WMO_MAP
+    documented = {0, 1, 2, 3, 45, 48, 51, 53, 55, 56, 57, 61, 63, 65,
+                  66, 67, 71, 73, 75, 77, 80, 81, 82, 85, 86, 95, 96, 99}
+    assert documented <= set(WMO_MAP)
+    for code, label in WMO_MAP.items():
+        assert label and not label.startswith("WMO ")
+
+def test_fetch_open_meteo_maps_hail_and_feels_like(monkeypatch):
+    # Thunderstorm-with-hail code + apparent temperature + rain chance
+    # must flow into the payload (mocked provider, no network).
+    import services.weather_service as ws
+    def fake_fetch(url, timeout=5):
+        if "hourly=" in url:
+            return {"hourly": {"time": [], "temperature_2m": []}, "daily": {}}
+        return {"current": {"temperature_2m": 31.0, "relative_humidity_2m": 70,
+                            "apparent_temperature": 36.5, "precipitation": 0.2,
+                            "precipitation_probability": 80,
+                            "wind_speed_10m": 5.0, "weather_code": 96,
+                            "is_day": 1, "time": "2026-09-04T14:00"}}
+    monkeypatch.setattr(ws, "_fetch_json", fake_fetch)
+    payload = ws.fetch_open_meteo(14.6, 121.0, "Manila")
+    assert payload["weather"][0]["description"] == "Thunderstorm with slight hail"
+    assert payload["main"]["feels_like"] == 36.5
+    assert payload["precipitation_probability"] == 80
+    assert payload["precipitation_mm"] == 0.2
+
+def test_fetch_weather_passes_lgu_coords_to_provider(app, monkeypatch):
+    # Regression: every city used to fetch Marikina's grid (14.6308,
+    # 121.0968) because the frontend hardcoded coords in the city branch.
+    # The provider must receive the requested LGU coordinates.
+    import services.weather_service as ws
+    urls = []
+    def fake_fetch(url, timeout=5):
+        urls.append(url)
+        if "hourly=" in url:
+            return {"hourly": {"time": [], "temperature_2m": []}, "daily": {}}
+        return {"current": {"temperature_2m": 30, "relative_humidity_2m": 70,
+                            "apparent_temperature": 34, "precipitation": 0.0,
+                            "precipitation_probability": 10,
+                            "wind_speed_10m": 3.0, "weather_code": 1,
+                            "is_day": 1, "time": "2026-09-04T14:00"}}
+    monkeypatch.setattr(ws, "_fetch_json", fake_fetch)
+    with app.app_context():
+        from utils.db import get_db
+        payload, err = ws.fetch_weather(get_db(), 14.5995, 120.9842, "Manila")
+    assert err is None
+    assert payload["lat"] == 14.5995 and payload["lon"] == 120.9842
+    assert any("latitude=14.5995" in u and "longitude=120.9842" in u for u in urls)
+
+def test_weather_page_sends_coords_with_city_and_links_officials(client):
+    html = client.get("/weather").get_data(as_text=True)
+    # City branch must carry the real lat/lon, not a hardcoded grid.
+    assert "city=${encodeURIComponent(city)}&lat=14.6308" not in html
+    assert "&city=${encodeURIComponent(city)}" in html
+    # Official cross-check card (external links, not scraped content:
+    # ligtas.cair.ph robots.txt disallows /api/).
+    assert "https://www.pagasa.dost.gov.ph/" in html
+    assert "https://ligtas.cair.ph/home/" in html
+    assert 'target="_blank"' in html
+    # Per-city proof: provider-resolved station name shown next to the label.
+    assert "• via ${esc(rawName)}" in html
+
 def test_api_weather_has_heat_index(client):
     r = client.get("/api/weather?lat=14.6308&lon=121.0968")
     assert r.status_code == 200

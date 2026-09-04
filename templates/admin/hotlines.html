@@ -3,13 +3,22 @@
 {% block content %}
 {% include 'partials/nav_admin.html' %}
 <h1 style="margin:12px 0 8px;">Hotline Management</h1>
+<form method="post" action="{{ url_for('admin.create_hotline') }}" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; align-items:end;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label style="font-size:12px;">Agency <input type="text" name="agency" required></label>
+  <label style="font-size:12px;">Category <select name="category">{% for cat in categories %}<option>{{ cat }}</option>{% endfor %}</select></label>
+  <label style="font-size:12px;">Number <input type="text" name="contact_number" required></label>
+  <label style="font-size:12px;">City <input type="text" name="city" required></label>
+  <button type="submit" class="btn btn-primary" style="padding:8px 12px; font-size:13px;">Add hotline</button>
+</form>
 <div style="overflow:auto; border:1px solid var(--border); border-radius:8px;">
 <table>
-  <thead><tr><th>Agency</th><th>Category</th><th>Number</th><th>City</th><th>Verified</th><th>Archived</th></tr></thead>
+  <thead><tr><th>Agency</th><th>Category</th><th>Number</th><th>City</th><th>Verified</th><th>Archived</th><th>Actions</th></tr></thead>
   <tbody>
     {% for h in hotlines %}
-      <tr><td style="font-weight:700;">{{ h['agency'] }}</td><td><span class="badge badge-unknown">{{ h['category'] }}</span></td><td><a href="tel:{{ h['contact_number'] }}">{{ h['contact_number'] }}</a></td><td>{{ h['city'] }}</td><td style="font-size:12px;">{{ h['last_verified'] }}</td><td>{{ 'Yes' if h['archived'] else 'No' }}</td></tr>
-    {% else %}<tr><td colspan="6">No hotlines.</td></tr>{% endfor %}
+      <tr><td style="font-weight:700;">{{ h['agency'] }}</td><td><span class="badge badge-unknown">{{ h['category'] }}</span></td><td><a href="tel:{{ h['contact_number'] }}">{{ h['contact_number'] }}</a></td><td>{{ h['city'] }}</td><td style="font-size:12px;">{{ h['last_verified'] }}</td><td>{{ 'Yes' if h['archived'] else 'No' }}</td>
+      <td><form method="post" action="{{ url_for('admin.archive_hotline', hid=h['id']) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="{{ 'unarchive' if h['archived'] else 'archive' }}"><button type="submit" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">{{ 'Restore' if h['archived'] else 'Archive' }}</button></form></td></tr>
+    {% else %}<tr><td colspan="7">No hotlines.</td></tr>{% endfor %}
   </tbody>
 </table>
 </div>

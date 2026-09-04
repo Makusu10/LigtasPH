@@ -67,7 +67,7 @@ venv\Scripts\Activate.ps1
 # Then run
 flask --app app run --debug       # http://127.0.0.1:5000 with auto-reload
 # or
-python wsgi.py                    # same, uses wsgi.py:87
+python wsgi.py                    # same, uses wsgi.py:1
 ```
 
 **Option C — Production (local prod check):**
@@ -98,10 +98,10 @@ deactivate
 | Command | Description |
 | :--- | :--- |
 | `flask --app app run` | Flask dev server (auto reload) |
-| `flask --app app init-db` | Create 5 tables (FK ON, CHECKs, indexes) |
+| `flask --app app init-db` | Create 8 tables (FK ON, CHECKs, indexes) |
 | `flask --app app seed` | Seed 7 centers (Available/Nearly/Full/archived), 12 hotlines, 1 admin (hashed), weather_cache demo (incl. heat/AQI demo) |
 | `gunicorn wsgi:app` | Production server (Render/PythonAnywhere) |
-| `pytest -q` | Run 17+ Sprint 1+2 tests (auth, API, weather, env heat/AQI 503, 404) |
+| `pytest -q` | Run 83 tests (auth, API, weather, env heat/AQI 503, 404, sharing, hazards, admin CRUD) |
 | `pip install -r requirements.txt` | Install Flask, Flask-WTF, Flask-Limiter, gunicorn, whitenoise, pytest |
 
 ---
@@ -124,7 +124,7 @@ deactivate
 ## 🏗️ Tech Stack & Architecture
 - **Frontend**: HTML5, CSS3 (Material 3 liquid-glass matte, Inter/Roboto, tokens --primary/#3b6ef5), Vanilla JS, Leaflet 1.9 + OSM, Lucide + Material Symbols, Visual weather Now + hourly + environmental (Heat/AQI) cards
 - **Backend**: Flask 3.x, Flask-WTF (CSRF), Flask-Limiter (5/15min lockout), Werkzeug hash, python-dotenv, whitenoise
-- **DB**: SQLite (`instance/ligtas.sqlite`, `PRAGMA foreign_keys=ON`), 5 tables: `administrators`, `evacuation_centers`, `center_status_updates`, `emergency_hotlines`, `weather_cache` (also caches `air-quality` 10m/1h)
+- **DB**: SQLite (`instance/ligtas.sqlite`, `PRAGMA foreign_keys=ON`), 8 tables: `administrators`, `evacuation_centers`, `center_status_updates`, `emergency_hotlines`, `weather_cache` (also caches `air-quality` 10m/1h), `emergency_groups`, `live_locations`, `hazards_cache`
 - **Weather**: `services/weather_service.py` → `cache<10min → OpenWeather (key, PH is_day) → Open-Meteo (no key, Asia/Manila + is_day + daily High/Low) → stale 1h →503`, never fabricates; Heat Index via Rothfusz (`utils/environment.py`)
 - **Air Quality**: `services/air_quality_service.py` → `cache10m → OpenWeather Air Pollution (if key) → Open-Meteo Air Quality (no key, PM2.5/US AQI) → stale 1h →503`; DENR DAO 2020-14 PM2.5 + US EPA AQI labeled separately
 - **Structure**: `app.py` (factory) + `wsgi.py`, `config.py`, `routes/{public,auth,admin,api}.py`, `models/`, `services/{weather_service,air_quality_service}`, `utils/{db,seed,validators,security,environment}`, `templates/{public,admin,errors,partials}`, `static/{css,js,images}`, `tests/`
@@ -151,7 +151,7 @@ deactivate
 
 ## 🧪 Testing
 ```bash
-pytest -q  # 17+ passed: home/map/directory/weather/hotlines/admin pages, protected redirect, api centers/hotlines/weather+env (200+400/503), detail 200/404, login 401/302+dashboard + lockout 403, plus utils/environment boundaries (heat 8 values, PM2.5 10 values, overall, unavailable, stale)
+pytest -q  # 83 passed: pages + protected redirect, api centers/hotlines/weather+env (200+400/503), detail 200/404 incl. closed-status, login 401/302+dashboard + lockout 403, environment boundaries, sharing (groups/locations/expiry), hazards (quakes/fires cache + 503), admin CRUD (occupancy audit, hotline create/archive, logout POST)
 ```
 
 ## Known MVP Limitations

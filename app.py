@@ -25,6 +25,11 @@ def create_app(env=None):
     app.config["ADMIN_PASSWORD"] = os.getenv("ADMIN_PASSWORD", "admin123")
     app.config["OPENWEATHER_API_KEY"] = os.getenv("OPENWEATHER_API_KEY", app.config.get("OPENWEATHER_API_KEY",""))
     app.config["FIRMS_MAP_KEY"] = os.getenv("FIRMS_MAP_KEY", app.config.get("FIRMS_MAP_KEY", ""))
+    app.config["MAPBOX_TOKEN"] = os.getenv("MAPBOX_TOKEN", app.config.get("MAPBOX_TOKEN", ""))
+    if cfg_name == "testing":
+        # A developer .env key must not leak into the suite: tests such as
+        # test_api_weather_no_cache_503 expect a 503 when providers fail.
+        app.config["OPENWEATHER_API_KEY"] = ""
 
     Path(app.config["DATABASE"]).parent.mkdir(parents=True, exist_ok=True)
 
@@ -33,10 +38,9 @@ def create_app(env=None):
     csrf = CSRFProtect(app)
 
     try:
-        from flask_limiter import Limiter
-        from flask_limiter.util import get_remote_address
-        limiter = Limiter(get_remote_address, app=app, default_limits=[], storage_uri=app.config.get("RATELIMIT_STORAGE_URI","memory://"))
-        app.limiter = limiter
+        from utils.ratelimit import limiter as shared_limiter
+        shared_limiter.init_app(app)
+        app.limiter = shared_limiter
     except Exception as e:
         app.logger.warning("Flask-Limiter init failed: %s", e)
         app.limiter = None

@@ -9,6 +9,7 @@ class BaseConfig:
     DATABASE = os.getenv("DATABASE_URL", str(basedir / "instance" / "ligtas.sqlite"))
     OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
     FIRMS_MAP_KEY = os.getenv("FIRMS_MAP_KEY", "")
+    MAPBOX_TOKEN = os.getenv("MAPBOX_TOKEN", "")  # public pk.* token for 2D/3D map; empty → OSM fallback
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")  # reserved for Sprint 2 AI — unused in Sprint 1
     # Security
     SESSION_COOKIE_HTTPONLY = True

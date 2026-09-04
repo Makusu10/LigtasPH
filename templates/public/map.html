@@ -1,10 +1,24 @@
 {% extends 'base.html' %}
 {% block title %}Evacuation Map — LigtasPH{% endblock %}
 {% block content %}
-<h1 style="margin:0 0 8px;">Evacuation Map</h1>
-<p style="color:var(--text-secondary); margin:0 0 12px;">Search by name/city/address and filter by occupancy/supply. Use My Location or pick manually.</p>
-<div style="display:grid; grid-template-columns: 320px 1fr; gap:16px;" class="map-layout">
-  <div class="card">
+<div class="map-fullbleed">
+  <div class="map-shell">
+    <div id="map"></div>
+    <button id="panelOpen" class="btn btn-secondary" style="display:none; position:absolute; top:12px; left:12px; z-index:11; padding:8px 12px; font-size:13px;" aria-label="Show details panel">☰ Details</button>
+    <aside id="sidePanel" class="card" aria-label="Map details and filters">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <strong style="font-size:14px;">Evacuation Map</strong>
+          <span id="mapMode" style="font-size:10px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:var(--text-secondary); background:rgba(27,35,48,0.06); padding:3px 8px; border-radius:999px;">…</span>
+        </div>
+        <button id="panelClose" class="btn btn-secondary" style="padding:4px 10px; font-size:12px;" aria-label="Hide details panel">✕</button>
+      </div>
+    <div id="panelTabs" role="tablist" aria-label="Map panel sections" style="display:flex; gap:6px; margin-bottom:8px;">
+      <button id="tabBtnCenters" role="tab" aria-selected="true" aria-controls="tabCenters" class="btn btn-primary" style="flex:1; padding:6px 4px; font-size:12px;">Centers</button>
+      <button id="tabBtnHazards" role="tab" aria-selected="false" aria-controls="tabHazards" class="btn btn-secondary" style="flex:1; padding:6px 4px; font-size:12px;">Hazards<span id="hzBadge"></span></button>
+      <button id="tabBtnRoutes" role="tab" aria-selected="false" aria-controls="tabRoutes" class="btn btn-secondary" style="flex:1; padding:6px 4px; font-size:12px;">Routes</button>
+    </div>
+    <div id="tabCenters" role="tabpanel" aria-labelledby="tabBtnCenters">
     <label for="q">Search</label>
     <input id="q" placeholder="e.g. Marikina, Sports Center" style="margin-bottom:8px;">
     <label for="cityFilter">City</label>
@@ -18,156 +32,991 @@
       <option value="">All</option><option>Adequate</option><option>High</option><option>Low</option><option>Unknown</option>
     </select>
     <div style="display:flex; gap:8px; margin:8px 0;">
-      <button id="locBtn" class="btn btn-secondary" style="flex:1;">Use My Location</button>
-      <button id="clearBtn" class="btn btn-secondary">Clear</button>
+      <button id="clearBtn" class="btn btn-secondary" style="flex:1;">Clear</button>
     </div>
+    <div id="list" style="max-height:50vh; overflow:auto; display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--border); padding-top:8px;"></div>
+    </div>
+    <div id="tabRoutes" role="tabpanel" aria-labelledby="tabBtnRoutes" hidden>
+    {% if mapbox_token %}
+    <div id="viewToggle" style="display:flex; gap:8px; margin:0 0 8px;">
+      <button id="btn2d" class="btn btn-secondary" style="flex:1;">2D</button>
+      <button id="btn3d" class="btn btn-secondary" style="flex:1;">3D</button>
+    </div>
+    <fieldset id="gpsBox" style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin:0 0 8px; font-size:13px;">
+      <legend style="font-size:12px; font-weight:700; padding:0 4px;">GPS &amp; group</legend>
+      <div id="gpsStatus" role="status" style="font-size:12px; color:var(--text-secondary); margin-bottom:4px;">Starting GPS…</div>
+      <button id="locBtn" class="btn btn-secondary" style="width:100%; margin:0 0 4px; padding:6px 8px; font-size:12px;">Use My Location</button>
+      <label for="groupCode" style="font-size:12px;">Group invite code</label>
+      <div style="display:flex; gap:6px; margin:4px 0;">
+        <input id="groupCode" placeholder="e.g. A1B2C3" maxlength="12" style="flex:1; margin:0;">
+        <button id="groupBtn" class="btn btn-secondary" style="padding:6px 10px; font-size:12px;">Show</button>
+      </div>
+      <div style="font-size:12px; color:var(--text-secondary);">Tap “Route here” in any center popup for turn-by-turn directions from your location.</div>
+      <div style="border-top:1px solid var(--border); margin-top:8px; padding-top:8px;">
+        <label for="navDest" style="font-size:12px;">Go somewhere (like Maps/Waze)</label>
+        <div style="position:relative;">
+          <input id="navDest" placeholder="e.g. SM Marikina, hospital…" autocomplete="off" style="margin:4px 0;">
+          <div id="navSuggest" style="position:absolute; z-index:20; left:0; right:0; background:#fff; border:1px solid var(--border); border-radius:8px; overflow:hidden; display:none; max-height:180px; overflow:auto; box-shadow:0 4px 12px rgba(0,0,0,0.12);"></div>
+        </div>
+        <label for="navOrigin" style="font-size:12px;">Start (blank = my GPS location)</label>
+        <input id="navOrigin" placeholder="My Location" autocomplete="off" style="margin:4px 0;">
+        <div id="navModes" style="display:flex; gap:6px; margin:4px 0;" role="group" aria-label="Travel mode">
+          <button data-profile="driving" class="btn btn-primary" style="flex:1; padding:6px 4px; font-size:12px;">Drive</button>
+          <button data-profile="walking" class="btn btn-secondary" style="flex:1; padding:6px 4px; font-size:12px;">Walk</button>
+          <button data-profile="cycling" class="btn btn-secondary" style="flex:1; padding:6px 4px; font-size:12px;">Bike</button>
+        </div>
+        <div style="display:flex; gap:6px; margin:4px 0;">
+          <button id="navGo" class="btn btn-primary" style="flex:1; padding:6px 8px; font-size:12px;">Go</button>
+          <button id="followBtn" class="btn btn-secondary" style="flex:1; padding:6px 8px; font-size:12px;" aria-pressed="false">Follow: off</button>
+        </div>
+        <div id="navSteps" style="display:none; max-height:180px; overflow:auto; margin:4px 0 0; font-size:12px; border-top:1px solid var(--border); padding-top:6px;"></div>
+      </div>
+      <div id="routeStatus" role="status" style="color:var(--text-secondary); font-size:12px; margin-top:6px;"></div>
+    </fieldset>
+    {% endif %}
+    </div>
+    <div id="tabHazards" role="tabpanel" aria-labelledby="tabBtnHazards" hidden>
     <fieldset style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin:0 0 8px; font-size:13px;">
       <legend style="font-size:12px; font-weight:700; padding:0 4px;">Hazards overlay</legend>
       <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzQuake"> Earthquakes (USGS)</label>
       <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzFire"> Active fires (FIRMS)</label>
-      <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="hzHeat"> Fire density heat</label>
+      <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzHeat"> Fire density heat</label>
+      <div style="border-top:1px solid var(--border); margin:8px 0 6px; padding-top:6px; font-weight:700; font-size:12px;">Project NOAH (Metro Manila)</div>
+      <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzFlood"> Flood — 5-yr return</label>
+      <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzSlide"> Landslide</label>
+      <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzSurge"> Storm surge
+        <select id="hzSSA" aria-label="Storm surge advisory" style="margin:0; padding:2px 4px; font-size:12px;">
+          <option value="ssa1">SSA1</option><option value="ssa2">SSA2</option>
+          <option value="ssa3">SSA3</option><option value="ssa4" selected>SSA4</option>
+        </select>
+      </label>
+      <div style="display:flex; gap:8px; font-size:11px; color:var(--text-secondary); margin:2px 0 4px;">
+        <span><i style="display:inline-block; width:10px; height:10px; background:#facc15; border-radius:2px;"></i> Low</span>
+        <span><i style="display:inline-block; width:10px; height:10px; background:#f97316; border-radius:2px;"></i> Moderate</span>
+        <span><i style="display:inline-block; width:10px; height:10px; background:#dc2626; border-radius:2px;"></i> High</span>
+      </div>
+      <div style="font-size:11px; color:var(--text-secondary);">Source: Project NOAH (DOST). SSA4 = worst-case advisory.</div>
+      <div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">Rings: purple ≈ quake felt area by magnitude • red ≈ 1 km fire watch. Estimates, not official danger zones.</div>
       <div id="hzStatus" role="status" style="color:var(--text-secondary); font-size:12px; margin-top:6px;"></div>
+      <button id="showHazardsBtn" class="btn btn-secondary" style="width:100%; margin-top:6px; padding:6px 8px; font-size:12px;" disabled>Show hazards on map</button>
     </fieldset>
-    <div id="list" style="max-height:50vh; overflow:auto; display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--border); padding-top:8px;"></div>
-  </div>
-  <div class="card" style="padding:0; overflow:hidden;">
-    <div id="map" style="height:65vh; min-height:420px;"></div>
+    </div>
+    </aside>
   </div>
 </div>
 {% endblock %}
+{% block head %}
+{% if mapbox_token %}
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.29.0/mapbox-gl.css" rel="stylesheet">
+{% else %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+{% endif %}
+<style>
+  /* Truly full-screen map: break out of .container, nav + banner float over the map */
+  .map-fullbleed{ width:100vw; margin-left:calc(-50vw + 50%); margin-top:-16px; margin-bottom:-32px; }
+  .map-shell{ position:relative; height:100dvh; min-height:520px; overflow:hidden; background:#e8edf3; }
+  #map{ height:100%; }
+  #sidePanel{ position:absolute; top:76px; left:12px; bottom:12px; width:min(360px, calc(100% - 24px)); overflow-y:auto; z-index:10; margin:0; }
+  #sidePanel.collapsed{ display:none; }
+  #panelOpen{ top:76px !important; }
+  /* map controls clear the floating nav */
+  #map .mapboxgl-ctrl-top-right{ top:70px; }
+  #map .leaflet-top.leaflet-right{ margin-top:70px; }
+  /* top nav becomes a hoverable overlay (map page only) */
+  body:has(.map-shell) .nav{ position:absolute; top:0; left:0; right:0; z-index:30;
+    background:linear-gradient(180deg, rgba(255,255,255,0.88), rgba(255,255,255,0));
+    border-bottom:none; box-shadow:none; }
+  body:has(.map-shell) .nav:hover,
+  body:has(.map-shell) .nav:focus-within,
+  body:has(.map-shell) .nav:has(.mobile-menu.open){ background:rgba(255,255,255,0.94);
+    backdrop-filter:blur(20px) saturate(1.3); border-bottom:1px solid var(--glass-border);
+    box-shadow:0 4px 20px rgba(16,42,67,0.08); }
+  /* demo banner becomes a small floating pill; footer hidden for full height */
+  body:has(.map-shell) .demo-banner{ position:absolute; top:74px; left:50%; transform:translateX(-50%);
+    z-index:15; width:max-content; max-width:min(620px, 92vw); margin:0; padding:8px 14px;
+    pointer-events:none; white-space:normal; text-align:center; }
+  body:has(.map-shell) footer{ display:none; }
+  @media (max-width: 768px){
+    .map-shell{ min-height:480px; }
+    #sidePanel{ top:auto; bottom:0; left:0; right:0; width:auto; max-height:46%; border-radius:16px 16px 0 0; }
+    #panelOpen{ top:auto !important; bottom:12px; }
+    body:has(.map-shell) .demo-banner{ display:none; }
+  }
+</style>
+{% endblock %}
 {% block scripts %}
+{% if mapbox_token %}
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.29.0/mapbox-gl.js"></script>
+{% else %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" crossorigin=""></script>
+{% endif %}
 <script>
-let map, markers=[], allCenters=[];
-let quakeLayer=null, fireLayer=null, heatLayer=null, lastFires=[];
-let hzAbort={quake:null, fire:null}, hzTimer=null;
-document.addEventListener('DOMContentLoaded', async ()=>{
-  map = L.map('map').setView([14.6308,121.0968],11);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);
-  quakeLayer=L.layerGroup().addTo(map); fireLayer=L.layerGroup().addTo(map);
-  await load();
-  document.getElementById('q').addEventListener('input', render);
-  document.getElementById('cityFilter').addEventListener('change', render);
-  document.getElementById('statusFilter').addEventListener('change', render);
-  document.getElementById('supplyFilter').addEventListener('change', render);
-  document.getElementById('clearBtn').addEventListener('click', ()=>{ document.getElementById('q').value=''; document.getElementById('statusFilter').value=''; document.getElementById('supplyFilter').value=''; document.getElementById('cityFilter').value=''; render();});
-  document.getElementById('locBtn').addEventListener('click', useLocation);
-  document.getElementById('hzQuake').addEventListener('change', refreshHazards);
-  document.getElementById('hzFire').addEventListener('change', refreshHazards);
-  document.getElementById('hzHeat').addEventListener('change', refreshHazards);
-  map.on('moveend', ()=>{ clearTimeout(hzTimer); hzTimer=setTimeout(refreshHazards, 500); });
-});
-async function load(){
-  const res = await fetch('/api/centers');
-  allCenters = await res.json();
-  const cities = [...new Set(allCenters.map(c=>c.city))].sort();
-  const sel=document.getElementById('cityFilter');
-  cities.forEach(ci=>{ const o=document.createElement('option'); o.textContent=ci; o.value=ci; sel.appendChild(o); });
-  render();
+const MAPBOX_TOKEN = {{ mapbox_token|tojson }};
+const USE_MAPBOX = !!(MAPBOX_TOKEN && typeof mapboxgl !== 'undefined');
+// ---------- shared state & helpers (engine-agnostic) ----------
+let allCenters=[];
+let hzAbort={quake:null, fire:null}, hzTimer=null, lastFires=[], lastQuakes=[];
+function badgeClass(s){ return s==='Available'?'available':s==='Nearly Full'?'nearly':s==='Full'?'full':'unknown'; }
+function statusColor(s){ return s==='Available'?'#039855':s==='Nearly Full'?'#F79009':s==='Full'?'#D92D20':'#667085'; }
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function centerPopupHTML(c, routeBtn){
+  return `<div style="min-width:220px">
+    <div style="font-weight:800;">${esc(c.name)}</div>
+    <div style="color:#667085; font-size:13px;">${esc(c.address)}, ${esc(c.city)}</div>
+    <div style="margin:8px 0; font-size:13px;">Capacity ${c.capacity} • Occupancy ${c.current_occupancy} • Available ${c.available_slots} • ${c.occupancy_pct}%<br><span class="badge badge-${badgeClass(c.occupancy_status)}">${esc(c.occupancy_status)}</span></div>
+    <div style="font-size:12px;">Food ${esc(c.food_status)} • Water ${esc(c.water_status)} • Basic ${esc(c.basic_needs_status)}</div>
+    <div style="font-size:12px; color:#667085;">Updated ${esc(c.updated_at)}</div>
+    <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;"><a href="/centers/${c.id}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">View Details</a>${routeBtn||''}<a href="https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}" target="_blank" rel="noopener" class="btn btn-primary" style="padding:6px 8px; font-size:12px;">Get Directions</a></div>
+  </div>`;
 }
-function render(){
+function getFiltered(){
   const q=document.getElementById('q').value.toLowerCase();
   const city=document.getElementById('cityFilter').value;
   const status=document.getElementById('statusFilter').value;
   const supply=document.getElementById('supplyFilter').value;
-  let filtered = allCenters.filter(c=>{
+  return allCenters.filter(c=>{
     if(q && !(c.name.toLowerCase().includes(q) || c.city.toLowerCase().includes(q) || c.address.toLowerCase().includes(q))) return false;
     if(city && c.city!==city) return false;
     if(status && c.occupancy_status!==status) return false;
     if(supply && ![c.food_status,c.water_status,c.medicine_status,c.hygiene_status,c.basic_needs_status].includes(supply)) return false;
     return true;
   });
-  markers.forEach(m=> map.removeLayer(m)); markers=[];
+}
+function renderList(filtered, onLocate){
   const list=document.getElementById('list'); list.innerHTML='';
   if(filtered.length===0){ list.innerHTML='<div style="color:var(--text-secondary); font-size:13px; padding:8px;">No centers match. Clear filters or view all.</div>'; return; }
   filtered.forEach(c=>{
-    let color='#667085';
-    if(c.occupancy_status==='Available') color='#039855';
-    else if(c.occupancy_status==='Nearly Full') color='#F79009';
-    else if(c.occupancy_status==='Full') color='#D92D20';
-    const icon=L.divIcon({html:`<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`, className:'', iconSize:[16,16]});
-    const m=L.marker([c.lat,c.lng], {icon}).addTo(map);
-    m.bindPopup(`<div style="min-width:220px">
-      <div style="font-weight:800;">${c.name}</div>
-      <div style="color:#667085; font-size:13px;">${c.address}, ${c.city}</div>
-      <div style="margin:8px 0; font-size:13px;">Capacity ${c.capacity} • Occupancy ${c.current_occupancy} • Available ${c.available_slots} • ${c.occupancy_pct}%<br><span class="badge badge-${c.occupancy_status==='Available'?'available':c.occupancy_status==='Nearly Full'?'nearly':c.occupancy_status==='Full'?'full':'unknown'}">${c.occupancy_status}</span></div>
-      <div style="font-size:12px;">Food ${c.food_status} • Water ${c.water_status} • Basic ${c.basic_needs_status}</div>
-      <div style="font-size:12px; color:#667085;">Updated ${c.updated_at}</div>
-      <div style="display:flex; gap:8px; margin-top:8px;"><a href="/centers/${c.id}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">View Details</a><a href="https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}" target="_blank" rel="noopener" class="btn btn-primary" style="padding:6px 8px; font-size:12px;">Get Directions</a></div>
-    </div>`);
-    markers.push(m);
-    // list entry
     const row=document.createElement('div');
     row.style.cssText='border:1px solid var(--border); border-radius:8px; padding:8px 10px; display:flex; justify-content:space-between; gap:8px; align-items:center;';
-    row.innerHTML=`<div><div style="font-weight:700; font-size:13px;">${c.name}</div><div style="color:var(--text-secondary); font-size:12px;">${c.city} • ${c.available_slots} slots • ${c.occupancy_pct}%</div><span class="badge badge-${c.occupancy_status==='Available'?'available':c.occupancy_status==='Nearly Full'?'nearly':c.occupancy_status==='Full'?'full':'unknown'}">${c.occupancy_status}</span></div><button class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">Locate</button>`;
-    row.querySelector('button').addEventListener('click', ()=>{ map.setView([c.lat,c.lng],14); m.openPopup();});
+    row.innerHTML=`<div><div style="font-weight:700; font-size:13px;">${esc(c.name)}</div><div style="color:var(--text-secondary); font-size:12px;">${esc(c.city)} • ${c.available_slots} slots • ${c.occupancy_pct}%</div><span class="badge badge-${badgeClass(c.occupancy_status)}">${esc(c.occupancy_status)}</span></div><button class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">Locate</button>`;
+    row.querySelector('button').addEventListener('click', ()=>onLocate(c));
     list.appendChild(row);
   });
-  try{
-    const group=L.featureGroup(markers);
-    map.fitBounds(group.getBounds().pad(0.2));
-  }catch(e){}
 }
-function hzStatus(msg){ const el=document.getElementById('hzStatus'); if(el) el.textContent=msg||''; }
-function hzCenter(){ const c=map.getCenter(); return {lat:+c.lat.toFixed(4), lon:+c.lng.toFixed(4)}; }
-async function refreshHazards(){
-  const showQ=document.getElementById('hzQuake').checked;
-  const showF=document.getElementById('hzFire').checked;
-  const showH=document.getElementById('hzHeat').checked;
-  quakeLayer.clearLayers(); fireLayer.clearLayers();
-  if(heatLayer){ map.removeLayer(heatLayer); heatLayer=null; }
-  if(!showQ && !showF && !showH){ hzStatus(''); return; }
-  const {lat, lon}=hzCenter();
+function hzStatus(msg){ setStatus('hzStatus', msg); }
+function setStatus(id, msg){ const el=document.getElementById(id); if(el) el.textContent=msg||''; }
+// Single reader for all hazard toggles — both map engines share it so the
+// checkbox set can't drift between Mapbox and Leaflet behavior.
+function hazardSelection(){
+  const v=id=>{ const el=document.getElementById(id); return !!(el && el.checked); };
+  return {quake:v('hzQuake'), fire:v('hzFire'), heat:v('hzHeat'),
+          flood:v('hzFlood'), slide:v('hzSlide'), surge:v('hzSurge')};
+}
+function noahCheckboxId(id){ return id==='flood'?'hzFlood':id==='slide'?'hzSlide':'hzSurge'; }
+// Shared status-line text — one copy used by both engines.
+function quakeStatusText(data){ return `Quakes: ${data.count??0} • Fires: ${lastFires.length}`; }
+function fireStatusText(data, showHeat){ return `Fires: ${(data.fires||[]).length} • Heat ${showHeat?'on':'off'}`; }
+function noahStatusText(id, data){
+  const n=(data.features||[]).reduce((a,f)=>a+((f.geometry||{}).coordinates||[]).length,0);
+  return `NOAH ${id}: ${n} zones`;
+}
+// ---------- side-panel tabs (Centers / Hazards / Routes) ----------
+function switchPanelTab(name){
+  const tabs={centers:['tabBtnCenters','tabCenters'], hazards:['tabBtnHazards','tabHazards'], routes:['tabBtnRoutes','tabRoutes']};
+  Object.entries(tabs).forEach(([key,[btnId,panelId]])=>{
+    const b=document.getElementById(btnId), p=document.getElementById(panelId);
+    if(!b||!p) return;
+    const on=key===name;
+    b.setAttribute('aria-selected', String(on));
+    b.className='btn '+(on?'btn-primary':'btn-secondary');
+    if(on) p.removeAttribute('hidden'); else p.setAttribute('hidden','');
+  });
+  try{ notifyMapResize(); }catch(e){}
+}
+function updateHazardsBadge(){
+  const sel=hazardSelection();
+  const n=Object.values(sel).filter(Boolean).length;
+  const badge=document.getElementById('hzBadge');
+  if(badge) badge.textContent=n?` • ${n} on`:'';
+  // The Show-hazards button only makes sense with a layer switched on.
+  const sh=document.getElementById('showHazardsBtn');
+  if(sh) sh.disabled=!n;
+}
+function bindPanelTabs(){
+  [['tabBtnCenters','centers'],['tabBtnHazards','hazards'],['tabBtnRoutes','routes']].forEach(([id,name])=>{
+    const b=document.getElementById(id);
+    if(b) b.addEventListener('click', ()=>switchPanelTab(name));
+  });
+  // Routes tab content (GPS box) is server-rendered only with a Mapbox token.
+  if(!document.getElementById('gpsBox')){
+    const rb=document.getElementById('tabBtnRoutes');
+    if(rb) rb.style.display='none';
+  }
+  updateHazardsBadge();
+}
+async function fetchQuakes(lat, lon, signal){
+  const res=await fetch(`/api/earthquakes?lat=${lat}&lon=${lon}&radius_km=500`, {signal});
+  if(!res.ok) throw new Error('quakes '+res.status);
+  return res.json();
+}
+async function fetchFires(lat, lon, signal){
+  const res=await fetch(`/api/fires?lat=${lat}&lon=${lon}&days=1`, {signal});
+  if(res.status===503){ const e=new Error('fires-unavailable'); e.code=503; throw e; }
+  if(!res.ok) throw new Error('fires '+res.status);
+  return res.json();
+}
+// ---------- Project NOAH static overlays (pre-built GeoJSON, no API key) ----------
+const NOAH_COLORS={low:'#facc15', moderate:'#f97316', high:'#dc2626'};
+const noahCache={};
+function noahFileFor(id){
+  if(id==='flood') return 'flood_mm_5yr';
+  if(id==='slide') return 'landslide_mm';
+  if(id==='surge') return 'stormsurge_'+(document.getElementById('hzSSA')?.value||'ssa4');
+  return null;
+}
+async function fetchNoah(id){
+  const name=noahFileFor(id);
+  if(!name) throw new Error('unknown noah layer');
+  if(noahCache[name]) return noahCache[name];
+  const res=await fetch(`/static/noah/${name}.geojson`);
+  if(!res.ok) throw new Error(name+' '+res.status);
+  const data=await res.json();
+  noahCache[name]=data;
+  return data;
+}
+function noahLabel(feat){
+  const p=(feat&&feat.properties)||{};
+  const hz=p.hazard||'hazard';
+  const lv=p.level||'?';
+  const adv=p.advisory?` (${p.advisory})`:'';
+  return `<div style="min-width:180px"><div style="font-weight:800; text-transform:capitalize;">${esc(hz)} — ${esc(lv)}${esc(adv)}</div><div style="font-size:12px;color:#667085;">Source: Project NOAH (DOST)</div></div>`;
+}
+async function loadCenters(){
+  const res = await fetch('/api/centers');
+  allCenters = await res.json();
+  const cities = [...new Set(allCenters.map(c=>c.city))].sort();
+  const sel=document.getElementById('cityFilter');
+  cities.forEach(ci=>{ const o=document.createElement('option'); o.textContent=ci; o.value=ci; sel.appendChild(o); });
+}
+function bindFilterInputs(render){
+  document.getElementById('q').addEventListener('input', render);
+  document.getElementById('cityFilter').addEventListener('change', render);
+  document.getElementById('statusFilter').addEventListener('change', render);
+  document.getElementById('supplyFilter').addEventListener('change', render);
+  document.getElementById('clearBtn').addEventListener('click', ()=>{ document.getElementById('q').value=''; document.getElementById('statusFilter').value=''; document.getElementById('supplyFilter').value=''; document.getElementById('cityFilter').value=''; if(USE_MAPBOX) clearRoute(); render();});
+}
+// ---------- detected-hazard area overlays (estimated, illustrative) ----------
+// Quake ring radius doubles per magnitude unit from a 15 km M3 baseline:
+// M4≈30, M5≈60, M6≈120, M7≈240 km. A rough felt-area guide, NOT an
+// official danger zone. Fire ring is a fixed ~1 km watch perimeter.
+function quakeRadiusKm(mag){ const m=+mag||0; return Math.round(15*Math.pow(2, Math.max(0, m-3))); }
+function fireRadiusKm(){ return 1; }
+// Destination-point circle polygon (lon/lat degrees) for Mapbox fill layers.
+function circlePolygon(lon, lat, radiusKm, steps){
+  steps=steps||48;
+  const coords=[], R=6371, lat1=lat*Math.PI/180, lon1=lon*Math.PI/180, d=radiusKm/R;
+  for(let i=0;i<=steps;i++){
+    const brng=(i/steps)*2*Math.PI;
+    const lat2=Math.asin(Math.sin(lat1)*Math.cos(d)+Math.cos(lat1)*Math.sin(d)*Math.cos(brng));
+    const lon2=lon1+Math.atan2(Math.sin(brng)*Math.sin(d)*Math.cos(lat1), Math.cos(d)-Math.sin(lat1)*Math.sin(lat2));
+    coords.push([lon2*180/Math.PI, lat2*180/Math.PI]);
+  }
+  return coords;
+}
+const QUAKE_RING_NOTE='<div style="font-size:11px;color:#667085;">Purple ring ≈ estimated felt area (illustrative, not official).</div>';
+const FIRE_RING_NOTE='<div style="font-size:11px;color:#667085;">Red ring ≈ 1 km watch perimeter (illustrative).</div>';
+function debounceHazards(refresh){
+  const wrapped=()=>{ updateHazardsBadge(); refresh(); };
+  ['hzQuake','hzFire','hzHeat','hzFlood','hzSlide','hzSurge'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.addEventListener('change', wrapped);
+  });
+  const ssa=document.getElementById('hzSSA');
+  if(ssa) ssa.addEventListener('change', ()=>{
+    // Drop cached surge files so the newly selected advisory loads fresh.
+    Object.keys(noahCache).forEach(k=>{ if(k.startsWith('stormsurge_')) delete noahCache[k]; });
+    wrapped();
+  });
+}
+// route helpers are engine-specific; this no-op is replaced in Mapbox mode
+function clearRoute(){}
+// Engine mode badge (Mapbox vs OSM fallback) — instant triage for "I can't see X" reports.
+function setMapMode(mode){ const el=document.getElementById('mapMode'); if(el) el.textContent=mode; }
+// Panel collapse is engine-agnostic; each engine sets notifyMapResize.
+let notifyMapResize = ()=>{};
+function bindPanelToggle(){
+  const panel=document.getElementById('sidePanel'), open=document.getElementById('panelOpen'), close=document.getElementById('panelClose');
+  if(!panel||!open||!close) return;
+  const set=(collapsed)=>{
+    panel.classList.toggle('collapsed', collapsed);
+    open.style.display=collapsed?'':'none';
+    setTimeout(()=>{ try{ notifyMapResize(); }catch(e){} }, 60);
+  };
+  open.addEventListener('click', ()=>set(false));
+  close.addEventListener('click', ()=>set(true));
+}
+
+// ================= MAPBOX MODE =================
+async function initMapbox(){
+  mapboxgl.accessToken = MAPBOX_TOKEN;
+  const map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/streets-v12',
+    center: [121.0968, 14.6308],
+    zoom: 11,
+    fadeDuration: 0 // no white fade-in flash on tiles
+  });
+  // Re-sync canvas size once the style loads (prevents blank/white areas).
+  map.on('load', ()=>{ try{ map.resize(); }catch(e){} });
+  notifyMapResize = ()=>{ try{ map.resize(); }catch(e){} };
+  map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+  const geo = new mapboxgl.GeolocateControl({
+    positionOptions: {enableHighAccuracy: true, timeout: 8000},
+    trackUserLocation: true, showUserHeading: true, showAccuracyCircle: true
+  });
+  map.addControl(geo, 'top-right');
+  let userPos = null, userAcc = null; // [lng, lat], accuracy meters
+  function gpsStatus(msg){ setStatus('gpsStatus', msg); }
+  function gpsErrorHint(e){
+    if(!window.isSecureContext) return 'GPS blocked: browsers only allow location on HTTPS or localhost — not plain HTTP.';
+    if(e && e.code===1) return 'Location permission denied — allow location in the browser site settings, then press Use My Location.';
+    if(e && e.code===3) return 'GPS timed out — move outdoors or near a window, then retry.';
+    return 'GPS unavailable — type a start point instead, routing still works.';
+  }
+  geo.on('geolocate', (e)=>{ userPos=[e.coords.longitude, e.coords.latitude]; userAcc=e.coords.accuracy;
+    gpsStatus(`GPS fix ✓ ±${Math.round(userAcc||0)} m`); });
+  geo.on('error', (e)=>{ gpsStatus(gpsErrorHint(e)); });
+  geo.on('trackuserlocationstart', ()=>{ if(!userPos) gpsStatus('Waiting for GPS fix…'); });
+  if(!('geolocation' in navigator)) gpsStatus('This browser has no geolocation — type a start point instead.');
+  else if(!window.isSecureContext) gpsStatus('Heads up: GPS needs HTTPS or localhost (browser rule).');
+  // Auto-start Mapbox integrated GPS on load so routing/follow work immediately.
+  map.on('load', ()=>{ try{ geo.trigger(); }catch(e){ gpsStatus(gpsErrorHint()); } });
+  // Visibility guard: if the native ⌖ control failed to render, inject a floating backup.
+  map.on('load', ()=>{
+    if(document.querySelector('#map .mapboxgl-ctrl-geolocate')) return;
+    const b=document.createElement('button');
+    b.type='button'; b.title='Use my location'; b.setAttribute('aria-label','Use my location');
+    b.textContent='⌖';
+    b.style.cssText='position:absolute; top:78px; right:10px; z-index:5; width:30px; height:30px; font-size:16px; line-height:28px; text-align:center; cursor:pointer; background:#fff; border:none; border-radius:6px; box-shadow:0 0 0 2px rgba(0,0,0,0.1);';
+    b.addEventListener('click', ()=>{ gpsStatus('Waiting for GPS fix…'); try{ geo.trigger(); }catch(e){ gpsStatus(gpsErrorHint()); } });
+    document.getElementById('map').appendChild(b);
+  });
+  setMapMode('Mapbox');
+
+  let markers = []; // {id, marker}
+  let groupMarkers = [];
+  let groupTimer = null;
+  const quakeSrcId='hz-quakes', fireSrcId='hz-fires';
+  const quakeAreaSrcId='hz-quake-area', fireAreaSrcId='hz-fire-area';
+
+  function ensureHazardLayers(){
+    if(!map.getSource(quakeSrcId)){
+      map.addSource(quakeSrcId, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
+      map.addLayer({id:'hz-quakes-layer', type:'circle', source:quakeSrcId,
+        paint:{'circle-radius':['max', 6, ['interpolate',['linear'],['get','mag'],3,6,9,20]],
+               'circle-color':'#9333ea','circle-opacity':0.75,'circle-stroke-color':'#fff','circle-stroke-width':1}});
+    }
+    if(!map.getSource(quakeAreaSrcId)){
+      map.addSource(quakeAreaSrcId, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
+      map.addLayer({id:'hz-quake-area-layer', type:'fill', source:quakeAreaSrcId,
+        layout:{visibility:'none'},
+        paint:{'fill-color':'#9333ea','fill-opacity':0.14,'fill-outline-color':'#6b21a8'}},
+        'hz-quakes-layer');
+    }
+    if(!map.getSource(fireSrcId)){
+      map.addSource(fireSrcId, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
+      map.addLayer({id:'hz-fires-layer', type:'circle', source:fireSrcId,
+        paint:{'circle-radius':5,'circle-color':'#dc2626','circle-opacity':0.8,'circle-stroke-color':'#fff','circle-stroke-width':1}});
+      map.addLayer({id:'hz-heat-layer', type:'heatmap', source:fireSrcId,
+        layout:{visibility:'none'},
+        paint:{'heatmap-weight':['interpolate',['linear'],['get','brightness'],300,0.3,450,1],
+               'heatmap-intensity':1,'heatmap-radius':28,'heatmap-opacity':0.6,
+               'heatmap-color':['interpolate',['linear'],['heatmap-density'],0,'rgba(254,249,195,0)',0.4,'#f97316',0.8,'#dc2626']}});
+    }
+    if(!map.getSource(fireAreaSrcId)){
+      map.addSource(fireAreaSrcId, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
+      map.addLayer({id:'hz-fire-area-layer', type:'fill', source:fireAreaSrcId,
+        layout:{visibility:'none'},
+        paint:{'fill-color':'#dc2626','fill-opacity':0.14,'fill-outline-color':'#991b1b'}},
+        'hz-fires-layer');
+    }
+  }
+  // Project NOAH fill layers (one source per hazard; surge source swaps SSA1-4).
+  const noahSrc={flood:'noah-flood', slide:'noah-slide', surge:'noah-surge'};
+  function ensureNoahLayers(){
+    Object.entries(noahSrc).forEach(([id, src])=>{
+      if(map.getSource(src)) return;
+      map.addSource(src, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
+      map.addLayer({id:src+'-layer', type:'fill', source:src,
+        layout:{visibility:'none'},
+        paint:{'fill-color':['match',['get','level'],'low','#facc15','moderate','#f97316','high','#dc2626','#f97316'],
+               'fill-opacity':0.35,'fill-outline-color':'#7c2d12'}});
+    });
+  }
+  function routeStatus(msg){ setStatus('routeStatus', msg); }
+  let navProfile='driving', destPin=null, followMode=false, navSession=null, suggestAbort=null, suggestTimer=null;
+  const PH_BBOX='116.0,4.0,127.0,22.0'; // bias search to the Philippines
+  function newSession(){ try{ navSession=crypto.randomUUID(); }catch(e){ navSession='sess-'+Date.now(); } }
+  clearRoute = function(){
+    if(map.getLayer('route-line')) map.removeLayer('route-line');
+    if(map.getSource('route-src')) map.removeSource('route-src');
+    if(destPin){ destPin.remove(); destPin=null; }
+    const st=document.getElementById('navSteps'); if(st){ st.style.display='none'; st.innerHTML=''; }
+    routeStatus('');
+  };
+  async function ensureUserPos(){
+    if(userPos) return userPos;
+    // Drive the fix through the Mapbox control so the dot/accuracy circle stay in sync.
+    try{ geo.trigger(); }catch(e){}
+    const fix = await new Promise((res)=>{
+      let done=false;
+      const to=setTimeout(()=>{ if(!done){ done=true; res(null); } }, 9000);
+      geo.once('geolocate', (e)=>{ if(!done){ done=true; clearTimeout(to); res(e); } });
+      geo.once('error', ()=>{ if(!done){ done=true; clearTimeout(to); res(null); } });
+    });
+    if(fix){ userPos=[fix.coords.longitude, fix.coords.latitude]; return userPos; }
+    throw new Error(gpsErrorHint());
+  }
+  // ---- Mapbox Search Box API (public pk.* token, URL-restricted in dashboard) ----
+  function searchParams(extra){
+    const c=map.getCenter();
+    const p=new URLSearchParams(Object.assign({access_token:MAPBOX_TOKEN, language:'en', limit:'5',
+      proximity:`${c.lng.toFixed(4)},${c.lat.toFixed(4)}`, bbox:PH_BBOX}, extra||{}));
+    if(navSession) p.set('session_token', navSession);
+    return p;
+  }
+  async function geocodeSuggest(q, signal){
+    const res=await fetch(`https://api.mapbox.com/search/searchbox/v1/suggest?${searchParams({q})}`, {signal});
+    if(!res.ok) throw new Error('search '+res.status);
+    const data=await res.json();
+    return data.suggestions||[];
+  }
+  async function geocodeRetrieve(mapboxId){
+    const res=await fetch(`https://api.mapbox.com/search/searchbox/v1/retrieve/${encodeURIComponent(mapboxId)}?${searchParams()}`);
+    if(!res.ok) throw new Error('retrieve '+res.status);
+    const data=await res.json();
+    const f=(data.features||[])[0];
+    if(!f) throw new Error('no result');
+    navSession=null; // end billing session once a suggestion is retrieved
+    return {lng:f.geometry.coordinates[0], lat:f.geometry.coordinates[1],
+      name:(f.properties||{}).name || (f.properties||{}).place_formatted || 'Destination'};
+  }
+  async function geocodeFirst(q){
+    // Typed origin without picking a suggestion: take top result.
+    const s=await geocodeSuggest(q);
+    if(!s.length) throw new Error('place not found');
+    return geocodeRetrieve(s[0].mapbox_id);
+  }
+  function fmtStep(m){
+    if(m>=1000) return (m/1000).toFixed(1)+' km';
+    return Math.round(m)+' m';
+  }
+  function renderSteps(route){
+    const box=document.getElementById('navSteps');
+    const steps=((route.legs||[])[0]||{}).steps||[];
+    if(!box || !steps.length){ if(box){box.style.display='none';} return; }
+    const rows=steps.slice(0,60).map((s,i)=>{
+      const ins=esc(((s.maneuver||{}).instruction)||'Continue');
+      return `<div style="display:flex; gap:8px; padding:5px 2px; border-bottom:1px solid var(--border);"><span style="color:var(--text-secondary); min-width:18px;">${i+1}</span><span style="flex:1;">${ins}</span><span style="color:var(--text-secondary); white-space:nowrap;">${fmtStep(s.distance||0)}</span></div>`;
+    }).join('');
+    box.innerHTML=`<div style="font-weight:700; margin-bottom:2px;">Turn-by-turn (${steps.length} steps)</div>`+rows;
+    box.style.display='block';
+  }
+  function profileLabel(){ return navProfile==='walking'?'walk':navProfile==='cycling'?'bike':'drive'; }
+  // Generalized routing: any origin → any destination, any profile.
+  async function routeToCoord(lng, lat, name, fromOverride){
+    try{
+      routeStatus('Getting start point…');
+      let from=fromOverride||null;
+      if(!from){
+        const typed=(document.getElementById('navOrigin').value||'').trim();
+        if(typed){ const g=await geocodeFirst(typed); from=[g.lng,g.lat]; }
+        else { from=await ensureUserPos(); }
+      }
+      routeStatus('Finding route…');
+      // Public pk.* token: same exposure as the map tiles themselves; URL-restricted in dashboard.
+      const url = `https://api.mapbox.com/directions/v5/mapbox/${navProfile}/${from[0]},${from[1]};${lng},${lat}?geometries=geojson&overview=full&steps=true&access_token=${encodeURIComponent(MAPBOX_TOKEN)}`;
+      const res = await fetch(url);
+      if(!res.ok) throw new Error('directions '+res.status);
+      const data = await res.json();
+      const route = (data.routes||[])[0];
+      if(!route) throw new Error('no route');
+      clearRoute();
+      map.addSource('route-src', {type:'geojson', data:{type:'Feature', properties:{}, geometry:route.geometry}});
+      map.addLayer({id:'route-line', type:'line', source:'route-src',
+        layout:{'line-join':'round','line-cap':'round'}, paint:{'line-color':'#3b6ef5','line-width':5,'line-opacity':0.9}});
+      const km=(route.distance/1000).toFixed(1), min=Math.round(route.duration/60);
+      routeStatus(`Route to ${name||'destination'}: ${km} km, ~${min} min ${profileLabel()}.`);
+      renderSteps(route);
+      const b=new mapboxgl.LngLatBounds(); route.geometry.coordinates.forEach(c=>b.extend(c)); map.fitBounds(b,{padding:60});
+    }catch(e){ routeStatus('Routing failed: '+(e.message||'location unavailable — enable GPS or type a start point.')); }
+  }
+  // Called from popup "Route here" buttons (event delegation on map container).
+  async function routeTo(lat, lng, name){
+    setDestPin(lng, lat, name);
+    await routeToCoord(lng, lat, name);
+  }
+  function setDestPin(lng, lat, name){
+    if(destPin) destPin.remove();
+    const el=document.createElement('div');
+    el.style.cssText='background:#7A271A;width:18px;height:18px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.5);cursor:pointer;';
+    destPin=new mapboxgl.Marker({element:el}).setLngLat([lng,lat])
+      .setPopup(new mapboxgl.Popup({offset:12}).setText(name||'Destination')).addTo(map);
+  }
+  document.getElementById('map').addEventListener('click', (ev)=>{
+    const btn = ev.target.closest('[data-route]');
+    if(!btn) return;
+    const [lat, lng] = btn.dataset.route.split(',').map(Number);
+    routeTo(lat, lng, btn.dataset.name);
+  });
+  // ---- destination autocomplete ----
+  function hideSuggest(){ const s=document.getElementById('navSuggest'); if(s){ s.style.display='none'; s.innerHTML=''; } }
+  function bindNavSearch(){
+    const input=document.getElementById('navDest'), box=document.getElementById('navSuggest');
+    input.addEventListener('input', ()=>{
+      clearTimeout(suggestTimer);
+      const q=input.value.trim();
+      if(suggestAbort) suggestAbort.abort();
+      if(q.length<3){ hideSuggest(); return; }
+      if(!navSession) newSession();
+      suggestTimer=setTimeout(async ()=>{
+        try{
+          suggestAbort=new AbortController();
+          const items=await geocodeSuggest(q, suggestAbort.signal);
+          if(!items.length){ box.innerHTML='<div style="padding:8px 10px; font-size:12px; color:var(--text-secondary);">No places found.</div>'; box.style.display='block'; return; }
+          box.innerHTML=items.map(s=>`<button data-mid="${esc(s.mapbox_id)}" style="display:block; width:100%; text-align:left; padding:8px 10px; font-size:12px; background:none; border:none; border-bottom:1px solid var(--border); cursor:pointer;"><b>${esc(s.name)}</b><br><span style="color:var(--text-secondary);">${esc(s.place_formatted||'')}</span></button>`).join('');
+          box.style.display='block';
+          box.querySelectorAll('button').forEach(b=>b.addEventListener('click', async ()=>{
+            hideSuggest();
+            try{
+              routeStatus('Locating destination…');
+              const g=await geocodeRetrieve(b.dataset.mid);
+              input.value=g.name;
+              setDestPin(g.lng, g.lat, g.name);
+              map.flyTo({center:[g.lng,g.lat], zoom:14});
+              routeStatus(`Destination: ${g.name}. Press Go to route.`);
+            }catch(e){ routeStatus('Could not locate that place — try another.'); }
+          }));
+        }catch(e){ if(e.name!=='AbortError') hideSuggest(); }
+      }, 400);
+    });
+    document.addEventListener('click', (e)=>{ if(!e.target.closest('#navDest') && !e.target.closest('#navSuggest')) hideSuggest(); });
+  }
+  function bindNavControls(){
+    document.querySelectorAll('#navModes button').forEach(b=>b.addEventListener('click', ()=>{
+      navProfile=b.dataset.profile;
+      document.querySelectorAll('#navModes button').forEach(x=>{ x.className='btn '+(x===b?'btn-primary':'btn-secondary'); });
+    }));
+    document.getElementById('navGo').addEventListener('click', async ()=>{
+      const typed=(document.getElementById('navDest').value||'').trim();
+      if(!typed){ routeStatus('Type a destination first (or use Route here on a center).'); return; }
+      hideSuggest();
+      try{
+        routeStatus('Locating destination…');
+        const g=await geocodeFirst(typed);
+        document.getElementById('navDest').value=g.name;
+        setDestPin(g.lng, g.lat, g.name);
+        await routeToCoord(g.lng, g.lat, g.name);
+      }catch(e){ routeStatus('Place not found — pick a suggestion or check spelling.'); }
+    });
+    const f=document.getElementById('followBtn');
+    f.addEventListener('click', ()=>{
+      followMode=!followMode;
+      f.textContent='Follow: '+(followMode?'on':'off');
+      f.setAttribute('aria-pressed', String(followMode));
+      if(followMode){ try{ geo.trigger(); }catch(e){} routeStatus('Follow on — camera tracks your GPS dot. Pan the map to pause.'); }
+      else routeStatus('');
+    });
+    // Panning pauses follow so the user stays in control (Waze-like passive state).
+    map.on('dragstart', ()=>{
+      if(!followMode) return;
+      followMode=false;
+      f.textContent='Follow: off'; f.setAttribute('aria-pressed','false');
+    });
+    geo.on('geolocate', (e)=>{
+      if(!followMode) return;
+      map.easeTo({center:[e.coords.longitude, e.coords.latitude], duration:600});
+    });
+  }
+
+  function render(){
+    const filtered = getFiltered();
+    markers.forEach(m=>m.marker.remove()); markers=[];
+    filtered.forEach(c=>{
+      const el=document.createElement('div');
+      el.style.cssText=`background:${statusColor(c.occupancy_status)};width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4);cursor:pointer;`;
+      const popup=new mapboxgl.Popup({offset:12, maxWidth:'300px'})
+        .setHTML(centerPopupHTML(c, `<button data-route="${c.lat},${c.lng}" data-name="${esc(c.name)}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">Route here</button>`));
+      const marker=new mapboxgl.Marker({element:el}).setLngLat([c.lng,c.lat]).setPopup(popup).addTo(map);
+      markers.push({id:c.id, marker});
+    });
+    renderList(filtered, (c)=>{
+      map.flyTo({center:[c.lng,c.lat], zoom:14});
+      const m=markers.find(m=>m.id===c.id); if(m) m.marker.togglePopup();
+    });
+    // Fit once on first load only, capped at zoom 12: re-fitting on every
+    // keystroke yanked the camera into the tight cluster (white surroundings).
+    if(filtered.length && !render._fitted){
+      render._fitted = true;
+      const b=new mapboxgl.LngLatBounds();
+      filtered.forEach(c=>b.extend([c.lng,c.lat]));
+      try{ map.fitBounds(b,{padding:60, maxZoom:12}); }catch(e){}
+    }
+  }
+  function hzCenter(){ const c=map.getCenter(); return {lat:+c.lat.toFixed(4), lon:+c.lng.toFixed(4)}; }
+  function inViewCount(feats){
+    try{
+      const bb=map.getBounds();
+      return feats.filter(f=>{ try{ return bb.contains(f.geometry.coordinates); }catch(e){ return false; } }).length;
+    }catch(e){ return -1; }
+  }
+  // Manual camera fit to loaded detections — distant events (often 100+
+  // km away) otherwise sit outside the viewport while counts look healthy.
+  function zoomToHazards(){
+    const sel=hazardSelection();
+    const b=new mapboxgl.LngLatBounds();
+    let n=0;
+    if(sel.quake) (lastQuakes||[]).forEach(q=>{ b.extend([q.lon,q.lat]); n++; });
+    if(sel.fire||sel.heat) (lastFires||[]).forEach(f=>{ b.extend([f.lon,f.lat]); n++; });
+    if(!n){ hzStatus('No hazard data loaded yet — turn a layer on first.'); return; }
+    try{ map.fitBounds(b,{padding:80, maxZoom:10}); hzStatus(`Showing ${n} hazard point(s).`); }
+    catch(e){ hzStatus('Could not frame hazards — try panning manually.'); }
+  }
+  async function refreshHazards(){
+    ensureHazardLayers();
+    const sel=hazardSelection();
+    const showQ=sel.quake, showF=sel.fire, showH=sel.heat;
+    map.getSource(quakeSrcId).setData({type:'FeatureCollection', features:[]});
+    map.getSource(fireSrcId).setData({type:'FeatureCollection', features:[]});
+    map.getSource(quakeAreaSrcId).setData({type:'FeatureCollection', features:[]});
+    map.getSource(fireAreaSrcId).setData({type:'FeatureCollection', features:[]});
+    map.setLayoutProperty('hz-quakes-layer','visibility', showQ?'visible':'none');
+    map.setLayoutProperty('hz-fires-layer','visibility', showF?'visible':'none');
+    map.setLayoutProperty('hz-heat-layer','visibility', (showH)?'visible':'none');
+    map.setLayoutProperty('hz-quake-area-layer','visibility', showQ?'visible':'none');
+    map.setLayoutProperty('hz-fire-area-layer','visibility', showF?'visible':'none');
+    const {lat, lon}=hzCenter();
+    const jobs=[];
+    if(showQ){
+      if(hzAbort.quake) hzAbort.quake.abort(); hzAbort.quake=new AbortController();
+      hzStatus('Loading earthquakes…');
+      jobs.push(fetchQuakes(lat, lon, hzAbort.quake.signal).then(data=>{
+        lastQuakes=(data.quakes||[]).slice(0,200);
+        const feats=lastQuakes.map(q=>({type:'Feature', properties:{mag:q.mag||0, place:q.place||'Earthquake', depth:q.depth_km, url:q.url}, geometry:{type:'Point', coordinates:[q.lon,q.lat]}}));
+        map.getSource(quakeSrcId).setData({type:'FeatureCollection', features:feats});
+        const areaFeats=(data.quakes||[]).slice(0,200).map(q=>({type:'Feature', properties:{mag:q.mag||0, place:q.place||'Earthquake', depth:q.depth_km, url:q.url, radius:quakeRadiusKm(q.mag)}, geometry:{type:'Polygon', coordinates:[circlePolygon(q.lon,q.lat,quakeRadiusKm(q.mag))]}}));
+        map.getSource(quakeAreaSrcId).setData({type:'FeatureCollection', features:areaFeats});
+        const _qin=inViewCount(feats);
+        hzStatus(_qin<0?quakeStatusText(data):`${quakeStatusText(data)} • ${_qin}/${feats.length} in view`);
+      }).catch(e=>{ if(e.name!=='AbortError') hzStatus('Earthquakes unavailable — retry shortly.'); }));
+    }
+    if(showF || showH){
+      if(hzAbort.fire) hzAbort.fire.abort(); hzAbort.fire=new AbortController();
+      hzStatus('Loading fires…');
+      jobs.push(fetchFires(lat, lon, hzAbort.fire.signal).then(data=>{
+        lastFires=data.fires||[];
+        const feats=lastFires.slice(0,500).map(f=>({type:'Feature', properties:{brightness:+f.brightness||320, confidence:f.confidence||'n/a', date:f.date||'', time:f.time||''}, geometry:{type:'Point', coordinates:[f.lon,f.lat]}}));
+        map.getSource(fireSrcId).setData({type:'FeatureCollection', features:feats});
+        const fireAreaFeats=lastFires.slice(0,500).map(f=>({type:'Feature', properties:{brightness:+f.brightness||320, confidence:f.confidence||'n/a', date:f.date||'', time:f.time||''}, geometry:{type:'Polygon', coordinates:[circlePolygon(f.lon,f.lat,fireRadiusKm())]}}));
+        map.getSource(fireAreaSrcId).setData({type:'FeatureCollection', features:fireAreaFeats});
+        const _fin=inViewCount(feats);
+        hzStatus(_fin<0?fireStatusText(data, showH):`${fireStatusText(data, showH)} • ${_fin}/${feats.length} in view`);
+      }).catch(e=>{ if(e.name!=='AbortError') hzStatus(e.code===503?'Fires unavailable — missing FIRMS key or provider down.':'Fires unavailable — retry shortly.'); }));
+    }
+    // ---- Project NOAH static polygons (local files, keyless) ----
+    ensureNoahLayers();
+    const noahOn={flood:sel.flood, slide:sel.slide, surge:sel.surge};
+    if(!showQ && !showF && !showH && !noahOn.flood && !noahOn.slide && !noahOn.surge){ hzStatus(''); return; }
+    Object.entries(noahOn).forEach(([id, on])=>{
+      map.setLayoutProperty(noahSrc[id]+'-layer','visibility', on?'visible':'none');
+      if(!on){ return; }
+      const wantFile=noahFileFor(id);
+      hzStatus('Loading NOAH '+id+'…');
+      jobs.push(fetchNoah(id).then(data=>{
+        // Skip stale SSA responses (user switched advisory mid-fetch).
+        if(noahFileFor(id)!==wantFile) return;
+        if(!document.getElementById(noahCheckboxId(id)).checked) return;
+        map.getSource(noahSrc[id]).setData(data);
+        hzStatus(noahStatusText(id, data));
+      }).catch(()=>{ hzStatus(`NOAH ${id} failed to load — reload the page.`); }));
+    });
+    await Promise.all(jobs);
+  }
+  // quake/fire popups on click
+  function quakePopupHTML(p){
+    return `<div style="min-width:200px"><div style="font-weight:800;">M${esc(p.mag)} — ${esc(p.place)}</div><div style="font-size:12px;color:#667085;">Depth ${esc(p.depth??'?')} km • Est. felt radius ${esc(p.radius??quakeRadiusKm(p.mag))} km • <a href="${esc(p.url||'#')}" target="_blank" rel="noopener">USGS</a></div>${QUAKE_RING_NOTE}</div>`;
+  }
+  function firePopupHTML(p){
+    return `<div style="font-size:12px;"><b>Active fire</b> (${esc(p.confidence)})<br>Brightness ${esc(p.brightness)} • ${esc(p.date)} ${esc(p.time)}</div>${FIRE_RING_NOTE}`;
+  }
+  map.on('click','hz-quakes-layer',(e)=>{
+    if(!e.features || !e.features.length) return;
+    new mapboxgl.Popup().setLngLat(e.lngLat).setHTML(quakePopupHTML(e.features[0].properties)).addTo(map);
+  });
+  map.on('click','hz-quake-area-layer',(e)=>{
+    if(!e.features || !e.features.length) return;
+    new mapboxgl.Popup().setLngLat(e.lngLat).setHTML(quakePopupHTML(e.features[0].properties)).addTo(map);
+  });
+  map.on('click','hz-fires-layer',(e)=>{
+    if(!e.features || !e.features.length) return;
+    new mapboxgl.Popup().setLngLat(e.lngLat).setHTML(firePopupHTML(e.features[0].properties)).addTo(map);
+  });
+  map.on('click','hz-fire-area-layer',(e)=>{
+    if(!e.features || !e.features.length) return;
+    new mapboxgl.Popup().setLngLat(e.lngLat).setHTML(firePopupHTML(e.features[0].properties)).addTo(map);
+  });
+  // Project NOAH polygon popups (same handler for all three layers).
+  ['noah-flood-layer','noah-slide-layer','noah-surge-layer'].forEach(lid=>{
+    map.on('click',lid,(e)=>{
+      if(!e.features || !e.features.length) return;
+      new mapboxgl.Popup().setLngLat(e.lngLat).setHTML(noahLabel(e.features[0])).addTo(map);
+    });
+  });
+  // Maps-style POI tap: press any landmark/place label → popup with Route here.
+  map.on('click',(e)=>{
+    try{
+      const style=map.getStyle();
+      if(!style || !style.layers) return;
+      // Hazard hits keep their dedicated popups.
+      const hz=map.queryRenderedFeatures(e.point, {layers:['hz-quakes-layer','hz-quake-area-layer','hz-fires-layer','hz-fire-area-layer','noah-flood-layer','noah-slide-layer','noah-surge-layer'].filter(id=>map.getLayer(id))});
+      if(hz.length) return;
+      const poiLayers=style.layers.filter(l=>l.type==='symbol' && /poi|place/i.test(l.id||'')).map(l=>l.id);
+      if(!poiLayers.length) return;
+      const hits=map.queryRenderedFeatures(e.point, {layers:poiLayers});
+      const f=(hits||[]).find(h=>h.geometry && h.geometry.type==='Point' && (h.properties||{}).name);
+      if(!f) return; // empty map / water / roads: stay silent
+      const props=f.properties||{};
+      const name=props.name_en || props.name;
+      const [lng, lat]=f.geometry.coordinates;
+      const sub=esc(props.address || props.category || '');
+      new mapboxgl.Popup({offset:12, maxWidth:'280px'}).setLngLat(e.lngLat).setHTML(
+        `<div style="min-width:180px"><div style="font-weight:800;">${esc(name)}</div>`+
+        (sub?`<div style="font-size:12px;color:#667085;">${sub}</div>`:'')+
+        `<button data-route="${lat},${lng}" data-name="${esc(name)}" class="btn btn-primary" style="padding:6px 10px; font-size:12px; margin-top:8px;">Route here</button></div>`
+      ).addTo(map);
+    }catch(err){ /* style not ready — ignore tap */ }
+  });
+  // ---- group live locations ----
+  async function loadGroup(){
+    const code=(document.getElementById('groupCode').value||'').trim();
+    groupMarkers.forEach(m=>m.remove()); groupMarkers=[];
+    if(groupTimer){ clearInterval(groupTimer); groupTimer=null; }
+    if(!code){ return; }
+    const draw=async ()=>{
+      try{
+        const res=await fetch(`/api/groups/${encodeURIComponent(code)}/locations`);
+        if(res.status===404){ routeStatus('Group not found — check the invite code.'); return; }
+        if(!res.ok) throw new Error('group '+res.status);
+        const rows=await res.json();
+        groupMarkers.forEach(m=>m.remove()); groupMarkers=[];
+        rows.forEach(r=>{
+          const el=document.createElement('div');
+          el.title=r.display_name;
+          el.style.cssText='background:#175CD3;width:16px;height:16px;border-radius:50%;border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.5);cursor:pointer;';
+          const m=new mapboxgl.Marker({element:el}).setLngLat([r.lon??r.lng, r.lat])
+            .setPopup(new mapboxgl.Popup({offset:10}).setHTML(`<b>${esc(r.display_name)}</b><br><span style="font-size:12px;color:#667085;">${esc(r.shared_at||'')}</span>`))
+            .addTo(map);
+          groupMarkers.push(m);
+        });
+        routeStatus(`Group ${code}: ${rows.length} live location(s).`);
+      }catch(e){ routeStatus('Group locations unavailable — retry shortly.'); }
+    };
+    await draw();
+    groupTimer=setInterval(draw, 30000);
+  }
+  // ---- 2D / 3D ----
+  let terrainOn=false;
+  function set3D(on){
+    terrainOn=on;
+    if(on){
+      if(!map.getSource('mapbox-dem')){
+        map.addSource('mapbox-dem', {type:'raster-dem', url:'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize:512, maxzoom:14});
+      }
+      map.setTerrain({'source':'mapbox-dem', 'exaggeration':1.5});
+      if(!map.getLayer('3d-buildings')){
+        const layers=map.getStyle().layers;
+        const labelLayer=layers.find(l=>l.type==='symbol' && l.layout && l.layout['text-field']);
+        map.addLayer({id:'3d-buildings', source:'composite', 'source-layer':'building',
+          filter:['==','extrude','true'], type:'fill-extrusion', minzoom:15,
+          paint:{'fill-extrusion-color':'#aaa','fill-extrusion-height':['get','height'],'fill-extrusion-base':['get','min_height'],'fill-extrusion-opacity':0.6}},
+          labelLayer && labelLayer.id);
+      }
+      map.easeTo({pitch:60, bearing:-20, duration:800});
+    }else{
+      map.setTerrain(null);
+      map.easeTo({pitch:0, bearing:0, duration:800});
+    }
+  }
+  // ---- wire up ----
+  await loadCenters();
+  bindFilterInputs(render);
+  document.getElementById('locBtn').addEventListener('click', ()=>{
+    gpsStatus('Waiting for GPS fix…');
+    try{ geo.trigger(); }catch(e){ gpsStatus(gpsErrorHint()); }
+  });
+  debounceHazards(refreshHazards);
+  document.getElementById('showHazardsBtn').addEventListener('click', zoomToHazards);
+  map.on('moveend', ()=>{ clearTimeout(hzTimer); hzTimer=setTimeout(refreshHazards, 500); });
+  document.getElementById('btn2d').addEventListener('click', ()=>set3D(false));
+  document.getElementById('btn3d').addEventListener('click', ()=>set3D(true));
+  document.getElementById('groupBtn').addEventListener('click', loadGroup);
+  bindNavSearch();
+  bindNavControls();
+  map.on('load', ()=>{ render(); });
+  render();
+}
+
+// ================= LEAFLET/OSM FALLBACK (unchanged behavior) =================
+let _map, _markers=[], _quakeLayer=null, _fireLayer=null, _heatLayer=null;
+let _noahLayers={flood:null, slide:null, surge:null};
+function noahStyle(feat){
+  const lv=(feat && feat.properties && feat.properties.level)||'moderate';
+  return {color:'#7c2d12', weight:1, fillColor:NOAH_COLORS[lv]||'#f97316', fillOpacity:0.35};
+}
+function ensureLeaflet(){
+  // Runtime fallback when Mapbox CDN failed: load Leaflet dynamically.
+  if(typeof L !== 'undefined') return Promise.resolve();
+  const css=document.createElement('link');
+  css.rel='stylesheet'; css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+  document.head.appendChild(css);
+  const load=(src)=>new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
+  return load('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js')
+    .then(()=>load('https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js'));
+}
+function initFallback(){
+  // Mapbox unavailable (no token or CDN blocked) — use free OSM tiles.
+  setMapMode('OSM fallback');
+  const gpsBox=document.getElementById('gpsBox'); if(gpsBox) gpsBox.style.display='none';
+  const vt=document.getElementById('viewToggle'); if(vt) vt.style.display='none';
+  ensureLeaflet().then(()=>{
+    _map = L.map('map', {zoomControl:false}).setView([14.6308,121.0968],11);
+    L.control.zoom({position:'topright'}).addTo(_map);
+    // Visible ⌖ locate control (fallback has no GeolocateControl equivalent).
+    const LocateCtl = L.Control.extend({options:{position:'topright'},
+      onAdd: function(){
+        const b=L.DomUtil.create('button','');
+        b.type='button'; b.title='Use my location'; b.setAttribute('aria-label','Use my location');
+        b.style.cssText='width:30px;height:30px;font-size:16px;line-height:28px;text-align:center;cursor:pointer;background:#fff;border:2px solid rgba(0,0,0,0.2);border-radius:4px;';
+        b.textContent='⌖';
+        L.DomEvent.on(b,'click', (e)=>{ L.DomEvent.stopPropagation(e); useLocationFb(); });
+        return b;
+      }});
+    _map.addControl(new LocateCtl());
+    notifyMapResize = ()=>{ try{ _map.invalidateSize(); }catch(e){} };
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(_map);
+    _quakeLayer=L.layerGroup().addTo(_map); _fireLayer=L.layerGroup().addTo(_map);
+    loadCenters().then(renderFb);
+    bindFilterInputs(renderFb);
+    document.getElementById('locBtn').addEventListener('click', useLocationFb);
+    debounceHazards(refreshHazardsFb);
+  document.getElementById('showHazardsBtn').addEventListener('click', zoomToHazardsFb);
+    _map.on('moveend', ()=>{ clearTimeout(hzTimer); hzTimer=setTimeout(refreshHazardsFb, 500); });
+  }).catch(()=>{ hzStatus('Map failed to load — check your connection and reload.'); });
+}
+function renderFb(){
+  const filtered=getFiltered();
+  _markers.forEach(m=> _map.removeLayer(m)); _markers=[];
+  renderList(filtered, (c)=>{ _map.setView([c.lat,c.lng],14); const m=_markers.find(m=>m._cid===c.id); if(m) m.openPopup(); });
+  filtered.forEach(c=>{
+    const color=statusColor(c.occupancy_status);
+    const icon=L.divIcon({html:`<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`, className:'', iconSize:[16,16]});
+    const m=L.marker([c.lat,c.lng], {icon}).addTo(_map);
+    m._cid=c.id;
+    m.bindPopup(centerPopupHTML(c));
+    _markers.push(m);
+  });
+  _map.invalidateSize();
+  if(!renderFb._fitted && _markers.length){
+    renderFb._fitted = true;
+    try{ const group=L.featureGroup(_markers); _map.fitBounds(group.getBounds().pad(0.2)); }catch(e){}
+  }
+}
+function hzCenterFb(){ const c=_map.getCenter(); return {lat:+c.lat.toFixed(4), lon:+c.lng.toFixed(4)}; }
+function inViewCountFb(pts){
+  try{
+    const bb=_map.getBounds();
+    return pts.filter(p=>{ try{ return bb.contains([p.lat??p[0], p.lon??p[1]]); }catch(e){ return false; } }).length;
+  }catch(e){ return -1; }
+}
+// Manual camera fit to loaded detections — see Mapbox zoomToHazards.
+function zoomToHazardsFb(){
+  const layers=[];
+  _quakeLayer.eachLayer(l=>layers.push(l));
+  _fireLayer.eachLayer(l=>layers.push(l));
+  Object.values(_noahLayers).forEach(l=>{ if(l) layers.push(l); });
+  if(!layers.length){ hzStatus('No hazard data loaded yet — turn a layer on first.'); return; }
+  try{ _map.fitBounds(L.featureGroup(layers).getBounds().pad(0.15)); hzStatus(`Showing ${layers.length} hazard marker(s).`); }
+  catch(e){ hzStatus('Could not frame hazards — try panning manually.'); }
+}
+async function refreshHazardsFb(){
+  const selFb=hazardSelection();
+  const showQ=selFb.quake, showF=selFb.fire, showH=selFb.heat;
+  _quakeLayer.clearLayers(); _fireLayer.clearLayers();
+  if(_heatLayer){ _map.removeLayer(_heatLayer); _heatLayer=null; }
+  Object.entries(_noahLayers).forEach(([id, lyr])=>{
+    if(lyr){ _map.removeLayer(lyr); _noahLayers[id]=null; }
+  });
+  const {lat, lon}=hzCenterFb();
   const jobs=[];
-  if(showQ) jobs.push(loadQuakes(lat, lon));
-  if(showF || showH) jobs.push(loadFires(lat, lon, showH));
+  if(showQ){
+    if(hzAbort.quake) hzAbort.quake.abort(); hzAbort.quake=new AbortController();
+    hzStatus('Loading earthquakes…');
+    jobs.push(fetchQuakes(lat, lon, hzAbort.quake.signal).then(data=>{
+      (data.quakes||[]).slice(0,200).forEach(q=>{
+        L.circle([q.lat,q.lon], {radius:quakeRadiusKm(q.mag)*1000, color:'#9333ea', weight:1, opacity:0.6, fillOpacity:0.12}).addTo(_quakeLayer)
+          .bindPopup(`<div style="min-width:200px"><div style="font-weight:800;">M${q.mag??'?'} — ${esc(q.place||'Earthquake')}</div><div style="font-size:12px;color:#667085;">Depth ${q.depth_km??'?'} km • Est. felt radius ${quakeRadiusKm(q.mag)} km • <a href="${q.url||'#'}" target="_blank" rel="noopener">USGS</a></div>${QUAKE_RING_NOTE}</div>`);
+        const size=10+Math.min(14,(q.mag||0)*2);
+        const m=L.marker([q.lat,q.lon], {icon:L.divIcon({html:`<div class="quake-pulse" style="width:${size}px;height:${size}px;"></div>`, className:'', iconSize:[size,size]}), title:`M${q.mag} ${q.place||''}`}).addTo(_quakeLayer);
+        m.bindPopup(`<div style="min-width:200px"><div style="font-weight:800;">M${q.mag??'?'} — ${esc(q.place||'Earthquake')}</div><div style="font-size:12px;color:#667085;">Depth ${q.depth_km??'?'} km • <a href="${q.url||'#'}" target="_blank" rel="noopener">USGS</a></div></div>`);
+      });
+      const _qfb=inViewCountFb((data.quakes||[]).slice(0,200));
+      hzStatus(_qfb<0?quakeStatusText(data):`${quakeStatusText(data)} • ${_qfb} in view`);
+    }).catch(e=>{ if(e.name!=='AbortError') hzStatus('Earthquakes unavailable — retry shortly.'); }));
+  }
+  if(showF || showH){
+    if(hzAbort.fire) hzAbort.fire.abort(); hzAbort.fire=new AbortController();
+    hzStatus('Loading fires…');
+    jobs.push(fetchFires(lat, lon, hzAbort.fire.signal).then(data=>{
+      lastFires=data.fires||[];
+      lastFires.slice(0,500).forEach(f=>{
+        L.circle([f.lat,f.lon], {radius:fireRadiusKm()*1000, color:'#dc2626', weight:1, opacity:0.6, fillOpacity:0.12}).addTo(_fireLayer)
+          .bindPopup(`<div style="font-size:12px;"><b>Active fire</b> (${esc(f.confidence||'n/a')})<br>Brightness ${f.brightness} • ${esc(f.date||'')} ${esc(f.time||'')}</div>${FIRE_RING_NOTE}`);
+        const m=L.marker([f.lat,f.lon], {icon:L.divIcon({html:'<div class="fire-dot">🔥</div>', className:'', iconSize:[18,18]}), title:`Fire ${f.confidence||''}`}).addTo(_fireLayer);
+        m.bindPopup(`<div style="font-size:12px;"><b>Active fire</b> (${esc(f.confidence||'n/a')})<br>Brightness ${f.brightness} • ${esc(f.date||'')} ${esc(f.time||'')}</div>`);
+      });
+      if(showH && lastFires.length){
+        const pts=lastFires.map(f=>{ const b=+f.brightness||320; const i=Math.min(1,Math.max(0.25,(b-300)/150)); return [f.lat,f.lon,i]; });
+        _heatLayer=L.heatLayer(pts, {radius:28, blur:18, maxZoom:11, minOpacity:0.45, gradient:{0.2:'#fef9c3',0.5:'#f97316',0.8:'#dc2626'}}).addTo(_map);
+      }
+      const _ffb=inViewCountFb(lastFires.slice(0,500));
+      hzStatus(_ffb<0?fireStatusText(data, showH):`${fireStatusText(data, showH)} • ${_ffb} in view`);
+    }).catch(e=>{ if(e.name!=='AbortError') hzStatus(e.code===503?'Fires unavailable — missing FIRMS key or provider down.':'Fires unavailable — retry shortly.'); }));
+  }
+  // ---- Project NOAH static polygons (local files, keyless) ----
+  const noahOnFb={flood:selFb.flood, slide:selFb.slide, surge:selFb.surge};
+  if(!showQ && !showF && !showH && !noahOnFb.flood && !noahOnFb.slide && !noahOnFb.surge){ hzStatus(''); return; }
+  Object.entries(noahOnFb).forEach(([id, on])=>{
+    if(!on) return;
+    const wantFile=noahFileFor(id);
+    hzStatus('Loading NOAH '+id+'…');
+    jobs.push(fetchNoah(id).then(data=>{
+      if(noahFileFor(id)!==wantFile) return; // stale SSA response
+      if(!document.getElementById(noahCheckboxId(id)).checked) return;
+      const lyr=L.geoJSON(data, {style:noahStyle,
+        onEachFeature:(feat, layer)=>{ layer.bindPopup(noahLabel(feat)); }});
+      if(_noahLayers[id]) _map.removeLayer(_noahLayers[id]);
+      _noahLayers[id]=lyr;
+      lyr.addTo(_map);
+      lyr.bringToBack();
+      hzStatus(noahStatusText(id, data));
+    }).catch(()=>{ hzStatus(`NOAH ${id} failed to load — reload the page.`); }));
+  });
   await Promise.all(jobs);
 }
-async function loadQuakes(lat, lon){
-  try{
-    if(hzAbort.quake) hzAbort.quake.abort();
-    hzAbort.quake=new AbortController();
-    hzStatus('Loading earthquakes…');
-    const res=await fetch(`/api/earthquakes?lat=${lat}&lon=${lon}&radius_km=500`, {signal:hzAbort.quake.signal});
-    if(!res.ok) throw new Error('quakes '+res.status);
-    const data=await res.json();
-    (data.quakes||[]).slice(0,200).forEach(q=>{
-      const size=10+Math.min(14,(q.mag||0)*2);
-      const m=L.marker([q.lat,q.lon], {icon:L.divIcon({html:`<div class="quake-pulse" style="width:${size}px;height:${size}px;"></div>`, className:'', iconSize:[size,size]}), title:`M${q.mag} ${q.place||''}`}).addTo(quakeLayer);
-      m.bindPopup(`<div style="min-width:200px"><div style="font-weight:800;">M${q.mag??'?'} — ${q.place||'Earthquake'}</div><div style="font-size:12px;color:#667085;">Depth ${q.depth_km??'?'} km • <a href="${q.url||'#'}" target="_blank" rel="noopener">USGS</a></div></div>`);
-    });
-    hzStatus(`Quakes: ${data.count??0} • Fires: ${lastFires.length}`);
-  }catch(e){ if(e.name!=='AbortError') hzStatus('Earthquakes unavailable — retry shortly.'); }
-}
-async function loadFires(lat, lon, showHeat){
-  try{
-    if(hzAbort.fire) hzAbort.fire.abort();
-    hzAbort.fire=new AbortController();
-    hzStatus('Loading fires…');
-    const res=await fetch(`/api/fires?lat=${lat}&lon=${lon}&days=1`, {signal:hzAbort.fire.signal});
-    if(res.status===503){ hzStatus('Fires unavailable — missing FIRMS key or provider down.'); lastFires=[]; return; }
-    if(!res.ok) throw new Error('fires '+res.status);
-    const data=await res.json();
-    lastFires=data.fires||[];
-    lastFires.slice(0,500).forEach(f=>{
-      const m=L.marker([f.lat,f.lon], {icon:L.divIcon({html:'<div class="fire-dot">🔥</div>', className:'', iconSize:[18,18]}), title:`Fire ${f.confidence||''}`}).addTo(fireLayer);
-      m.bindPopup(`<div style="font-size:12px;"><b>Active fire</b> (${f.confidence||'n/a'})<br>Brightness ${f.brightness} • ${f.date||''} ${f.time||''}</div>`);
-    });
-    if(showHeat && lastFires.length){
-      const pts=lastFires.map(f=>{ const b=+f.brightness||320; const i=Math.min(1,Math.max(0.25,(b-300)/150)); return [f.lat,f.lon,i]; });
-      heatLayer=L.heatLayer(pts, {radius:28, blur:18, maxZoom:11, minOpacity:0.45, gradient:{0.2:'#fef9c3',0.5:'#f97316',0.8:'#dc2626'}}).addTo(map);
-    }
-    hzStatus(`Fires: ${lastFires.length} • Heat ${showHeat?'on':'off'}`);
-  }catch(e){ if(e.name!=='AbortError') hzStatus('Fires unavailable — retry shortly.'); }
-}
-function useLocation(){
+function useLocationFb(){
   if(!navigator.geolocation){ alert('Geolocation not supported. Please select manually.'); return; }
   navigator.geolocation.getCurrentPosition(pos=>{
     const lat=pos.coords.latitude, lng=pos.coords.longitude;
-    L.marker([lat,lng], {icon: L.divIcon({html:'<div style="background:var(--primary); width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.4)"></div>', className:'', iconSize:[16,16]})}).addTo(map).bindPopup('Your location').openPopup();
-    map.setView([lat,lng],13);
+    L.marker([lat,lng], {icon: L.divIcon({html:'<div style="background:var(--primary); width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.4)"></div>', className:'', iconSize:[16,16]})}).addTo(_map).bindPopup('Your location').openPopup();
+    _map.setView([lat,lng],13);
   }, err=>{ alert('Location denied. You can search by city or address.'); }, {enableHighAccuracy:true, timeout:8000});
 }
+document.addEventListener('DOMContentLoaded', ()=>{
+  bindPanelToggle();
+  bindPanelTabs();
+  if(USE_MAPBOX){ initMapbox().catch(e=>{ console.warn('Mapbox failed, falling back to OSM:', e); initFallback(); }); }
+  else { initFallback(); }
+});
 </script>
 {% endblock %}
