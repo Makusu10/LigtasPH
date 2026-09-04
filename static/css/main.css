@@ -1,145 +1,148 @@
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Archivo+Narrow:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 /* ==========================================================================
-   LIGTASPH — RAPID RESPONSE / CIVIL DEFENSE THEME
-   Hard edges, high contrast, warning colors. Not a "clean" look — an
-   operations console for emergencies.
+   LIGTASPH — MUNICIPAL OPERATIONS CENTER THEME (rev. 2)
+   Professional, presentable, calm competence. Navy/slate foundation, one warm
+   amber accent for primary actions + status; true red only for live alerts.
+   Moderate radii, hairline borders, restrained glass on elevated surfaces.
    ========================================================================== */
 
 :root {
-  /* Ops palette — ink, siren, warning */
-  --night: #0d1b22;          /* nav / dark bars */
-  --ink:   #142127;          /* deep field colour */
-  --panel: #f1f4ef;          /* card surface */
-  --panel-2: #e5ebe4;        /* inset / well surface */
-  --paper: #dbe1dc;          /* page background */
-  --line:  #23343c;          /* hard borders (1px / 2px) */
-  --line-soft: #7e8d93;      /* secondary hairlines */
+  /* Navy / slate foundation */
+  --night: #12283f;          /* deep navy — nav, bars, active states */
+  --ink:   #1b2c3f;          /* headings / deep text */
+  --panel: #f4f6f8;          /* card surface (slate-tinted) */
+  --panel-2: #e9edf1;        /* inset / well surface */
+  --paper: #e7ebef;          /* page background */
+  --line:  #b9c4cd;          /* hairline borders / dividers */
+  --line-soft: #d6dde3;      /* faint hairlines */
 
-  --red:   #c1121f;          /* siren / primary CTA */
+  /* Single warm accent (primary actions + status). Red is NOT for buttons/nav. */
+  --amber: #b26a00;          /* measured amber-orange — primary actions */
+  --amber-dark: #7c4a00;
+  --amber-bright: #f3b04e;   /* small accents on navy */
+  --red: #c1121f;            /* alerts ONLY: danger strip, full, flashes */
   --red-dark: #7f0b11;
-  --amber: #d9991a;          /* caution */
-  --amber-bright: #f6b83a;
-  --green: #25743a;          /* available / safe */
-  --blue:  #1f5fbf;          /* operational info */
+  --green: #2e7d52;          /* open / available */
+  --blue: #2563a8;           /* information / links */
 
-  --text: #162229;
-  --text-secondary: #3d4a52;
-  --text-muted: #67757c;
+  --text: #1c2b3a;
+  --text-secondary: #4a5b6a;
+  --text-muted: #71828f;
 
-  --font-display: 'Oswald', 'Archivo Narrow', sans-serif;
-  --font-body: 'Archivo Narrow', 'Oswald', sans-serif;
+  --font-display: 'IBM Plex Sans', sans-serif;
+  --font-body: 'IBM Plex Sans', sans-serif;
   --font-mono: 'IBM Plex Mono', 'Consolas', monospace;
 
-  --hard-shadow: 4px 4px 0 rgba(13,27,34,0.18);
-  --hard-shadow-lg: 6px 6px 0 rgba(13,27,34,0.22);
-  --radius: 2px;
+  --hard-shadow: 0 1px 3px rgba(18,40,63,0.10), 0 1px 0 rgba(18,40,63,0.04);
+  --hard-shadow-lg: 0 2px 6px rgba(18,40,63,0.14);
+  --radius: 8px;
 
-  /* Compatibility aliases — templates still reference the old palette names */
-  --primary: var(--red);
+  /* Compatibility aliases — templates still reference the old names */
+  --primary: var(--amber);
   --navy: var(--ink);
   --orange: var(--amber);
   --bg: var(--paper);
   --bg-gradient: none;
-  --border: rgba(35,52,60,0.4);
+  --border: rgba(185,196,205,0.7);
   --border-strong: var(--line);
-  --glass: var(--panel);
-  --glass-strong: var(--panel);
-  --glass-border: rgba(35,52,60,0.35);
-  --glass-blur: 0px;
-  --glass-shadow: var(--hard-shadow);
-  --glass-shadow-strong: var(--hard-shadow-lg);
-  --radius-pill: 2px;
+  --glass: rgba(244,246,248,0.82);
+  --glass-strong: rgba(244,246,248,0.94);
+  --glass-border: rgba(20,40,63,0.14);
+  --glass-blur: 10px;
+  --glass-shadow: 0 1px 3px rgba(18,40,63,0.12);
+  --glass-shadow-strong: 0 2px 8px rgba(18,40,63,0.16);
+  --radius-pill: 8px;
 }
 
 * { box-sizing: border-box; }
 html, body {
   margin:0; padding:0;
   font-family: var(--font-body);
-  font-size:16px; line-height:1.45;
+  font-size:16px; line-height:1.5;
   color: var(--text);
   min-height:100vh;
   background-color: var(--paper);
   background-image:
-    linear-gradient(rgba(35,52,60,0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(35,52,60,0.06) 1px, transparent 1px);
+    linear-gradient(rgba(27,44,63,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(27,44,63,0.045) 1px, transparent 1px);
   background-size: 24px 24px;
   background-attachment: fixed;
 }
-h1,h2,h3,h4 { font-family: var(--font-display); font-weight:600; text-transform:uppercase; letter-spacing:0.02em; color: var(--ink); }
-h1 { font-size:28px; }
+h1,h2,h3,h4 { font-family: var(--font-display); font-weight:600; letter-spacing:0.01em; color: var(--ink); }
+h1 { font-size:26px; }
 h2 { font-size:18px; }
-code { font-family: var(--font-mono); font-size:0.9em; background: var(--panel-2); padding:1px 5px; border:1px solid var(--line-soft); border-radius:2px; }
+code { font-family: var(--font-mono); font-size:0.9em; background: var(--panel-2); padding:1px 5px; border:1px solid var(--line-soft); border-radius:4px; }
 a { color: var(--blue); }
 
 .container { max-width:1200px; margin:0 auto; padding:0 16px; }
 
-/* Cards — panel + hard border + print-style offset shadow */
+/* Cards — slate panel + hairline border + soft dashboard shadow */
 .card {
   background: var(--panel);
-  border: 2px solid var(--line);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 16px;
   box-shadow: var(--hard-shadow);
 }
 .card:hover { box-shadow: var(--hard-shadow-lg); }
-.map-shell .card, .map-shell #routeDock { box-shadow: 4px 4px 0 rgba(13,27,34,0.25); }
+.map-shell .card, .map-shell #routeDock { box-shadow: var(--glass-shadow); }
 
-/* Badges — squared, uppercase, mono */
+/* Badges — small mono tags */
 .badge {
   display:inline-flex; align-items:center; gap:6px;
   font-family: var(--font-mono); font-size:11px; font-weight:600;
   letter-spacing:0.05em; text-transform:uppercase;
-  padding:4px 8px; border-radius:var(--radius);
-  border:2px solid transparent; white-space:nowrap;
+  padding:3px 8px; border-radius:6px;
+  border:1px solid transparent; white-space:nowrap;
 }
-.badge-available { background:#e2f0e2; color:var(--green); border-color:var(--green); }
-.badge-nearly { background:#f9ecc8; color:#8a5c06; border-color:var(--amber); }
-.badge-full { background:#f4dada; color:var(--red-dark); border-color:var(--red); }
+.badge-available { background:#e4efe6; color:var(--green); border-color:var(--green); }
+.badge-nearly { background:#f7efd9; color:var(--amber-dark); border-color:var(--amber); }
+.badge-full { background:#f8e3e0; color:var(--red-dark); border-color:var(--red); }
 .badge-unknown { background:var(--panel-2); color:var(--text-secondary); border-color:var(--line-soft); }
 
-/* Buttons — flat, squared, stated, tactile press */
+/* Buttons — flat, hairline-bordered, tactile press; primary uses the amber accent */
 .btn {
   display:inline-flex; align-items:center; justify-content:center; gap:8px;
   padding:9px 16px; border-radius:var(--radius);
   font-family: var(--font-display); font-weight:600; font-size:14px;
-  letter-spacing:0.08em; text-transform:uppercase;
-  border:2px solid var(--line); cursor:pointer; text-decoration:none;
-  box-shadow: 0 3px 0 var(--line); background: var(--panel);
-  color: var(--text); transition: none;
+  letter-spacing:0.02em;
+  border:1px solid var(--line); cursor:pointer; text-decoration:none;
+  box-shadow: 0 2px 0 var(--line); background: var(--panel);
+  color: var(--text);
 }
-.btn:hover { filter:brightness(1.06); }
-.btn:active { transform:translate(2px,2px); box-shadow:0 1px 0 var(--line); }
-.btn-primary { background: var(--red); border-color: var(--red-dark); color:#fff; box-shadow:0 3px 0 var(--red-dark); }
-.btn-primary:hover { background:#cf2a32; }
+.btn:hover { filter:brightness(0.98); }
+.btn:active { transform:translate(1px,1px); box-shadow:0 1px 0 var(--line); }
+.btn-primary { background: var(--amber); border-color: var(--amber-dark); color:#201905; box-shadow:0 2px 0 var(--amber-dark); }
+.btn-primary:hover { background: var(--amber-dark); border-color:#5f3a01; color:#fff; }
 .btn-secondary { background: var(--panel); color: var(--text); border-color: var(--line); }
-.btn-secondary:hover { background:#e3e9e1; }
-/* Dominant emergency action — big, obvious, tappable one-handed */
-.btn-lg { padding:16px 22px; font-size:17px; letter-spacing:0.1em; }
+.btn-secondary:hover { background:#e2e7ec; }
+/* Dominant emergency action — the one shout on the screen */
+.btn-lg { padding:15px 22px; font-size:16px; letter-spacing:0.02em; }
 .btn-lg .btn-icon { font-family:var(--font-mono); font-size:20px; line-height:1; }
 
-/* Emergency action band — printed-form strip that dominates before lists/filters */
+/* Emergency action band — amber/red alert strip that dominates before lists/filters */
 .emergency-strip {
   display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
-  background: var(--night); border:2px solid var(--line); border-left:10px solid var(--red);
+  background: var(--night); border:1px solid rgba(255,255,255,0.16); border-left:8px solid var(--red);
   color:#fff; padding:12px 14px; margin:0 0 14px; border-radius:var(--radius);
   box-shadow: var(--hard-shadow);
 }
 .emergency-strip .strip-tag { font-family:var(--font-mono); font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--amber-bright); display:block; }
-.emergency-strip .strip-copy { font-family:var(--font-display); font-weight:600; font-size:20px; text-transform:uppercase; letter-spacing:0.03em; line-height:1.15; }
+.emergency-strip .strip-copy { font-family:var(--font-display); font-weight:600; font-size:19px; letter-spacing:0.01em; line-height:1.2; }
 .emergency-strip .btn { flex:0 0 auto; }
 
-/* Nav — dark ops bar with siren top edge */
+/* Nav — dark navy bar, amber top edge (no red), glass applied on elevated surfaces */
 .nav {
-  background: var(--night);
-  border-bottom: 2px solid var(--line);
-  border-top: 4px solid var(--red);
+  background: rgba(18,40,63,0.94);
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+  border-top: 3px solid var(--amber);
   position: sticky; top:0; z-index:20;
-  box-shadow: 0 4px 0 rgba(13,27,34,0.15);
+  box-shadow: var(--hard-shadow);
 }
 .nav-inner { display:flex; align-items:center; justify-content:space-between; height:62px; gap:16px; }
-.nav-brand { display:flex; align-items:center; gap:10px; font-family:var(--font-display); font-weight:600; letter-spacing:0.06em; font-size:19px; color:#fff; text-decoration:none; text-transform:uppercase; }
-.nav-brand-mark { width:30px; height:30px; background: var(--red); border:2px solid #fff; border-radius:var(--radius); display:grid; place-items:center; color:#fff; font-weight:700; font-size:13px; box-shadow:0 2px 0 rgba(0,0,0,0.3); }
+.nav-brand { display:flex; align-items:center; gap:10px; font-family: var(--font-display); font-weight:600; letter-spacing:0.03em; font-size:19px; color:#fff; text-decoration:none; text-transform:uppercase; }
+.nav-brand-mark { width:30px; height:30px; background: var(--amber); border:1px solid #fff; border-radius:var(--radius); display:grid; place-items:center; color:var(--ink); font-weight:700; font-size:13px; box-shadow:0 1px 2px rgba(0,0,0,0.25); }
 .nav-links { display:flex; gap:2px; align-items:center; }
 .nav-links a { color:#c6d2d6; text-decoration:none; font-family:var(--font-display); font-weight:500; font-size:13px; letter-spacing:0.06em; text-transform:uppercase; padding:7px 12px; border-bottom:3px solid transparent; }
 .nav-links a:hover { color:#fff; background:rgba(255,255,255,0.08); }
@@ -147,7 +150,7 @@ a { color: var(--blue); }
 .nav-toggle { display:none; background: transparent; border:2px solid var(--line-soft); border-radius:var(--radius); padding:8px 10px; color:#fff; }
 .mobile-menu { display:none; flex-direction:column; gap:2px; padding:12px 0 16px; border-top:1px solid var(--line); }
 .mobile-menu a { padding:10px 14px; color:#fff; text-decoration:none; font-family:var(--font-display); letter-spacing:0.05em; text-transform:uppercase; border-left:3px solid transparent; }
-.mobile-menu a:hover { background:rgba(255,255,255,0.08); border-left-color:var(--red); }
+.mobile-menu a:hover { background:rgba(255,255,255,0.08); border-left-color:var(--amber-bright); }
 
 @media (max-width: 768px) {
   .nav-links { display:none; }
@@ -159,33 +162,33 @@ a { color: var(--blue); }
   table { display:block; overflow-x:auto; }
 }
 
-/* Focus — hard red outline */
-a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline:3px solid var(--red); outline-offset:2px; }
+/* Focus — visible slate-blue ring (not red; red stays for alerts) */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline:3px solid var(--blue); outline-offset:2px; }
 
-/* Tables — squared, capped header bar */
-table { width:100%; border-collapse:collapse; background: var(--panel); border:2px solid var(--line); border-radius:var(--radius); box-shadow: var(--hard-shadow); }
+/* Tables — hairline dividers, navy header bar */
+table { width:100%; border-collapse:collapse; background: var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow: var(--hard-shadow); }
 th, td { padding:10px 12px; border-bottom:1px solid var(--line-soft); border-right:1px solid var(--line-soft); text-align:left; font-size:14px; }
 th { background: var(--night); color:#e6eef0; font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:0.06em; font-weight:600; }
 tr:last-child td { border-bottom:none; }
 th:last-child, td:last-child { border-right:none; }
-tr:nth-child(even) td { background:rgba(35,52,60,0.04); }
+tr:nth-child(even) td { background:rgba(27,44,63,0.035); }
 
-/* Forms — squared, hard border, no glow */
-label { font-family: var(--font-display); font-size:12px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-secondary); }
+/* Forms — hairline-bordered, focused with slate-blue ring */
+label { font-family: var(--font-display); font-size:12px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:var(--text-secondary); }
 input, select, textarea {
   width:100%; padding:9px 12px;
-  border:2px solid var(--line); border-radius:var(--radius);
+  border:1px solid var(--line); border-radius:var(--radius);
   font-family: var(--font-body); font-size:15px;
   background: #fff; color:var(--text);
 }
-input:focus, select:focus, textarea:focus { outline:none; border-color:var(--red); background:#fffdf9; box-shadow:0 0 0 2px rgba(193,18,31,0.25); }
+input:focus, select:focus, textarea:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 2px rgba(37,99,168,0.18); }
 
-/* Flash — squared with thick warning side bar */
-.flash { padding:10px 12px; border-radius:var(--radius); margin-bottom:12px; font-size:14px; border:2px solid var(--line); border-left:8px solid var(--line); background:var(--panel); }
-.flash-danger { background:#f9e6e4; color:#5e0a0e; border-left-color:var(--red); }
-.flash-warning { background:#f9ecc8; color:#6d4a05; border-left-color:var(--amber); }
-.flash-info { background:#dce9f4; color:#123b7a; border-left-color:var(--blue); }
-.flash-success { background:#e2f0e2; color:#155024; border-left-color:var(--green); }
+/* Flash — hairline card with thick warning side bar */
+.flash { padding:10px 12px; border-radius:var(--radius); margin-bottom:12px; font-size:14px; border:1px solid var(--line); border-left:8px solid var(--line); background:var(--panel); }
+.flash-danger { background:#f8e3e0; color:#5e0a0e; border-left-color:var(--red); }
+.flash-warning { background:#f7efd9; color:#6d4a05; border-left-color:var(--amber); }
+.flash-info { background:#e7eef6; color:#123b7a; border-left-color:var(--blue); }
+.flash-success { background:#e4efe6; color:#155024; border-left-color:var(--green); }
 
 /* Grid helpers */
 .grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
@@ -195,7 +198,7 @@ input:focus, select:focus, textarea:focus { outline:none; border-color:var(--red
   background:
     repeating-linear-gradient(45deg, var(--amber-bright) 0 14px, var(--ink) 14px 28px);
   color:#fff; text-shadow:0 1px 0 rgba(0,0,0,0.45);
-  border:2px solid var(--line);
+  border:1px solid var(--line);
   padding:10px 14px; text-align:center; font-size:13px; font-weight:600; letter-spacing:0.04em;
   margin-bottom:16px; border-radius:var(--radius);
   box-shadow:var(--hard-shadow);
@@ -215,7 +218,7 @@ input:focus, select:focus, textarea:focus { outline:none; border-color:var(--red
 .hourly-strip { display:flex; gap:10px; overflow-x:auto; padding:8px 2px 12px; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; }
 .hourly-strip::-webkit-scrollbar{ height:8px; }
 .hourly-strip::-webkit-scrollbar-thumb{ background: var(--line); }
-.hourly-card { min-width:84px; flex:0 0 auto; scroll-snap-align:start; background:#fff; border:2px solid var(--line); border-radius:var(--radius); padding:10px 8px; text-align:center; box-shadow:0 3px 0 var(--line); }
+.hourly-card { min-width:84px; flex:0 0 auto; scroll-snap-align:start; background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:10px 8px; text-align:center; box-shadow:var(--hard-shadow); }
 .hourly-card:hover { transform:translate(-1px,-1px); box-shadow:0 4px 0 var(--line); }
 .hourly-card .h-time{ font-family:var(--font-mono); font-size:11px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; }
 .hourly-card .h-temp{ font-family:var(--font-display); font-size:18px; font-weight:600; margin-top:4px; }
@@ -223,8 +226,8 @@ input:focus, select:focus, textarea:focus { outline:none; border-color:var(--red
 @keyframes shimmer{ 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
 /* Now card — day/night, hard-edged */
-.weather-now { border-radius:var(--radius); padding:20px; display:flex; justify-content:space-between; gap:16px; border:2px solid var(--line); box-shadow:var(--hard-shadow); }
-.weather-now.day { background: #dde6ea; color:var(--ink); }
+.weather-now { border-radius:var(--radius); padding:20px; display:flex; justify-content:space-between; gap:16px; border:1px solid var(--line); box-shadow:var(--hard-shadow); }
+.weather-now.day { background: #edf1f4; color:var(--ink); }
 .weather-now.night { background: var(--night); color:#c9d6da; }
 .weather-now .now-label{ font-family:var(--font-display); font-size:13px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; }
 .weather-now.day .now-label{ color:#3d4a52; }
@@ -245,21 +248,21 @@ input:focus, select:focus, textarea:focus { outline:none; border-color:var(--red
 @media (max-width: 640px){ .weather-now{ flex-direction:column; } .weather-now-temp{ font-size:64px; } }
 
 /* Environmental status — Heat Index & AQI (PAGASA/DENR) */
-.env-section { border-radius:var(--radius); padding:16px; margin-top:16px; border:2px solid var(--line); }
-.env-tint-green { background:#e9f2e6; }
-.env-tint-yellow { background:#f7efcf; }
-.env-tint-orange { background:#fae3c4; }
-.env-tint-red { background:#f6dcd9; }
-.env-tint-purple { background:#ebdcf3; }
+.env-section { border-radius:var(--radius); padding:16px; margin-top:16px; border:1px solid var(--line); }
+.env-tint-green { background:#e9f1e9; }
+.env-tint-yellow { background:#f7efd9; }
+.env-tint-orange { background:#faeadia; }
+.env-tint-red { background:#f7e3e1; }
+.env-tint-purple { background:#eee6f4; }
 .env-tint-maroon { background:#4a1418; color:#f2e4e3; }
-.env-overall { display:flex; gap:10px; align-items:center; padding:12px 14px; border-radius:var(--radius); border:2px solid var(--line); background:var(--panel); box-shadow:var(--hard-shadow); margin-bottom:12px; }
-.env-overall-icon { width:36px; height:36px; display:grid; place-items:center; border-radius:var(--radius); background:#fff; border:2px solid var(--line); flex:0 0 auto; font-family:var(--font-mono); font-weight:700; }
+.env-overall { display:flex; gap:10px; align-items:center; padding:12px 14px; border-radius:var(--radius); border:1px solid var(--line); background:var(--panel); box-shadow:var(--hard-shadow); margin-bottom:12px; }
+.env-overall-icon { width:36px; height:36px; display:grid; place-items:center; border-radius:var(--radius); background:#fff; border:1px solid var(--line); flex:0 0 auto; font-family:var(--font-mono); font-weight:700; }
 .env-grid { display:grid; grid-template-columns: 1.1fr 1.6fr; gap:12px; align-items:stretch; }
 @media (max-width: 768px){ .env-grid{ grid-template-columns:1fr; } }
-.env-card { padding:14px; border-radius:var(--radius); border:2px solid var(--line); background:var(--panel); box-shadow:0 3px 0 var(--line); }
+.env-card { padding:14px; border-radius:var(--radius); border:1px solid var(--line); background:var(--panel); box-shadow:var(--hard-shadow); }
 .env-card:hover { transform:translate(-1px,-1px); }
 .env-card-head { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
-.env-card-icon { width:32px; height:32px; display:grid; place-items:center; border-radius:var(--radius); background:#fff; border:2px solid var(--line); font-family:var(--font-mono); font-weight:700; }
+.env-card-icon { width:32px; height:32px; display:grid; place-items:center; border-radius:var(--radius); background:#fff; border:1px solid var(--line); font-family:var(--font-mono); font-weight:700; }
 .env-card--aqi { padding:16px; }
 .env-card--aqi .env-measure { font-size:38px; }
 .env-card--aqi .env-card-icon { width:36px; height:36px; }
@@ -283,13 +286,13 @@ input:focus, select:focus, textarea:focus { outline:none; border-color:var(--red
 /* Splash cover — ops boot screen, once per tab session */
 #splash{ position:fixed; inset:0; z-index:2000; display:grid; place-items:center; cursor:pointer;
   background:
-    repeating-linear-gradient(45deg, rgba(193,18,31,0.35) 0 6px, transparent 6px 14px),
+    repeating-linear-gradient(45deg, rgba(243,176,78,0.10) 0 6px, transparent 6px 14px),
     var(--night); }
 #splash.splash-hide{ opacity:0; pointer-events:none; transition:opacity .25s ease; }
 .splash-inner{ display:grid; justify-items:center; gap:12px; text-align:center; padding:24px; }
-.splash-mark{ width:96px; height:96px; border:4px solid #fff; border-radius:var(--radius); display:grid; place-items:center; color:#fff;
-  background: var(--red);
-  box-shadow:0 6px 0 rgba(0,0,0,0.35); animation:splash-pop .5s ease-out both; }
+.splash-mark{ width:96px; height:96px; border:3px solid #fff; border-radius:var(--radius); display:grid; place-items:center; color:var(--ink);
+  background: var(--amber);
+  box-shadow:0 4px 0 rgba(0,0,0,0.3); animation:splash-pop .5s ease-out both; }
 .splash-mark .material-symbols-rounded{ font-size:52px; }
 .splash-word{ color:#fff; font-family:var(--font-display); font-weight:600; font-size:40px; letter-spacing:.06em; text-transform:uppercase; animation:splash-rise .5s .25s ease both; }
 .splash-word span{ color:var(--amber-bright); }
@@ -306,33 +309,37 @@ input:focus, select:focus, textarea:focus { outline:none; border-color:var(--red
 
 /* --------------------------------------------------------------------------
    DARK MODE — default for `prefers-color-scheme: dark`, no toggle, no JS.
-   Low-light field use (brownouts, nights) without forcing surface colours to
-   glow. Text-on-light surfaces get explicit light text; white pictogram tiles
-   (weather icon, env icons) stay white so the glyphs keep contrast.
+   Navy-slate night shift: surfaces deepen, accents keep their amber role,
+   red stays brighter for true alerts. Tags/flashes keep light backgrounds
+   so their fixed dark text stays AA.
    -------------------------------------------------------------------------- */
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper:#0f1a20; --panel:#14252e; --panel-2:#1b2e39;
-    --line:#2c404a; --line-soft:#43555e;
-    --red:#d33b44; --red-dark:#8f141b;
-    --blue:#3b82d8; --green:#3f9c5b;
-    --text:#e2e7e4; --text-secondary:#a7b4b8; --text-muted:#7c8a90;
-    --hard-shadow:4px 4px 0 rgba(0,0,0,0.55);
-    --hard-shadow-lg:6px 6px 0 rgba(0,0,0,0.6);
+    --paper:#0e1c2e; --panel:#15283d; --panel-2:#1c3148;
+    --line:#2f465e; --line-soft:#41586f;
+    --red:#e0525a; --red-dark:#a41d25;
+    --blue:#6ba0d6; --green:#58a76e;
+    --text:#dde6ec; --text-secondary:#9fb0bf; --text-muted:#74879a;
+    --hard-shadow:0 1px 3px rgba(0,0,0,0.4), 0 1px 0 rgba(0,0,0,0.3);
+    --hard-shadow-lg:0 2px 8px rgba(0,0,0,0.5);
   }
-  h1,h2,h3,h4 { color:#e8edeb; }
-  input,select,textarea { color:#162229; }
-  a { color:#7fb4e0; }
-  .btn-secondary:hover { background:#2a3e49; }
-  .weather-now.day { background:#17262f; color:#c9d6da; }
-  .weather-now.day .now-label, .weather-now.day .weather-now-feels, .weather-now.day .weather-now-hilo { color:#9fb2b9; }
-  .weather-now.day .weather-now-temp, .weather-now.day .weather-now-desc { color:#eef3f4; }
-  .hourly-card { background:#111e26; color:#eef3f4; }
-  .hourly-card .h-temp { color:#eef3f4; }
-  .env-tint-green { background:#1d2b20; }
-  .env-tint-yellow { background:#2e2818; }
-  .env-tint-orange { background:#33251a; }
-  .env-tint-red { background:#331b1a; }
-  .env-tint-purple { background:#241d2e; }
-  .stat-num { color:#e8edeb; }
+  h1,h2,h3,h4 { color:#e9eef3; }
+  input,select,textarea { color:#1b2c3f; }
+  a { color:#8ab6e8; }
+  .btn-secondary:hover { background:#253c54; }
+  .weather-now.day { background:#15283d; color:#cfe0ea; }
+  .weather-now.day .now-label, .weather-now.day .weather-now-feels, .weather-now.day .weather-now-hilo { color:#9fb0bf; }
+  .weather-now.day .weather-now-temp, .weather-now.day .weather-now-desc { color:#eef3f6; }
+  .hourly-card { background:#122338; color:#eef3f6; }
+  .hourly-card .h-temp { color:#eef3f6; }
+  .env-tint-green { background:#1c2f23; }
+  .env-tint-yellow { background:#2f2a1c; }
+  .env-tint-orange { background:#342a1e; }
+  .env-tint-red { background:#351c1c; }
+  .env-tint-purple { background:#261f30; }
+  .stat-num { color:#e9eef3; }
+  .badge-available { background:#e7f2ea; color:#2e7d52; }
+  .badge-nearly { background:#faf3df; color:#8a5c06; }
+  .badge-full { background:#f8e6e3; color:#8c1a20; }
+  .badge-unknown { background:#eef2f5; color:#4a5b6a; }
 }

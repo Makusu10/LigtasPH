@@ -19,9 +19,9 @@
     <div class="card" style="background:var(--panel-2);"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Occupancy %</div><div id="statPct" style="font-size:22px; font-weight:800;">{{ pct ~ '%' if pct is not none else 'Unreported' }}</div></div>
   </div>
   {% if pct is not none %}
-  <div style="background:var(--panel-2); border:2px solid var(--line); border-radius:2px; height:14px; overflow:hidden;"><div id="occBar" style="width:{{ pct if pct<=100 else 100 }}%; background: {{ '#c1121f' if pct>=100 else '#d9991a' if pct>=80 else '#25743a' }}; height:100%; border-right:2px solid var(--line);"></div></div>
+  <div style="background:var(--panel-2); border:2px solid var(--line); border-radius:var(--radius); height:14px; overflow:hidden;"><div id="occBar" style="width:{{ pct if pct<=100 else 100 }}%; background: {{ '#c1121f' if pct>=100 else '#d9991a' if pct>=80 else '#25743a' }}; height:100%; border-right:2px solid var(--line);"></div></div>
   {% else %}
-  <div style="background:var(--panel-2); border:2px solid var(--line); border-radius:2px; padding:8px 12px; color:var(--text-secondary); font-size:13px;">Occupancy not yet reported for this center — an admin needs to set its capacity.</div>
+  <div style="background:var(--panel-2); border:2px solid var(--line); border-radius:var(--radius); padding:8px 12px; color:var(--text-secondary); font-size:13px;">Occupancy not yet reported for this center — an admin needs to set its capacity.</div>
   {% endif %}
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
     <span id="supFood" class="badge badge-unknown">Food {{ c['food_status'] }}</span>
@@ -34,9 +34,9 @@
     {% if c['contact_number'] %}<a href="tel:{{ c['contact_number'] }}" class="btn btn-secondary">Call {{ c['contact_number'] }}</a>{% endif %}
     <a href="https://www.google.com/maps/dir/?api=1&destination={{ c['lat'] }},{{ c['lng'] }}" target="_blank" rel="noopener" class="btn btn-primary">Get Directions</a>
   </div>
-  {% if c['notes'] %}<div id="centerNotes" style="background:#f9ecc8; border:2px solid var(--amber); border-left:8px solid var(--amber); padding:10px 12px; border-radius:2px; color:#6d4a05;">Notes: {{ c['notes'] }}</div>{% endif %}
+  {% if c['notes'] %}<div id="centerNotes" style="background:#f9ecc8; border:2px solid var(--amber); border-left:8px solid var(--amber); padding:10px 12px; border-radius:var(--radius); color:#6d4a05;">Notes: {{ c['notes'] }}</div>{% endif %}
   <div id="updatedLine" style="color:var(--text-secondary); font-size:12px;">Last updated: {{ c['updated_at'] }} • Created: {{ c['created_at'] }}</div>
-  <div id="detailMap" style="height:280px; border:2px solid var(--line); border-radius:2px;"></div>
+  <div id="detailMap" style="height:280px; border:2px solid var(--line); border-radius:var(--radius);"></div>
 </div>
 {% endblock %}
 {% block head %}

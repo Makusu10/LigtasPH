@@ -4,13 +4,13 @@
 <div class="map-fullbleed">
   <div class="map-shell">
     <div id="map"></div>
-    <div id="tileFallback" role="status" aria-live="polite" style="display:none; position:absolute; bottom:16px; left:50%; transform:translateX(-50%); z-index:1002; background:var(--panel); border:2px solid var(--line); border-radius:2px; padding:8px 14px; font-size:12px; max-width:380px; text-align:center; box-shadow:4px 4px 0 rgba(13,27,34,0.2); pointer-events:none;">Map background blocked — try hotspot or disable adblocker. Center dots still work.</div>
+    <div id="tileFallback" role="status" aria-live="polite" style="display:none; position:absolute; bottom:16px; left:50%; transform:translateX(-50%); z-index:1002; background:var(--panel); border:2px solid var(--line); border-radius:var(--radius); padding:8px 14px; font-size:12px; max-width:380px; text-align:center; box-shadow:var(--hard-shadow); pointer-events:none;">Map background blocked — try hotspot or disable adblocker. Center dots still work.</div>
     <button id="panelOpen" class="btn btn-secondary" style="display:none; position:absolute; top:12px; left:12px; z-index:1001; padding:8px 12px; font-size:13px;" aria-label="Show details panel">☰ Details</button>
     <aside id="sidePanel" class="card" aria-label="Map details and filters">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <div style="display:flex; align-items:center; gap:8px;">
           <strong style="font-size:14px;">Evacuation Map</strong>
-          <span id="mapMode" style="font-size:11px; font-family:var(--font-mono); font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-secondary); background:var(--panel-2); border:1px solid var(--line); padding:3px 8px; border-radius:2px;">…</span>
+          <span id="mapMode" style="font-size:11px; font-family:var(--font-mono); font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-secondary); background:var(--panel-2); border:1px solid var(--line); padding:3px 8px; border-radius:var(--radius);">…</span>
         </div>
         <button id="panelClose" class="btn btn-secondary" style="padding:4px 10px; font-size:12px;" aria-label="Hide details panel">✕</button>
       </div>
@@ -45,7 +45,7 @@
       <button id="btn2d" class="btn btn-secondary" style="flex:1;">2D</button>
       <button id="btn3d" class="btn btn-secondary" style="flex:1;">3D</button>
     </div>
-    <fieldset id="gpsBox" style="border:2px solid var(--line); border-radius:2px; padding:8px 10px; margin:0 0 8px; font-size:13px;">
+    <fieldset id="gpsBox" style="border:2px solid var(--line); border-radius:var(--radius); padding:8px 10px; margin:0 0 8px; font-size:13px;">
       <legend style="font-size:12px; font-weight:700; padding:0 4px;">GPS &amp; group</legend>
       <div id="gpsStatus" role="status" style="font-size:12px; color:var(--text-secondary); margin-bottom:4px;">Starting GPS…</div>
       <button id="locBtn" class="btn btn-secondary" style="width:100%; margin:0 0 4px; padding:6px 8px; font-size:12px;">Use My Location</button>
@@ -59,7 +59,7 @@
         <label for="navDest" style="font-size:12px;">Go somewhere (like Maps/Waze)</label>
         <div style="position:relative;">
           <input id="navDest" placeholder="e.g. SM Marikina, hospital…" autocomplete="off" style="margin:4px 0;">
-          <div id="navSuggest" style="position:absolute; z-index:20; left:0; right:0; background:#fff; border:2px solid var(--line); border-radius:2px; overflow:hidden; display:none; max-height:180px; overflow:auto; box-shadow:4px 4px 0 rgba(13,27,34,0.2);"></div>
+          <div id="navSuggest" style="position:absolute; z-index:20; left:0; right:0; background:#fff; border:2px solid var(--line); border-radius:var(--radius); overflow:hidden; display:none; max-height:180px; overflow:auto; box-shadow:var(--hard-shadow);"></div>
         </div>
         <label for="navOrigin" style="font-size:12px;">Start (blank = my GPS location)</label>
         <input id="navOrigin" placeholder="My Location" autocomplete="off" style="margin:4px 0;">
@@ -79,7 +79,7 @@
     {% endif %}
     </div>
     <div id="tabGroup" role="tabpanel" aria-labelledby="tabBtnGroup" hidden>
-    <fieldset style="border:2px solid var(--line); border-radius:2px; padding:8px 10px; margin:0 0 8px; font-size:13px;">
+    <fieldset style="border:2px solid var(--line); border-radius:var(--radius); padding:8px 10px; margin:0 0 8px; font-size:13px;">
       <legend style="font-size:12px; font-weight:700; padding:0 4px;">Emergency group</legend>
       <div style="font-size:12px; color:var(--text-secondary); margin-bottom:6px;">Create a group, share the code with family/friends, and see each other's live pins in an emergency. Pins expire after 2 hours.</div>
       <label for="gName" style="font-size:12px;">New group name</label>
@@ -87,7 +87,7 @@
         <input id="gName" placeholder="e.g. Dela Cruz Family" maxlength="80" style="flex:1; margin:0;">
         <button id="gCreateBtn" class="btn btn-secondary" style="padding:6px 10px; font-size:12px;">Create</button>
       </div>
-      <div id="gCodeOut" style="display:none; align-items:center; gap:6px; margin:4px 0; background:var(--panel-2); border:2px dashed var(--line); border-radius:2px; padding:8px 10px;">
+      <div id="gCodeOut" style="display:none; align-items:center; gap:6px; margin:4px 0; background:var(--panel-2); border:2px dashed var(--line); border-radius:var(--radius); padding:8px 10px;">
         <span style="font-size:12px;">Invite code:</span>
         <strong id="gCodeVal" style="font-size:16px; letter-spacing:0.1em;"></strong>
         <button id="gCopyBtn" class="btn btn-secondary" style="padding:4px 8px; font-size:12px; margin-left:auto;">Copy</button>
@@ -107,7 +107,7 @@
     <div id="groupList" style="max-height:30vh; overflow:auto; display:flex; flex-direction:column; gap:6px;"></div>
     </div>
     <div id="tabHazards" role="tabpanel" aria-labelledby="tabBtnHazards" hidden>
-    <fieldset style="border:2px solid var(--line); border-radius:2px; padding:8px 10px; margin:0 0 8px; font-size:13px;">
+    <fieldset style="border:2px solid var(--line); border-radius:var(--radius); padding:8px 10px; margin:0 0 8px; font-size:13px;">
       <legend style="font-size:12px; font-weight:700; padding:0 4px;">Hazards overlay</legend>
       <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzQuake"> Earthquakes (USGS)</label>
       <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzFire"> Active fires (FIRMS)</label>
@@ -122,9 +122,9 @@
         </select>
       </label>
       <div style="display:flex; gap:8px; font-size:11px; color:var(--text-secondary); margin:2px 0 4px;">
-        <span><i style="display:inline-block; width:10px; height:10px; background:#facc15; border-radius:2px;"></i> Low</span>
-        <span><i style="display:inline-block; width:10px; height:10px; background:#f97316; border-radius:2px;"></i> Moderate</span>
-        <span><i style="display:inline-block; width:10px; height:10px; background:#dc2626; border-radius:2px;"></i> High</span>
+        <span><i style="display:inline-block; width:10px; height:10px; background:#facc15; border-radius:var(--radius);"></i> Low</span>
+        <span><i style="display:inline-block; width:10px; height:10px; background:#f97316; border-radius:var(--radius);"></i> Moderate</span>
+        <span><i style="display:inline-block; width:10px; height:10px; background:#dc2626; border-radius:var(--radius);"></i> High</span>
       </div>
       <div style="font-size:11px; color:var(--text-secondary);">Source: Project NOAH (DOST). SSA4 = worst-case advisory.</div>
       <div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">Rings: purple ≈ quake felt area by magnitude • red ≈ 1 km fire watch. Estimates, not official danger zones.</div>
@@ -188,7 +188,7 @@
   body:has(.map-shell) footer{ display:none; }
   @media (max-width: 768px){
     .map-shell{ min-height:480px; }
-    #sidePanel{ top:auto; bottom:0; left:0; right:0; width:auto; max-height:46%; border-radius:2px 2px 0 0; }
+    #sidePanel{ top:auto; bottom:0; left:0; right:0; width:auto; max-height:46%; border-radius:var(--radius) var(--radius) 0 0; }
     #panelOpen{ top:auto !important; bottom:12px; }
     /* Keep the bottom dock above the bottom-sheet Details panel */
     #routeDock{ width:calc(100% - 16px); z-index:1002; bottom:12px; }
@@ -245,7 +245,7 @@ function renderList(filtered, onLocate){
   if(filtered.length===0){ list.innerHTML='<div style="color:var(--text-secondary); font-size:13px; padding:8px;">No centers match. Clear filters or view all.</div>'; return; }
   filtered.forEach(c=>{
     const row=document.createElement('div');
-    row.style.cssText='border:2px solid var(--line); border-radius:2px; padding:8px 10px; display:flex; justify-content:space-between; gap:8px; align-items:center;';
+    row.style.cssText='border:2px solid var(--line); border-radius:var(--radius); padding:8px 10px; display:flex; justify-content:space-between; gap:8px; align-items:center;';
     row.innerHTML=`<div><div style="font-weight:700; font-size:13px;">${esc(c.name)}</div><div style="color:var(--text-secondary); font-size:12px;">${esc(c.city)} • ${c.occupancy_pct===null||c.occupancy_pct===undefined ? 'capacity unreported' : c.available_slots+' slots • '+c.occupancy_pct+'%'}</div><span class="badge badge-${badgeClass(c.occupancy_status)}">${esc(c.occupancy_status)}</span></div><button class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">Locate</button>`;
     row.querySelector('button').addEventListener('click', ()=>onLocate(c));
     list.appendChild(row);
@@ -281,7 +281,7 @@ function renderGroupList(){
   rows.forEach(r=>{
     const mine=groupState.myName && r.display_name && r.display_name.toLowerCase()===groupState.myName.toLowerCase();
     const row=document.createElement('div');
-    row.style.cssText='border:2px solid var(--line); border-radius:2px; padding:6px 8px; font-size:12px; display:flex; justify-content:space-between; gap:8px; align-items:center;'+(mine?' border-color:var(--red); background:rgba(193,18,31,0.06);':'');
+    row.style.cssText='border:2px solid var(--line); border-radius:var(--radius); padding:6px 8px; font-size:12px; display:flex; justify-content:space-between; gap:8px; align-items:center;'+(mine?' border-color:var(--red); background:rgba(193,18,31,0.06);':'');
     const acc=(r.accuracy!==null && r.accuracy!==undefined && r.accuracy!=='')?` • ±${Math.round(+r.accuracy)} m`:'';
     row.innerHTML=`<div style="min-width:0;"><div style="font-weight:700;">${esc(r.display_name)}${mine?' • you':''}</div><div style="color:var(--text-secondary);">${esc(timeAgo(r.shared_at))}${esc(acc)}</div></div><button class="btn btn-secondary" style="padding:4px 8px; font-size:11px; flex-shrink:0;">Locate</button>`;
     row.querySelector('button').addEventListener('click', ()=>{ if(groupState.locate) groupState.locate(r); });
@@ -654,7 +654,7 @@ async function initMapbox(){
     const b=document.createElement('button');
     b.type='button'; b.title='Use my location'; b.setAttribute('aria-label','Use my location');
     b.textContent='⌖';
-    b.style.cssText='position:absolute; top:78px; right:10px; z-index:5; width:30px; height:30px; font-size:16px; line-height:28px; text-align:center; cursor:pointer; background:#fff; border:2px solid var(--line); border-radius:2px; box-shadow:0 0 0 2px rgba(0,0,0,0.15);';
+    b.style.cssText='position:absolute; top:78px; right:10px; z-index:5; width:30px; height:30px; font-size:16px; line-height:28px; text-align:center; cursor:pointer; background:#fff; border:2px solid var(--line); border-radius:var(--radius); box-shadow:0 0 0 2px rgba(0,0,0,0.15);';
     b.addEventListener('click', ()=>{ gpsStatus('Waiting for GPS fix…'); try{ geo.trigger(); }catch(e){ gpsStatus(gpsErrorHint()); } });
     document.getElementById('map').appendChild(b);
   });
@@ -1145,7 +1145,7 @@ function initFallback(){
       onAdd: function(){
         const b=L.DomUtil.create('button','');
         b.type='button'; b.title='Use my location'; b.setAttribute('aria-label','Use my location');
-        b.style.cssText='width:30px;height:30px;font-size:16px;line-height:28px;text-align:center;cursor:pointer;background:#fff;border:2px solid var(--line);border-radius:2px;';
+        b.style.cssText='width:30px;height:30px;font-size:16px;line-height:28px;text-align:center;cursor:pointer;background:#fff;border:2px solid var(--line);border-radius:var(--radius);';
         b.textContent='⌖';
         L.DomEvent.on(b,'click', (e)=>{ L.DomEvent.stopPropagation(e); useLocationFb(); });
         return b;
