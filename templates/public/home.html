@@ -53,10 +53,13 @@
     {% endif %}
   </div>
 </section>
+<div id="weatherSummary" style="margin-top:12px;"></div>
 {% endblock %}
 {% block head %}
 {% if mapbox_token %}
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.29.0/mapbox-gl.css" rel="stylesheet">
+{% else %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 {% endif %}
 {% endblock %}
 {% block scripts %}
@@ -78,6 +81,7 @@
       map = new mapboxgl.Map({container: el, style:'mapbox://styles/mapbox/streets-v12', center:[121.0968,14.6308], zoom:11, interactive:false});
     }else{
       if(typeof L === 'undefined'){
+        const css=document.createElement('link'); css.rel='stylesheet'; css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(css);
         await new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); }).catch(()=>{});
         if(typeof L === 'undefined') return;
       }
@@ -100,14 +104,14 @@
         }else{
           const icon = L.divIcon({html:dot(color), className:'', iconSize:[14,14]});
           L.marker([c.lat,c.lng], {icon}).addTo(map).bindPopup(html);
-          bounds.push(L.marker([c.lat,c.lng]));
+          bounds.push([c.lat,c.lng]);
         }
       });
       if(useMb){
         if(bounds.length){ const b=new mapboxgl.LngLatBounds(); bounds.forEach(p=>b.extend(p)); try{ map.fitBounds(b,{padding:30, maxZoom:12}); }catch(e){} }
       }else if(bounds.length) {
-        const group = L.featureGroup(bounds);
-        try{ map.fitBounds(group.getBounds().pad(0.2)); }catch(e){}
+        try{ map.fitBounds(L.latLngBounds(bounds).pad(0.2)); }catch(e){}
+        try{ map.invalidateSize(); }catch(e){}
       }
     }catch(e){ console.warn(e); }
     // weather summary fetch
@@ -117,9 +121,8 @@
         const d=await w.json();
         const sec=document.createElement('div');
         sec.className='card';
-        sec.style.marginTop='12px';
         sec.innerHTML=`<div style="font-weight:700; font-size:13px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.06em;">Weather — ${d.name||''}</div><div style="font-size:14px;">${d.weather?.[0]?.description||''} • ${d.main?.temp??''}°C • Humidity ${d.main?.humidity??''}% • Wind ${d.wind?.speed??''} m/s</div><div style="font-size:12px; color:var(--text-secondary);">${d.source||''} • ${d.fetched_at||''}</div>`;
-        document.querySelector('.map-layout').appendChild(sec);
+        document.getElementById('weatherSummary').appendChild(sec);
       }
     }catch(e){}
   });
