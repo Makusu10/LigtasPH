@@ -4,6 +4,7 @@
 <div class="map-fullbleed">
   <div class="map-shell">
     <div id="map"></div>
+    <div id="tileFallback" role="status" aria-live="polite" style="display:none; position:absolute; bottom:16px; left:50%; transform:translateX(-50%); z-index:1002; background:rgba(255,255,255,0.95); border:1px solid var(--border); border-radius:10px; padding:8px 14px; font-size:12px; max-width:380px; text-align:center; box-shadow:0 2px 10px rgba(0,0,0,0.12); pointer-events:none;">Map background blocked — try hotspot or disable adblocker. Center dots still work.</div>
     <button id="panelOpen" class="btn btn-secondary" style="display:none; position:absolute; top:12px; left:12px; z-index:1001; padding:8px 12px; font-size:13px;" aria-label="Show details panel">☰ Details</button>
     <aside id="sidePanel" class="card" aria-label="Map details and filters">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -359,6 +360,14 @@ async function initMapbox(){
   });
   // Re-sync canvas size once the style loads (prevents blank/white areas).
   map.on('load', ()=>{ try{ map.resize(); }catch(e){} });
+  // Tile/style error handler — show guidance when Mapbox tiles fail to load.
+  map.on('error', (e)=>{
+    const msg=(e.error && e.error.message)||'';
+    if(/token|forbidden|unauthorized/i.test(msg)){
+      const fallbackEl=document.getElementById('tileFallback');
+      if(fallbackEl){ fallbackEl.textContent='Map token invalid — add a valid MAPBOX_TOKEN in .env.'; fallbackEl.style.display='block'; }
+    }
+  });
   notifyMapResize = ()=>{ try{ map.resize(); }catch(e){} };
   map.addControl(new mapboxgl.NavigationControl(), 'top-right');
   const geo = new mapboxgl.GeolocateControl({
@@ -894,7 +903,26 @@ function initFallback(){
       }});
     _map.addControl(new LocateCtl());
     notifyMapResize = ()=>{ try{ _map.invalidateSize(); }catch(e){} };
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(_map);
+    const fallbackEl=document.getElementById('tileFallback');
+    const CARTO_URL='https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+    let tileErrors=0, tileSource='osm', switchedToCarto=false;
+    function showTileFallback(msg, show){
+      if(!fallbackEl) return;
+      fallbackEl.textContent=msg||'Map background blocked — try hotspot or disable adblocker. Center dots still work.';
+      fallbackEl.style.display=show?'block':'none';
+    }
+    let osmLayer=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM', crossOrigin:''}).addTo(_map);
+    osmLayer.on('tileerror', function(){
+      tileErrors++;
+      if(tileErrors>=3 && !switchedToCarto){
+        switchedToCarto=true; tileSource='carto';
+        _map.removeLayer(osmLayer);
+        L.tileLayer(CARTO_URL,{attribution:'© CartoDB', crossOrigin:''}).addTo(_map);
+        showTileFallback('Switched to CartoDB tiles. Center dots still work.', false);
+      } else if(tileErrors>=3){
+        showTileFallback('', true);
+      }
+    });
     _quakeLayer=L.layerGroup().addTo(_map); _fireLayer=L.layerGroup().addTo(_map);
     loadCenters().then(renderFb);
     bindFilterInputs(renderFb);
