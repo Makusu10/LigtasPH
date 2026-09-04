@@ -13,6 +13,12 @@
         </div>
         <button id="panelClose" class="btn btn-secondary" style="padding:4px 10px; font-size:12px;" aria-label="Hide details panel">✕</button>
       </div>
+    <div id="panelTabs" role="tablist" aria-label="Map panel sections" style="display:flex; gap:6px; margin-bottom:8px;">
+      <button id="tabBtnCenters" role="tab" aria-selected="true" aria-controls="tabCenters" class="btn btn-primary" style="flex:1; padding:6px 4px; font-size:12px;">Centers</button>
+      <button id="tabBtnHazards" role="tab" aria-selected="false" aria-controls="tabHazards" class="btn btn-secondary" style="flex:1; padding:6px 4px; font-size:12px;">Hazards<span id="hzBadge"></span></button>
+      <button id="tabBtnRoutes" role="tab" aria-selected="false" aria-controls="tabRoutes" class="btn btn-secondary" style="flex:1; padding:6px 4px; font-size:12px;">Routes</button>
+    </div>
+    <div id="tabCenters" role="tabpanel" aria-labelledby="tabBtnCenters">
     <label for="q">Search</label>
     <input id="q" placeholder="e.g. Marikina, Sports Center" style="margin-bottom:8px;">
     <label for="cityFilter">City</label>
@@ -26,9 +32,11 @@
       <option value="">All</option><option>Adequate</option><option>High</option><option>Low</option><option>Unknown</option>
     </select>
     <div style="display:flex; gap:8px; margin:8px 0;">
-      <button id="locBtn" class="btn btn-secondary" style="flex:1;">Use My Location</button>
-      <button id="clearBtn" class="btn btn-secondary">Clear</button>
+      <button id="clearBtn" class="btn btn-secondary" style="flex:1;">Clear</button>
     </div>
+    <div id="list" style="max-height:50vh; overflow:auto; display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--border); padding-top:8px;"></div>
+    </div>
+    <div id="tabRoutes" role="tabpanel" aria-labelledby="tabBtnRoutes" hidden>
     {% if mapbox_token %}
     <div id="viewToggle" style="display:flex; gap:8px; margin:0 0 8px;">
       <button id="btn2d" class="btn btn-secondary" style="flex:1;">2D</button>
@@ -37,6 +45,7 @@
     <fieldset id="gpsBox" style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin:0 0 8px; font-size:13px;">
       <legend style="font-size:12px; font-weight:700; padding:0 4px;">GPS &amp; group</legend>
       <div id="gpsStatus" role="status" style="font-size:12px; color:var(--text-secondary); margin-bottom:4px;">Starting GPS…</div>
+      <button id="locBtn" class="btn btn-secondary" style="width:100%; margin:0 0 4px; padding:6px 8px; font-size:12px;">Use My Location</button>
       <label for="groupCode" style="font-size:12px;">Group invite code</label>
       <div style="display:flex; gap:6px; margin:4px 0;">
         <input id="groupCode" placeholder="e.g. A1B2C3" maxlength="12" style="flex:1; margin:0;">
@@ -65,14 +74,31 @@
       <div id="routeStatus" role="status" style="color:var(--text-secondary); font-size:12px; margin-top:6px;"></div>
     </fieldset>
     {% endif %}
+    </div>
+    <div id="tabHazards" role="tabpanel" aria-labelledby="tabBtnHazards" hidden>
     <fieldset style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin:0 0 8px; font-size:13px;">
       <legend style="font-size:12px; font-weight:700; padding:0 4px;">Hazards overlay</legend>
       <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzQuake"> Earthquakes (USGS)</label>
       <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzFire"> Active fires (FIRMS)</label>
-      <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="hzHeat"> Fire density heat</label>
+      <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzHeat"> Fire density heat</label>
+      <div style="border-top:1px solid var(--border); margin:8px 0 6px; padding-top:6px; font-weight:700; font-size:12px;">Project NOAH (Metro Manila)</div>
+      <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzFlood"> Flood — 5-yr return</label>
+      <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzSlide"> Landslide</label>
+      <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzSurge"> Storm surge
+        <select id="hzSSA" aria-label="Storm surge advisory" style="margin:0; padding:2px 4px; font-size:12px;">
+          <option value="ssa1">SSA1</option><option value="ssa2">SSA2</option>
+          <option value="ssa3">SSA3</option><option value="ssa4" selected>SSA4</option>
+        </select>
+      </label>
+      <div style="display:flex; gap:8px; font-size:11px; color:var(--text-secondary); margin:2px 0 4px;">
+        <span><i style="display:inline-block; width:10px; height:10px; background:#facc15; border-radius:2px;"></i> Low</span>
+        <span><i style="display:inline-block; width:10px; height:10px; background:#f97316; border-radius:2px;"></i> Moderate</span>
+        <span><i style="display:inline-block; width:10px; height:10px; background:#dc2626; border-radius:2px;"></i> High</span>
+      </div>
+      <div style="font-size:11px; color:var(--text-secondary);">Source: Project NOAH (DOST). SSA4 = worst-case advisory.</div>
       <div id="hzStatus" role="status" style="color:var(--text-secondary); font-size:12px; margin-top:6px;"></div>
     </fieldset>
-    <div id="list" style="max-height:50vh; overflow:auto; display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--border); padding-top:8px;"></div>
+    </div>
     </aside>
   </div>
 </div>
@@ -166,7 +192,54 @@ function renderList(filtered, onLocate){
     list.appendChild(row);
   });
 }
-function hzStatus(msg){ const el=document.getElementById('hzStatus'); if(el) el.textContent=msg||''; }
+function hzStatus(msg){ setStatus('hzStatus', msg); }
+function setStatus(id, msg){ const el=document.getElementById(id); if(el) el.textContent=msg||''; }
+// Single reader for all hazard toggles — both map engines share it so the
+// checkbox set can't drift between Mapbox and Leaflet behavior.
+function hazardSelection(){
+  const v=id=>{ const el=document.getElementById(id); return !!(el && el.checked); };
+  return {quake:v('hzQuake'), fire:v('hzFire'), heat:v('hzHeat'),
+          flood:v('hzFlood'), slide:v('hzSlide'), surge:v('hzSurge')};
+}
+function noahCheckboxId(id){ return id==='flood'?'hzFlood':id==='slide'?'hzSlide':'hzSurge'; }
+// Shared status-line text — one copy used by both engines.
+function quakeStatusText(data){ return `Quakes: ${data.count??0} • Fires: ${lastFires.length}`; }
+function fireStatusText(data, showHeat){ return `Fires: ${(data.fires||[]).length} • Heat ${showHeat?'on':'off'}`; }
+function noahStatusText(id, data){
+  const n=(data.features||[]).reduce((a,f)=>a+((f.geometry||{}).coordinates||[]).length,0);
+  return `NOAH ${id}: ${n} zones`;
+}
+// ---------- side-panel tabs (Centers / Hazards / Routes) ----------
+function switchPanelTab(name){
+  const tabs={centers:['tabBtnCenters','tabCenters'], hazards:['tabBtnHazards','tabHazards'], routes:['tabBtnRoutes','tabRoutes']};
+  Object.entries(tabs).forEach(([key,[btnId,panelId]])=>{
+    const b=document.getElementById(btnId), p=document.getElementById(panelId);
+    if(!b||!p) return;
+    const on=key===name;
+    b.setAttribute('aria-selected', String(on));
+    b.className='btn '+(on?'btn-primary':'btn-secondary');
+    if(on) p.removeAttribute('hidden'); else p.setAttribute('hidden','');
+  });
+  try{ notifyMapResize(); }catch(e){}
+}
+function updateHazardsBadge(){
+  const sel=hazardSelection();
+  const n=Object.values(sel).filter(Boolean).length;
+  const badge=document.getElementById('hzBadge');
+  if(badge) badge.textContent=n?` • ${n} on`:'';
+}
+function bindPanelTabs(){
+  [['tabBtnCenters','centers'],['tabBtnHazards','hazards'],['tabBtnRoutes','routes']].forEach(([id,name])=>{
+    const b=document.getElementById(id);
+    if(b) b.addEventListener('click', ()=>switchPanelTab(name));
+  });
+  // Routes tab content (GPS box) is server-rendered only with a Mapbox token.
+  if(!document.getElementById('gpsBox')){
+    const rb=document.getElementById('tabBtnRoutes');
+    if(rb) rb.style.display='none';
+  }
+  updateHazardsBadge();
+}
 async function fetchQuakes(lat, lon, signal){
   const res=await fetch(`/api/earthquakes?lat=${lat}&lon=${lon}&radius_km=500`, {signal});
   if(!res.ok) throw new Error('quakes '+res.status);
@@ -177,6 +250,32 @@ async function fetchFires(lat, lon, signal){
   if(res.status===503){ const e=new Error('fires-unavailable'); e.code=503; throw e; }
   if(!res.ok) throw new Error('fires '+res.status);
   return res.json();
+}
+// ---------- Project NOAH static overlays (pre-built GeoJSON, no API key) ----------
+const NOAH_COLORS={low:'#facc15', moderate:'#f97316', high:'#dc2626'};
+const noahCache={};
+function noahFileFor(id){
+  if(id==='flood') return 'flood_mm_5yr';
+  if(id==='slide') return 'landslide_mm';
+  if(id==='surge') return 'stormsurge_'+(document.getElementById('hzSSA')?.value||'ssa4');
+  return null;
+}
+async function fetchNoah(id){
+  const name=noahFileFor(id);
+  if(!name) throw new Error('unknown noah layer');
+  if(noahCache[name]) return noahCache[name];
+  const res=await fetch(`/static/noah/${name}.geojson`);
+  if(!res.ok) throw new Error(name+' '+res.status);
+  const data=await res.json();
+  noahCache[name]=data;
+  return data;
+}
+function noahLabel(feat){
+  const p=(feat&&feat.properties)||{};
+  const hz=p.hazard||'hazard';
+  const lv=p.level||'?';
+  const adv=p.advisory?` (${p.advisory})`:'';
+  return `<div style="min-width:180px"><div style="font-weight:800; text-transform:capitalize;">${esc(hz)} — ${esc(lv)}${esc(adv)}</div><div style="font-size:12px;color:#667085;">Source: Project NOAH (DOST)</div></div>`;
 }
 async function loadCenters(){
   const res = await fetch('/api/centers');
@@ -190,12 +289,20 @@ function bindFilterInputs(render){
   document.getElementById('cityFilter').addEventListener('change', render);
   document.getElementById('statusFilter').addEventListener('change', render);
   document.getElementById('supplyFilter').addEventListener('change', render);
-  document.getElementById('clearBtn').addEventListener('click', ()=>{ document.getElementById('q').value=''; document.getElementById('statusFilter').value=''; document.getElementById('supplyFilter').value=''; document.getElementById('cityFilter').value=''; clearRoute(); render();});
+  document.getElementById('clearBtn').addEventListener('click', ()=>{ document.getElementById('q').value=''; document.getElementById('statusFilter').value=''; document.getElementById('supplyFilter').value=''; document.getElementById('cityFilter').value=''; if(USE_MAPBOX) clearRoute(); render();});
 }
 function debounceHazards(refresh){
-  document.getElementById('hzQuake').addEventListener('change', refresh);
-  document.getElementById('hzFire').addEventListener('change', refresh);
-  document.getElementById('hzHeat').addEventListener('change', refresh);
+  const wrapped=()=>{ updateHazardsBadge(); refresh(); };
+  ['hzQuake','hzFire','hzHeat','hzFlood','hzSlide','hzSurge'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.addEventListener('change', wrapped);
+  });
+  const ssa=document.getElementById('hzSSA');
+  if(ssa) ssa.addEventListener('change', ()=>{
+    // Drop cached surge files so the newly selected advisory loads fresh.
+    Object.keys(noahCache).forEach(k=>{ if(k.startsWith('stormsurge_')) delete noahCache[k]; });
+    wrapped();
+  });
 }
 // route helpers are engine-specific; this no-op is replaced in Mapbox mode
 function clearRoute(){}
@@ -235,7 +342,7 @@ async function initMapbox(){
   });
   map.addControl(geo, 'top-right');
   let userPos = null, userAcc = null; // [lng, lat], accuracy meters
-  function gpsStatus(msg){ const el=document.getElementById('gpsStatus'); if(el) el.textContent=msg||''; }
+  function gpsStatus(msg){ setStatus('gpsStatus', msg); }
   function gpsErrorHint(e){
     if(!window.isSecureContext) return 'GPS blocked: browsers only allow location on HTTPS or localhost — not plain HTTP.';
     if(e && e.code===1) return 'Location permission denied — allow location in the browser site settings, then press Use My Location.';
@@ -285,7 +392,19 @@ async function initMapbox(){
                'heatmap-color':['interpolate',['linear'],['heatmap-density'],0,'rgba(254,249,195,0)',0.4,'#f97316',0.8,'#dc2626']}});
     }
   }
-  function routeStatus(msg){ const el=document.getElementById('routeStatus'); if(el) el.textContent=msg||''; }
+  // Project NOAH fill layers (one source per hazard; surge source swaps SSA1-4).
+  const noahSrc={flood:'noah-flood', slide:'noah-slide', surge:'noah-surge'};
+  function ensureNoahLayers(){
+    Object.entries(noahSrc).forEach(([id, src])=>{
+      if(map.getSource(src)) return;
+      map.addSource(src, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
+      map.addLayer({id:src+'-layer', type:'fill', source:src,
+        layout:{visibility:'none'},
+        paint:{'fill-color':['match',['get','level'],'low','#facc15','moderate','#f97316','high','#dc2626','#f97316'],
+               'fill-opacity':0.35,'fill-outline-color':'#7c2d12'}});
+    });
+  }
+  function routeStatus(msg){ setStatus('routeStatus', msg); }
   let navProfile='driving', destPin=null, followMode=false, navSession=null, suggestAbort=null, suggestTimer=null;
   const PH_BBOX='116.0,4.0,127.0,22.0'; // bias search to the Philippines
   function newSession(){ try{ navSession=crypto.randomUUID(); }catch(e){ navSession='sess-'+Date.now(); } }
@@ -498,15 +617,13 @@ async function initMapbox(){
   function hzCenter(){ const c=map.getCenter(); return {lat:+c.lat.toFixed(4), lon:+c.lng.toFixed(4)}; }
   async function refreshHazards(){
     ensureHazardLayers();
-    const showQ=document.getElementById('hzQuake').checked;
-    const showF=document.getElementById('hzFire').checked;
-    const showH=document.getElementById('hzHeat').checked;
+    const sel=hazardSelection();
+    const showQ=sel.quake, showF=sel.fire, showH=sel.heat;
     map.getSource(quakeSrcId).setData({type:'FeatureCollection', features:[]});
     map.getSource(fireSrcId).setData({type:'FeatureCollection', features:[]});
     map.setLayoutProperty('hz-quakes-layer','visibility', showQ?'visible':'none');
     map.setLayoutProperty('hz-fires-layer','visibility', showF?'visible':'none');
     map.setLayoutProperty('hz-heat-layer','visibility', (showH)?'visible':'none');
-    if(!showQ && !showF && !showH){ hzStatus(''); return; }
     const {lat, lon}=hzCenter();
     const jobs=[];
     if(showQ){
@@ -515,7 +632,7 @@ async function initMapbox(){
       jobs.push(fetchQuakes(lat, lon, hzAbort.quake.signal).then(data=>{
         const feats=(data.quakes||[]).slice(0,200).map(q=>({type:'Feature', properties:{mag:q.mag||0, place:q.place||'Earthquake', depth:q.depth_km, url:q.url}, geometry:{type:'Point', coordinates:[q.lon,q.lat]}}));
         map.getSource(quakeSrcId).setData({type:'FeatureCollection', features:feats});
-        hzStatus(`Quakes: ${data.count??0} • Fires: ${lastFires.length}`);
+        hzStatus(quakeStatusText(data));
       }).catch(e=>{ if(e.name!=='AbortError') hzStatus('Earthquakes unavailable — retry shortly.'); }));
     }
     if(showF || showH){
@@ -525,9 +642,26 @@ async function initMapbox(){
         lastFires=data.fires||[];
         const feats=lastFires.slice(0,500).map(f=>({type:'Feature', properties:{brightness:+f.brightness||320, confidence:f.confidence||'n/a', date:f.date||'', time:f.time||''}, geometry:{type:'Point', coordinates:[f.lon,f.lat]}}));
         map.getSource(fireSrcId).setData({type:'FeatureCollection', features:feats});
-        hzStatus(`Fires: ${lastFires.length} • Heat ${showH?'on':'off'}`);
+        hzStatus(fireStatusText(data, showH));
       }).catch(e=>{ if(e.name!=='AbortError') hzStatus(e.code===503?'Fires unavailable — missing FIRMS key or provider down.':'Fires unavailable — retry shortly.'); }));
     }
+    // ---- Project NOAH static polygons (local files, keyless) ----
+    ensureNoahLayers();
+    const noahOn={flood:sel.flood, slide:sel.slide, surge:sel.surge};
+    if(!showQ && !showF && !showH && !noahOn.flood && !noahOn.slide && !noahOn.surge){ hzStatus(''); return; }
+    Object.entries(noahOn).forEach(([id, on])=>{
+      map.setLayoutProperty(noahSrc[id]+'-layer','visibility', on?'visible':'none');
+      if(!on){ return; }
+      const wantFile=noahFileFor(id);
+      hzStatus('Loading NOAH '+id+'…');
+      jobs.push(fetchNoah(id).then(data=>{
+        // Skip stale SSA responses (user switched advisory mid-fetch).
+        if(noahFileFor(id)!==wantFile) return;
+        if(!document.getElementById(noahCheckboxId(id)).checked) return;
+        map.getSource(noahSrc[id]).setData(data);
+        hzStatus(noahStatusText(id, data));
+      }).catch(()=>{ hzStatus(`NOAH ${id} failed to load — reload the page.`); }));
+    });
     await Promise.all(jobs);
   }
   // quake/fire popups on click
@@ -539,13 +673,20 @@ async function initMapbox(){
     const p=e.features[0].properties;
     new mapboxgl.Popup().setLngLat(e.lngLat).setHTML(`<div style="font-size:12px;"><b>Active fire</b> (${esc(p.confidence)})<br>Brightness ${esc(p.brightness)} • ${esc(p.date)} ${esc(p.time)}</div>`).addTo(map);
   });
+  // Project NOAH polygon popups (same handler for all three layers).
+  ['noah-flood-layer','noah-slide-layer','noah-surge-layer'].forEach(lid=>{
+    map.on('click',lid,(e)=>{
+      if(!e.features || !e.features.length) return;
+      new mapboxgl.Popup().setLngLat(e.lngLat).setHTML(noahLabel(e.features[0])).addTo(map);
+    });
+  });
   // Maps-style POI tap: press any landmark/place label → popup with Route here.
   map.on('click',(e)=>{
     try{
       const style=map.getStyle();
       if(!style || !style.layers) return;
       // Hazard hits keep their dedicated popups.
-      const hz=map.queryRenderedFeatures(e.point, {layers:['hz-quakes-layer','hz-fires-layer'].filter(id=>map.getLayer(id))});
+      const hz=map.queryRenderedFeatures(e.point, {layers:['hz-quakes-layer','hz-fires-layer','noah-flood-layer','noah-slide-layer','noah-surge-layer'].filter(id=>map.getLayer(id))});
       if(hz.length) return;
       const poiLayers=style.layers.filter(l=>l.type==='symbol' && /poi|place/i.test(l.id||'')).map(l=>l.id);
       if(!poiLayers.length) return;
@@ -634,6 +775,11 @@ async function initMapbox(){
 
 // ================= LEAFLET/OSM FALLBACK (unchanged behavior) =================
 let _map, _markers=[], _quakeLayer=null, _fireLayer=null, _heatLayer=null;
+let _noahLayers={flood:null, slide:null, surge:null};
+function noahStyle(feat){
+  const lv=(feat && feat.properties && feat.properties.level)||'moderate';
+  return {color:'#7c2d12', weight:1, fillColor:NOAH_COLORS[lv]||'#f97316', fillOpacity:0.35};
+}
 function ensureLeaflet(){
   // Runtime fallback when Mapbox CDN failed: load Leaflet dynamically.
   if(typeof L !== 'undefined') return Promise.resolve();
@@ -693,12 +839,13 @@ function renderFb(){
 }
 function hzCenterFb(){ const c=_map.getCenter(); return {lat:+c.lat.toFixed(4), lon:+c.lng.toFixed(4)}; }
 async function refreshHazardsFb(){
-  const showQ=document.getElementById('hzQuake').checked;
-  const showF=document.getElementById('hzFire').checked;
-  const showH=document.getElementById('hzHeat').checked;
+  const selFb=hazardSelection();
+  const showQ=selFb.quake, showF=selFb.fire, showH=selFb.heat;
   _quakeLayer.clearLayers(); _fireLayer.clearLayers();
   if(_heatLayer){ _map.removeLayer(_heatLayer); _heatLayer=null; }
-  if(!showQ && !showF && !showH){ hzStatus(''); return; }
+  Object.entries(_noahLayers).forEach(([id, lyr])=>{
+    if(lyr){ _map.removeLayer(lyr); _noahLayers[id]=null; }
+  });
   const {lat, lon}=hzCenterFb();
   const jobs=[];
   if(showQ){
@@ -710,7 +857,7 @@ async function refreshHazardsFb(){
         const m=L.marker([q.lat,q.lon], {icon:L.divIcon({html:`<div class="quake-pulse" style="width:${size}px;height:${size}px;"></div>`, className:'', iconSize:[size,size]}), title:`M${q.mag} ${q.place||''}`}).addTo(_quakeLayer);
         m.bindPopup(`<div style="min-width:200px"><div style="font-weight:800;">M${q.mag??'?'} — ${esc(q.place||'Earthquake')}</div><div style="font-size:12px;color:#667085;">Depth ${q.depth_km??'?'} km • <a href="${q.url||'#'}" target="_blank" rel="noopener">USGS</a></div></div>`);
       });
-      hzStatus(`Quakes: ${data.count??0} • Fires: ${lastFires.length}`);
+      hzStatus(quakeStatusText(data));
     }).catch(e=>{ if(e.name!=='AbortError') hzStatus('Earthquakes unavailable — retry shortly.'); }));
   }
   if(showF || showH){
@@ -726,9 +873,28 @@ async function refreshHazardsFb(){
         const pts=lastFires.map(f=>{ const b=+f.brightness||320; const i=Math.min(1,Math.max(0.25,(b-300)/150)); return [f.lat,f.lon,i]; });
         _heatLayer=L.heatLayer(pts, {radius:28, blur:18, maxZoom:11, minOpacity:0.45, gradient:{0.2:'#fef9c3',0.5:'#f97316',0.8:'#dc2626'}}).addTo(_map);
       }
-      hzStatus(`Fires: ${lastFires.length} • Heat ${showH?'on':'off'}`);
+      hzStatus(fireStatusText(data, showH));
     }).catch(e=>{ if(e.name!=='AbortError') hzStatus(e.code===503?'Fires unavailable — missing FIRMS key or provider down.':'Fires unavailable — retry shortly.'); }));
   }
+  // ---- Project NOAH static polygons (local files, keyless) ----
+  const noahOnFb={flood:selFb.flood, slide:selFb.slide, surge:selFb.surge};
+  if(!showQ && !showF && !showH && !noahOnFb.flood && !noahOnFb.slide && !noahOnFb.surge){ hzStatus(''); return; }
+  Object.entries(noahOnFb).forEach(([id, on])=>{
+    if(!on) return;
+    const wantFile=noahFileFor(id);
+    hzStatus('Loading NOAH '+id+'…');
+    jobs.push(fetchNoah(id).then(data=>{
+      if(noahFileFor(id)!==wantFile) return; // stale SSA response
+      if(!document.getElementById(noahCheckboxId(id)).checked) return;
+      const lyr=L.geoJSON(data, {style:noahStyle,
+        onEachFeature:(feat, layer)=>{ layer.bindPopup(noahLabel(feat)); }});
+      if(_noahLayers[id]) _map.removeLayer(_noahLayers[id]);
+      _noahLayers[id]=lyr;
+      lyr.addTo(_map);
+      lyr.bringToBack();
+      hzStatus(noahStatusText(id, data));
+    }).catch(()=>{ hzStatus(`NOAH ${id} failed to load — reload the page.`); }));
+  });
   await Promise.all(jobs);
 }
 function useLocationFb(){
@@ -741,6 +907,7 @@ function useLocationFb(){
 }
 document.addEventListener('DOMContentLoaded', ()=>{
   bindPanelToggle();
+  bindPanelTabs();
   if(USE_MAPBOX){ initMapbox().catch(e=>{ console.warn('Mapbox failed, falling back to OSM:', e); initFallback(); }); }
   else { initFallback(); }
 });
