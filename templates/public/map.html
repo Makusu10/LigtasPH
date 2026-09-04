@@ -4,13 +4,13 @@
 <div class="map-fullbleed">
   <div class="map-shell">
     <div id="map"></div>
-    <div id="tileFallback" role="status" aria-live="polite" style="display:none; position:absolute; bottom:16px; left:50%; transform:translateX(-50%); z-index:1002; background:rgba(255,255,255,0.95); border:1px solid var(--border); border-radius:10px; padding:8px 14px; font-size:12px; max-width:380px; text-align:center; box-shadow:0 2px 10px rgba(0,0,0,0.12); pointer-events:none;">Map background blocked — try hotspot or disable adblocker. Center dots still work.</div>
+    <div id="tileFallback" role="status" aria-live="polite" style="display:none; position:absolute; bottom:16px; left:50%; transform:translateX(-50%); z-index:1002; background:var(--panel); border:2px solid var(--line); border-radius:2px; padding:8px 14px; font-size:12px; max-width:380px; text-align:center; box-shadow:4px 4px 0 rgba(13,27,34,0.2); pointer-events:none;">Map background blocked — try hotspot or disable adblocker. Center dots still work.</div>
     <button id="panelOpen" class="btn btn-secondary" style="display:none; position:absolute; top:12px; left:12px; z-index:1001; padding:8px 12px; font-size:13px;" aria-label="Show details panel">☰ Details</button>
     <aside id="sidePanel" class="card" aria-label="Map details and filters">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <div style="display:flex; align-items:center; gap:8px;">
           <strong style="font-size:14px;">Evacuation Map</strong>
-          <span id="mapMode" style="font-size:10px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:var(--text-secondary); background:rgba(27,35,48,0.06); padding:3px 8px; border-radius:999px;">…</span>
+          <span id="mapMode" style="font-size:11px; font-family:var(--font-mono); font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-secondary); background:var(--panel-2); border:1px solid var(--line); padding:3px 8px; border-radius:2px;">…</span>
         </div>
         <button id="panelClose" class="btn btn-secondary" style="padding:4px 10px; font-size:12px;" aria-label="Hide details panel">✕</button>
       </div>
@@ -45,7 +45,7 @@
       <button id="btn2d" class="btn btn-secondary" style="flex:1;">2D</button>
       <button id="btn3d" class="btn btn-secondary" style="flex:1;">3D</button>
     </div>
-    <fieldset id="gpsBox" style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin:0 0 8px; font-size:13px;">
+    <fieldset id="gpsBox" style="border:2px solid var(--line); border-radius:2px; padding:8px 10px; margin:0 0 8px; font-size:13px;">
       <legend style="font-size:12px; font-weight:700; padding:0 4px;">GPS &amp; group</legend>
       <div id="gpsStatus" role="status" style="font-size:12px; color:var(--text-secondary); margin-bottom:4px;">Starting GPS…</div>
       <button id="locBtn" class="btn btn-secondary" style="width:100%; margin:0 0 4px; padding:6px 8px; font-size:12px;">Use My Location</button>
@@ -59,7 +59,7 @@
         <label for="navDest" style="font-size:12px;">Go somewhere (like Maps/Waze)</label>
         <div style="position:relative;">
           <input id="navDest" placeholder="e.g. SM Marikina, hospital…" autocomplete="off" style="margin:4px 0;">
-          <div id="navSuggest" style="position:absolute; z-index:20; left:0; right:0; background:#fff; border:1px solid var(--border); border-radius:8px; overflow:hidden; display:none; max-height:180px; overflow:auto; box-shadow:0 4px 12px rgba(0,0,0,0.12);"></div>
+          <div id="navSuggest" style="position:absolute; z-index:20; left:0; right:0; background:#fff; border:2px solid var(--line); border-radius:2px; overflow:hidden; display:none; max-height:180px; overflow:auto; box-shadow:4px 4px 0 rgba(13,27,34,0.2);"></div>
         </div>
         <label for="navOrigin" style="font-size:12px;">Start (blank = my GPS location)</label>
         <input id="navOrigin" placeholder="My Location" autocomplete="off" style="margin:4px 0;">
@@ -79,7 +79,7 @@
     {% endif %}
     </div>
     <div id="tabGroup" role="tabpanel" aria-labelledby="tabBtnGroup" hidden>
-    <fieldset style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin:0 0 8px; font-size:13px;">
+    <fieldset style="border:2px solid var(--line); border-radius:2px; padding:8px 10px; margin:0 0 8px; font-size:13px;">
       <legend style="font-size:12px; font-weight:700; padding:0 4px;">Emergency group</legend>
       <div style="font-size:12px; color:var(--text-secondary); margin-bottom:6px;">Create a group, share the code with family/friends, and see each other's live pins in an emergency. Pins expire after 2 hours.</div>
       <label for="gName" style="font-size:12px;">New group name</label>
@@ -87,7 +87,7 @@
         <input id="gName" placeholder="e.g. Dela Cruz Family" maxlength="80" style="flex:1; margin:0;">
         <button id="gCreateBtn" class="btn btn-secondary" style="padding:6px 10px; font-size:12px;">Create</button>
       </div>
-      <div id="gCodeOut" style="display:none; align-items:center; gap:6px; margin:4px 0; background:rgba(27,35,48,0.05); border:1px dashed var(--border); border-radius:8px; padding:8px 10px;">
+      <div id="gCodeOut" style="display:none; align-items:center; gap:6px; margin:4px 0; background:var(--panel-2); border:2px dashed var(--line); border-radius:2px; padding:8px 10px;">
         <span style="font-size:12px;">Invite code:</span>
         <strong id="gCodeVal" style="font-size:16px; letter-spacing:0.1em;"></strong>
         <button id="gCopyBtn" class="btn btn-secondary" style="padding:4px 8px; font-size:12px; margin-left:auto;">Copy</button>
@@ -107,7 +107,7 @@
     <div id="groupList" style="max-height:30vh; overflow:auto; display:flex; flex-direction:column; gap:6px;"></div>
     </div>
     <div id="tabHazards" role="tabpanel" aria-labelledby="tabBtnHazards" hidden>
-    <fieldset style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin:0 0 8px; font-size:13px;">
+    <fieldset style="border:2px solid var(--line); border-radius:2px; padding:8px 10px; margin:0 0 8px; font-size:13px;">
       <legend style="font-size:12px; font-weight:700; padding:0 4px;">Hazards overlay</legend>
       <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzQuake"> Earthquakes (USGS)</label>
       <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzFire"> Active fires (FIRMS)</label>
@@ -159,7 +159,7 @@
 <style>
   /* Truly full-screen map: break out of .container, nav + banner float over the map */
   .map-fullbleed{ width:100vw; margin-left:calc(-50vw + 50%); margin-top:-16px; margin-bottom:-32px; }
-  .map-shell{ position:relative; height:100dvh; min-height:520px; overflow:hidden; background:#e8edf3; }
+  .map-shell{ position:relative; height:100dvh; min-height:520px; overflow:hidden; background:var(--paper); }
   #map{ height:100%; position:relative; z-index:1; isolation:isolate; }
   #sidePanel{ position:absolute; top:76px; left:12px; bottom:12px; width:min(360px, calc(100% - 24px)); overflow-y:auto; z-index:1000; margin:0; }
   #sidePanel.collapsed{ display:none; }
@@ -176,13 +176,11 @@
   #map .leaflet-top.leaflet-right{ margin-top:70px; }
   /* top nav becomes a hoverable overlay (map page only) */
   body:has(.map-shell) .nav{ position:absolute; top:0; left:0; right:0; z-index:1100;
-    background:linear-gradient(180deg, rgba(255,255,255,0.88), rgba(255,255,255,0));
-    border-bottom:none; box-shadow:none; }
+    background:rgba(13,27,34,0.92); border-bottom:2px solid var(--line); box-shadow:none; }
   body:has(.map-shell) .nav:hover,
   body:has(.map-shell) .nav:focus-within,
-  body:has(.map-shell) .nav:has(.mobile-menu.open){ background:rgba(255,255,255,0.94);
-    backdrop-filter:blur(20px) saturate(1.3); border-bottom:1px solid var(--glass-border);
-    box-shadow:0 4px 20px rgba(16,42,67,0.08); }
+  body:has(.map-shell) .nav:has(.mobile-menu.open){ background:var(--night);
+    border-bottom:2px solid var(--line); box-shadow:0 4px 0 rgba(13,27,34,0.2); }
   /* demo banner becomes a small floating pill; footer hidden for full height */
   body:has(.map-shell) .demo-banner{ position:absolute; top:74px; left:50%; transform:translateX(-50%);
     z-index:1050; width:max-content; max-width:min(620px, 92vw); margin:0; padding:8px 14px;
@@ -190,7 +188,7 @@
   body:has(.map-shell) footer{ display:none; }
   @media (max-width: 768px){
     .map-shell{ min-height:480px; }
-    #sidePanel{ top:auto; bottom:0; left:0; right:0; width:auto; max-height:46%; border-radius:16px 16px 0 0; }
+    #sidePanel{ top:auto; bottom:0; left:0; right:0; width:auto; max-height:46%; border-radius:2px 2px 0 0; }
     #panelOpen{ top:auto !important; bottom:12px; }
     /* Keep the bottom dock above the bottom-sheet Details panel */
     #routeDock{ width:calc(100% - 16px); z-index:1002; bottom:12px; }
@@ -213,7 +211,7 @@ const USE_MAPBOX = !!(MAPBOX_TOKEN && typeof mapboxgl !== 'undefined');
 let allCenters=[];
 let hzAbort={quake:null, fire:null}, hzTimer=null, lastFires=[], lastQuakes=[];
 function badgeClass(s){ return s==='Available'?'available':s==='Nearly Full'?'nearly':s==='Full'?'full':'unknown'; }
-function statusColor(s){ return s==='Available'?'#039855':s==='Nearly Full'?'#F79009':s==='Full'?'#D92D20':'#667085'; }
+function statusColor(s){ return s==='Available'?'#25743a':s==='Nearly Full'?'#d9991a':s==='Full'?'#c1121f':'#67757c'; }
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function centerFig(c){
   if(c.occupancy_pct===null||c.occupancy_pct===undefined) return `Capacity unreported • ${esc(c.occupancy_status)}`;
@@ -222,10 +220,10 @@ function centerFig(c){
 function centerPopupHTML(c, routeBtn){
   return `<div style="min-width:220px">
     <div style="font-weight:800;">${esc(c.name)}</div>
-    <div style="color:#667085; font-size:13px;">${esc(c.address)}, ${esc(c.city)}</div>
+    <div style="color:#67757c; font-size:13px;">${esc(c.address)}, ${esc(c.city)}</div>
     <div style="margin:8px 0; font-size:13px;">${centerFig(c)}<br><span class="badge badge-${badgeClass(c.occupancy_status)}">${esc(c.occupancy_status)}</span></div>
     <div style="font-size:12px;">Food ${esc(c.food_status)} • Water ${esc(c.water_status)} • Basic ${esc(c.basic_needs_status)}</div>
-    <div style="font-size:12px; color:#667085;">Updated ${esc(c.updated_at)}</div>
+    <div style="font-size:12px; color:#67757c;">Updated ${esc(c.updated_at)}</div>
     <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;"><a href="/centers/${c.id}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">View Details</a>${routeBtn||''}<a href="https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}" target="_blank" rel="noopener" class="btn btn-primary" style="padding:6px 8px; font-size:12px;">Get Directions</a></div>
   </div>`;
 }
@@ -247,7 +245,7 @@ function renderList(filtered, onLocate){
   if(filtered.length===0){ list.innerHTML='<div style="color:var(--text-secondary); font-size:13px; padding:8px;">No centers match. Clear filters or view all.</div>'; return; }
   filtered.forEach(c=>{
     const row=document.createElement('div');
-    row.style.cssText='border:1px solid var(--border); border-radius:8px; padding:8px 10px; display:flex; justify-content:space-between; gap:8px; align-items:center;';
+    row.style.cssText='border:2px solid var(--line); border-radius:2px; padding:8px 10px; display:flex; justify-content:space-between; gap:8px; align-items:center;';
     row.innerHTML=`<div><div style="font-weight:700; font-size:13px;">${esc(c.name)}</div><div style="color:var(--text-secondary); font-size:12px;">${esc(c.city)} • ${c.occupancy_pct===null||c.occupancy_pct===undefined ? 'capacity unreported' : c.available_slots+' slots • '+c.occupancy_pct+'%'}</div><span class="badge badge-${badgeClass(c.occupancy_status)}">${esc(c.occupancy_status)}</span></div><button class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">Locate</button>`;
     row.querySelector('button').addEventListener('click', ()=>onLocate(c));
     list.appendChild(row);
@@ -283,7 +281,7 @@ function renderGroupList(){
   rows.forEach(r=>{
     const mine=groupState.myName && r.display_name && r.display_name.toLowerCase()===groupState.myName.toLowerCase();
     const row=document.createElement('div');
-    row.style.cssText='border:1px solid var(--border); border-radius:8px; padding:6px 8px; font-size:12px; display:flex; justify-content:space-between; gap:8px; align-items:center;'+(mine?' border-color:var(--primary); background:rgba(59,110,245,0.06);':'');
+    row.style.cssText='border:2px solid var(--line); border-radius:2px; padding:6px 8px; font-size:12px; display:flex; justify-content:space-between; gap:8px; align-items:center;'+(mine?' border-color:var(--red); background:rgba(193,18,31,0.06);':'');
     const acc=(r.accuracy!==null && r.accuracy!==undefined && r.accuracy!=='')?` • ±${Math.round(+r.accuracy)} m`:'';
     row.innerHTML=`<div style="min-width:0;"><div style="font-weight:700;">${esc(r.display_name)}${mine?' • you':''}</div><div style="color:var(--text-secondary);">${esc(timeAgo(r.shared_at))}${esc(acc)}</div></div><button class="btn btn-secondary" style="padding:4px 8px; font-size:11px; flex-shrink:0;">Locate</button>`;
     row.querySelector('button').addEventListener('click', ()=>{ if(groupState.locate) groupState.locate(r); });
@@ -471,7 +469,7 @@ function noahLabel(feat){
   const hz=p.hazard||'hazard';
   const lv=p.level||'?';
   const adv=p.advisory?` (${p.advisory})`:'';
-  return `<div style="min-width:180px"><div style="font-weight:800; text-transform:capitalize;">${esc(hz)} — ${esc(lv)}${esc(adv)}</div><div style="font-size:12px;color:#667085;">Source: Project NOAH (DOST)</div></div>`;
+  return `<div style="min-width:180px"><div style="font-weight:800; text-transform:capitalize;">${esc(hz)} — ${esc(lv)}${esc(adv)}</div><div style="font-size:12px;color:#67757c;">Source: Project NOAH (DOST)</div></div>`;
 }
 async function loadCenters(){
   const res = await fetch('/api/centers');
@@ -545,8 +543,8 @@ function circlePolygon(lon, lat, radiusKm, steps){
   }
   return coords;
 }
-const QUAKE_RING_NOTE='<div style="font-size:11px;color:#667085;">Purple ring ≈ estimated felt area (illustrative, not official).</div>';
-const FIRE_RING_NOTE='<div style="font-size:11px;color:#667085;">Red ring ≈ 1 km watch perimeter (illustrative).</div>';
+const QUAKE_RING_NOTE='<div style="font-size:11px;color:#67757c;">Purple ring ≈ estimated felt area (illustrative, not official).</div>';
+const FIRE_RING_NOTE='<div style="font-size:11px;color:#67757c;">Red ring ≈ 1 km watch perimeter (illustrative).</div>';
 function debounceHazards(refresh){
   const wrapped=()=>{ updateHazardsBadge(); refresh(); };
   ['hzQuake','hzFire','hzHeat','hzFlood','hzSlide','hzSurge'].forEach(id=>{
@@ -656,7 +654,7 @@ async function initMapbox(){
     const b=document.createElement('button');
     b.type='button'; b.title='Use my location'; b.setAttribute('aria-label','Use my location');
     b.textContent='⌖';
-    b.style.cssText='position:absolute; top:78px; right:10px; z-index:5; width:30px; height:30px; font-size:16px; line-height:28px; text-align:center; cursor:pointer; background:#fff; border:none; border-radius:6px; box-shadow:0 0 0 2px rgba(0,0,0,0.1);';
+    b.style.cssText='position:absolute; top:78px; right:10px; z-index:5; width:30px; height:30px; font-size:16px; line-height:28px; text-align:center; cursor:pointer; background:#fff; border:2px solid var(--line); border-radius:2px; box-shadow:0 0 0 2px rgba(0,0,0,0.15);';
     b.addEventListener('click', ()=>{ gpsStatus('Waiting for GPS fix…'); try{ geo.trigger(); }catch(e){ gpsStatus(gpsErrorHint()); } });
     document.getElementById('map').appendChild(b);
   });
@@ -1005,7 +1003,7 @@ async function initMapbox(){
   }
   // quake/fire popups on click
   function quakePopupHTML(p){
-    return `<div style="min-width:200px"><div style="font-weight:800;">M${esc(p.mag)} — ${esc(p.place)}</div><div style="font-size:12px;color:#667085;">Depth ${esc(p.depth??'?')} km • Est. felt radius ${esc(p.radius??quakeRadiusKm(p.mag))} km • <a href="${esc(p.url||'#')}" target="_blank" rel="noopener">USGS</a></div>${QUAKE_RING_NOTE}</div>`;
+    return `<div style="min-width:200px"><div style="font-weight:800;">M${esc(p.mag)} — ${esc(p.place)}</div><div style="font-size:12px;color:#67757c;">Depth ${esc(p.depth??'?')} km • Est. felt radius ${esc(p.radius??quakeRadiusKm(p.mag))} km • <a href="${esc(p.url||'#')}" target="_blank" rel="noopener">USGS</a></div>${QUAKE_RING_NOTE}</div>`;
   }
   function firePopupHTML(p){
     return `<div style="font-size:12px;"><b>Active fire</b> (${esc(p.confidence)})<br>Brightness ${esc(p.brightness)} • ${esc(p.date)} ${esc(p.time)}</div>${FIRE_RING_NOTE}`;
@@ -1052,7 +1050,7 @@ async function initMapbox(){
       const sub=esc(props.address || props.category || '');
       new mapboxgl.Popup({offset:12, maxWidth:'280px'}).setLngLat(e.lngLat).setHTML(
         `<div style="min-width:180px"><div style="font-weight:800;">${esc(name)}</div>`+
-        (sub?`<div style="font-size:12px;color:#667085;">${sub}</div>`:'')+
+        (sub?`<div style="font-size:12px;color:#67757c;">${sub}</div>`:'')+
         `<button data-route="${lat},${lng}" data-name="${esc(name)}" class="btn btn-primary" style="padding:6px 10px; font-size:12px; margin-top:8px;">Route here</button></div>`
       ).addTo(map);
     }catch(err){ /* style not ready — ignore tap */ }
@@ -1064,9 +1062,9 @@ async function initMapbox(){
       const mine=groupState.myName && r.display_name && r.display_name.toLowerCase()===groupState.myName.toLowerCase();
       const el=document.createElement('div');
       el.title=r.display_name;
-      el.style.cssText=`background:${mine?'#039855':'#175CD3'};width:${mine?'18px':'16px'};height:${mine?'18px':'16px'};border-radius:50%;border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.5);cursor:pointer;`;
+      el.style.cssText=`background:${mine?'#25743a':'#1f5fbf'};width:${mine?'18px':'16px'};height:${mine?'18px':'16px'};border-radius:50%;border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.5);cursor:pointer;`;
       const m=new mapboxgl.Marker({element:el}).setLngLat([r.lon??r.lng, r.lat])
-        .setPopup(new mapboxgl.Popup({offset:10}).setHTML(`<b>${esc(r.display_name)}${mine?' (you)':''}</b><br><span style="font-size:12px;color:#667085;">${esc(timeAgo(r.shared_at))} • shared ${esc(r.shared_at||'')}</span>`))
+        .setPopup(new mapboxgl.Popup({offset:10}).setHTML(`<b>${esc(r.display_name)}${mine?' (you)':''}</b><br><span style="font-size:12px;color:#67757c;">${esc(timeAgo(r.shared_at))} • shared ${esc(r.shared_at||'')}</span>`))
         .addTo(map);
       m._grow=r; groupMarkers.push(m);
     });
@@ -1147,7 +1145,7 @@ function initFallback(){
       onAdd: function(){
         const b=L.DomUtil.create('button','');
         b.type='button'; b.title='Use my location'; b.setAttribute('aria-label','Use my location');
-        b.style.cssText='width:30px;height:30px;font-size:16px;line-height:28px;text-align:center;cursor:pointer;background:#fff;border:2px solid rgba(0,0,0,0.2);border-radius:4px;';
+        b.style.cssText='width:30px;height:30px;font-size:16px;line-height:28px;text-align:center;cursor:pointer;background:#fff;border:2px solid var(--line);border-radius:2px;';
         b.textContent='⌖';
         L.DomEvent.on(b,'click', (e)=>{ L.DomEvent.stopPropagation(e); useLocationFb(); });
         return b;
@@ -1187,9 +1185,9 @@ function initFallback(){
       _groupLayer.clearLayers();
       (rows||[]).forEach(r=>{
         const mine=groupState.myName && r.display_name && r.display_name.toLowerCase()===groupState.myName.toLowerCase();
-        const m=L.marker([r.lat, r.lon??r.lng], {icon:L.divIcon({html:`<div style="background:${mine?'#039855':'#175CD3'};width:${mine?'18px':'16px'};height:${mine?'18px':'16px'};border-radius:50%;border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.5);"></div>`, className:'', iconSize:[18,18]}), title:r.display_name});
+        const m=L.marker([r.lat, r.lon??r.lng], {icon:L.divIcon({html:`<div style="background:${mine?'#25743a':'#1f5fbf'};width:${mine?'18px':'16px'};height:${mine?'18px':'16px'};border-radius:50%;border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.5);"></div>`, className:'', iconSize:[18,18]}), title:r.display_name});
         m._grow=r;
-        m.bindPopup(`<b>${esc(r.display_name)}${mine?' (you)':''}</b><br><span style="font-size:12px;color:#667085;">${esc(timeAgo(r.shared_at))} • shared ${esc(r.shared_at||'')}</span>`);
+        m.bindPopup(`<b>${esc(r.display_name)}${mine?' (you)':''}</b><br><span style="font-size:12px;color:#67757c;">${esc(timeAgo(r.shared_at))} • shared ${esc(r.shared_at||'')}</span>`);
         m.addTo(_groupLayer);
       });
     };
@@ -1247,10 +1245,10 @@ async function refreshHazardsFb(){
     jobs.push(fetchQuakes(lat, lon, hzAbort.quake.signal).then(data=>{
       (data.quakes||[]).slice(0,200).forEach(q=>{
         L.circle([q.lat,q.lon], {radius:quakeRadiusKm(q.mag)*1000, color:'#9333ea', weight:1, opacity:0.6, fillOpacity:0.12}).addTo(_quakeLayer)
-          .bindPopup(`<div style="min-width:200px"><div style="font-weight:800;">M${q.mag??'?'} — ${esc(q.place||'Earthquake')}</div><div style="font-size:12px;color:#667085;">Depth ${q.depth_km??'?'} km • Est. felt radius ${quakeRadiusKm(q.mag)} km • <a href="${q.url||'#'}" target="_blank" rel="noopener">USGS</a></div>${QUAKE_RING_NOTE}</div>`);
+          .bindPopup(`<div style="min-width:200px"><div style="font-weight:800;">M${q.mag??'?'} — ${esc(q.place||'Earthquake')}</div><div style="font-size:12px;color:#67757c;">Depth ${q.depth_km??'?'} km • Est. felt radius ${quakeRadiusKm(q.mag)} km • <a href="${q.url||'#'}" target="_blank" rel="noopener">USGS</a></div>${QUAKE_RING_NOTE}</div>`);
         const size=10+Math.min(14,(q.mag||0)*2);
         const m=L.marker([q.lat,q.lon], {icon:L.divIcon({html:`<div class="quake-pulse" style="width:${size}px;height:${size}px;"></div>`, className:'', iconSize:[size,size]}), title:`M${q.mag} ${q.place||''}`}).addTo(_quakeLayer);
-        m.bindPopup(`<div style="min-width:200px"><div style="font-weight:800;">M${q.mag??'?'} — ${esc(q.place||'Earthquake')}</div><div style="font-size:12px;color:#667085;">Depth ${q.depth_km??'?'} km • <a href="${q.url||'#'}" target="_blank" rel="noopener">USGS</a></div></div>`);
+        m.bindPopup(`<div style="min-width:200px"><div style="font-weight:800;">M${q.mag??'?'} — ${esc(q.place||'Earthquake')}</div><div style="font-size:12px;color:#67757c;">Depth ${q.depth_km??'?'} km • <a href="${q.url||'#'}" target="_blank" rel="noopener">USGS</a></div></div>`);
       });
       const _qfb=inViewCountFb((data.quakes||[]).slice(0,200));
       hzStatus(_qfb<0?quakeStatusText(data):`${quakeStatusText(data)} • ${_qfb} in view`);

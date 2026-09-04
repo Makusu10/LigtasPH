@@ -11,7 +11,7 @@
     <a href="{{ url_for('public.map_page') }}" class="btn btn-primary">Find an Evacuation Center</a>
     <a href="{{ url_for('public.hotlines_page') }}" class="btn btn-secondary">View Emergency Hotlines</a>
   </div>
-  <div style="background:#EFF8FF; border:1px solid #B2DDFF; padding:10px 12px; border-radius:8px; color:#1849A9; font-size:13px;">If you are in immediate danger, contact 911 or your local DRRMO. This site is for information only.</div>
+  <div style="background:#f9e6e4; border:2px solid var(--red); border-left:8px solid var(--red); padding:10px 12px; border-radius:2px; color:#5e0a0e; font-weight:600; font-family:var(--font-display); font-size:14px; letter-spacing:0.04em; text-transform:uppercase;">If you are in immediate danger, contact 911 or your local DRRMO. This site is for information only.</div>
 </section>
 
 <section style="margin-top:16px;">
@@ -29,7 +29,7 @@
 <section style="margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:16px;" class="map-layout">
   <div class="card">
     <h2 style="margin:0 0 8px; font-size:16px;">Map Preview</h2>
-    <div id="previewMap" style="height:280px; border-radius:8px; border:1px solid var(--border);"></div>
+    <div id="previewMap" style="height:280px; border-radius:2px; border:2px solid var(--line);"></div>
     <p style="color:var(--text-secondary); font-size:12px; margin:8px 0 0;"><span class="badge badge-available">Available</span> <span class="badge badge-nearly">Nearly Full</span> <span class="badge badge-full">Full</span></p>
   </div>
   <div class="card">
@@ -40,7 +40,7 @@
           {% if c['capacity'] is not none and c['current_occupancy'] is not none %}
           {% set pct = (c['current_occupancy']/c['capacity']*100) if c['capacity'] else 0 %}
           {% set avail = c['capacity']-c['current_occupancy'] %}
-          <div style="border:1px solid var(--border); border-radius:8px; padding:10px 12px; display:flex; justify-content:space-between; gap:12px; align-items:center;">
+          <div style="border:2px solid var(--line); border-radius:2px; padding:10px 12px; display:flex; justify-content:space-between; gap:12px; align-items:center;">
             <div>
               <div style="font-weight:700;">{{ c['name'] }}</div>
               <div style="color:var(--text-secondary); font-size:13px;">{{ c['city'] }} • {{ avail }} slots • {{ "%.1f"|format(pct) }}%</div>
@@ -48,7 +48,7 @@
             <a href="{{ url_for('public.center_detail', center_id=c['id']) }}" class="btn btn-secondary" style="padding:6px 10px; font-size:12px;">View</a>
           </div>
           {% else %}
-          <div style="border:1px solid var(--border); border-radius:8px; padding:10px 12px; display:flex; justify-content:space-between; gap:12px; align-items:center;">
+          <div style="border:2px solid var(--line); border-radius:2px; padding:10px 12px; display:flex; justify-content:space-between; gap:12px; align-items:center;">
             <div>
               <div style="font-weight:700;">{{ c['name'] }}</div>
               <div style="color:var(--text-secondary); font-size:13px;">{{ c['city'] }} • capacity unreported</div>
@@ -104,8 +104,8 @@
       const centers = await res.json();
       centers.slice(0,6).forEach(c=>{
         const known=c.occupancy_pct!==null&&c.occupancy_pct!==undefined;
-        let color = '#667085';
-        if(known){ color='#039855'; if(c.occupancy_pct>=100) color='#D92D20'; else if(c.occupancy_pct>=80) color='#F79009'; }
+        let color = '#67757c';
+        if(known){ color='#25743a'; if(c.occupancy_pct>=100) color='#c1121f'; else if(c.occupancy_pct>=80) color='#d9991a'; }
         const html=`<b>${c.name}</b><br>${c.city}<br>${c.occupancy_status}${known ? ' • '+c.available_slots+' slots' : ''}`;
         if(useMb){
           const mEl=document.createElement('div'); mEl.innerHTML=dot(color);

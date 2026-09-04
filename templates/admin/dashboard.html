@@ -10,7 +10,7 @@
   <div class="card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; text-transform:uppercase;">Full</div><div style="font-size:24px; font-weight:800; color:var(--red);">{{ full }}</div></div>
 </div>
 {% if unknown %}
-<div class="card" style="margin-top:12px; border-color:#FEDF89; background:#FFFAEB;"><div style="font-size:13px;"><b>{{ unknown }}</b> center{{ 's' if unknown != 1 }} awaiting capacity data (Sprint 2 imports) — set capacity in <a href="{{ url_for('admin.centers') }}">Manage Centers</a>.</div></div>
+<div class="card" style="margin-top:12px; border-color:var(--amber); background:#f9ecc8;"><div style="font-size:13px;"><b>{{ unknown }}</b> center{{ 's' if unknown != 1 }} awaiting capacity data (Sprint 2 imports) — set capacity in <a href="{{ url_for('admin.centers') }}">Manage Centers</a>.</div></div>
 {% endif %}
 <div class="grid-3" style="margin-top:12px;">
   <div class="card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; text-transform:uppercase;">Total Capacity</div><div style="font-size:20px; font-weight:800;">{{ total_capacity }}</div></div>

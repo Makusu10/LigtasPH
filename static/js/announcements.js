@@ -83,9 +83,9 @@
   }
 
   var SEV_STYLE = {
-    info: { bar: '#3b6ef5', bg: 'rgba(239,246,255,0.95)', border: 'rgba(178,221,255,0.8)', text: '#1849A9' },
-    warning: { bar: '#e08a0e', bg: 'rgba(255,250,235,0.95)', border: 'rgba(254,223,137,0.8)', text: '#7A4D07' },
-    critical: { bar: '#D92D20', bg: 'rgba(254,243,242,0.97)', border: 'rgba(254,205,202,0.9)', text: '#7A271A' }
+    info: { bar: '#1f5fbf', bg: '#dce9f4', border: '#1f5fbf', text: '#123b7a' },
+    warning: { bar: '#d9991a', bg: '#f9ecc8', border: '#d9991a', text: '#6d4a05' },
+    critical: { bar: '#c1121f', bg: '#f9e6e4', border: '#c1121f', text: '#5e0a0e' }
   };
 
   function ensureStyles() {
@@ -93,14 +93,14 @@
     var s = document.createElement('style');
     s.id = 'ann-style';
     s.textContent = [
-      '#ann-modal-overlay{position:fixed;inset:0;background:rgba(16,24,40,0.45);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;}',
-      '#ann-modal{background:#fff;border-radius:16px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.25);overflow:hidden;}',
-      '#ann-modal-head{height:6px;}',
+      '#ann-modal-overlay{position:fixed;inset:0;background:rgba(13,27,34,0.72);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;}',
+      '#ann-modal{background:#f1f4ef;border:3px solid #23343c;border-radius:2px;max-width:480px;width:100%;box-shadow:6px 6px 0 rgba(13,27,34,0.4);overflow:hidden;}',
+      '#ann-modal-head{height:8px;}',
       '#ann-modal-body{padding:20px;}',
-      '#ann-modal h2{margin:0 0 8px;font-size:18px;}',
+      '#ann-modal h2{margin:0 0 8px;font-size:20px;font-family:Oswald,"Archivo Narrow",sans-serif;text-transform:uppercase;letter-spacing:.03em;}',
       '#ann-modal p{margin:0 0 6px;font-size:14px;line-height:1.5;}',
-      '#ann-modal-meta{font-size:12px;color:#5f6b7a;margin-top:8px;}',
-      '#ann-topbar{position:sticky;top:64px;z-index:1060;margin-bottom:12px;border-radius:12px;padding:10px 14px;font-size:13px;display:flex;gap:10px;align-items:center;justify-content:space-between;border:1px solid;}'
+      '#ann-modal-meta{font-family:"IBM Plex Mono",monospace;font-size:12px;color:#3d4a52;margin-top:8px;}',
+      '#ann-topbar{position:sticky;top:64px;z-index:1060;margin-bottom:12px;border-radius:2px;padding:10px 14px;font-size:13px;display:flex;gap:10px;align-items:center;justify-content:space-between;border:2px solid;}'
     ].join('\n');
     document.head.appendChild(s);
   }

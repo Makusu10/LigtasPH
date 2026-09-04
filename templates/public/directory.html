@@ -10,7 +10,7 @@
 </div>
 <div id="liveStamp" role="status" style="font-size:12px; color:var(--text-secondary); margin-bottom:10px;">Live updates on • checking every 15s…</div>
 <div id="grid" class="grid-3"></div>
-<div id="empty" style="display:none; color:var(--text-secondary); padding:20px; text-align:center; border:1px dashed var(--border); border-radius:8px; margin-top:12px;">No centers match the selected filters. Clear filters or view all.</div>
+<div id="empty" style="display:none; color:var(--text-secondary); padding:20px; text-align:center; border:2px dashed var(--line); border-radius:2px; margin-top:12px;">No centers match the selected filters. Clear filters or view all.</div>
 {% endblock %}
 {% block scripts %}
 <script>
@@ -84,14 +84,14 @@ function render(){
   filtered.forEach(c=>{
     const pct=c.occupancy_pct;
     const known=pct!==null&&pct!==undefined;
-    const color = !known ? '#98A2B3' : pct>=100 ? '#D92D20' : pct>=80 ? '#F79009' : '#039855';
+    const color = !known ? '#67757c' : pct>=100 ? '#c1121f' : pct>=80 ? '#d9991a' : '#25743a';
     const card=document.createElement('div');
     card.className='card';
     const fig = known
       ? `Capacity ${c.capacity} • Occupancy ${c.current_occupancy} • <b>${c.available_slots} slots</b> • ${pct}%`
       : `Capacity unreported • <b>${c.occupancy_status}</b>`;
     const bar = known
-      ? `<div style="background:#F9FAFB; border:1px solid var(--border); border-radius:8px; height:10px; overflow:hidden; margin:6px 0;"><div style="width:${Math.min(pct,100)}%; background:${color}; height:100%;"></div></div>`
+      ? `<div style="background:var(--panel-2); border:2px solid var(--line); border-radius:2px; height:10px; overflow:hidden; margin:6px 0;"><div style="width:${Math.min(pct,100)}%; background:${color}; height:100%; border-right:2px solid var(--line);"></div></div>`
       : ``;
     card.innerHTML=`
       <div style="display:flex; justify-content:space-between; gap:8px; align-items:start;">

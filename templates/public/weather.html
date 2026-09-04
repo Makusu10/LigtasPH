@@ -31,7 +31,7 @@
 </div>
 
 <div id="card" class="card" style="display:none; margin-top:12px;"></div>
-<div id="error" class="card" style="display:none; margin-top:12px; background:#FEF3F2; border-color:#FECDCA;" role="alert"></div>
+<div id="error" class="card" style="display:none; margin-top:12px; background:#f9e6e4; border-color:#c1121f;" role="alert"></div>
 
 <!-- Environmental Safety — Heat Index & AQI (PAGASA/DENR) -->
 <div id="envSkeleton" class="card" style="display:none; margin-top:16px;">
@@ -263,11 +263,11 @@ function renderCard(data, lat, lon, city){
           <div class="weather-icon-wrap" aria-hidden="true"><i data-lucide="${icon}" style="width:36px;height:36px;"></i></div>
           <div style="min-width:0;">
             <div style="font-weight:700; font-size:13px; color:var(--text-secondary); letter-spacing:0.06em; text-transform:uppercase;">Condition</div>
-            <div class="badge" style="margin-top:6px; background:#EFF8FF; border-color:#B2DDFF; color:var(--primary); text-transform:capitalize; letter-spacing:0;">${esc(desc)}</div>
+            <div class="badge" style="margin-top:6px; background:#dce9f4; border-color:#1f5fbf; color:var(--primary); text-transform:capitalize; letter-spacing:0;">${esc(desc)}</div>
           </div>
         </div>
         <div style="display:grid; gap:12px;">
-          <div class="card" style="padding:12px; background:#F9FAFB;">
+          <div class="card" style="padding:12px; background:var(--panel-2);">
             <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px;">
               <span style="color:var(--text-secondary); font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Temperature</span>
               <span style="font-size:12px; color:var(--text-secondary);">Feels ${feels!=null? feels+'°C' : '—'}</span>
@@ -352,7 +352,7 @@ function renderEnvironment(weatherData, aqData, overall, lat, lon){
     const pct = hi.value_c!=null ? Math.max(4, Math.min(100, ((hi.value_c - 20)/35)*100)) : 0;
     const c = hi.colors || {};
     heatCard = `<div class="card env-card" style="background:${c.tint || 'var(--glass)'}; border-color:${c.border || 'var(--glass-border)'}">
-      <div class="env-card-head"><div class="env-card-icon" style="color:#d93d2a;"><i data-lucide="thermometer-sun" style="width:18px;height:18px;"></i></div><span style="font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-secondary);">Heat Index</span><span class="env-badge" style="margin-left:auto; background:${c.badge}; border-color:${c.border}; color:${c.text};">${hi.category}</span></div>
+      <div class="env-card-head"><div class="env-card-icon" style="color:#c1121f;"><i data-lucide="thermometer-sun" style="width:18px;height:18px;"></i></div><span style="font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-secondary);">Heat Index</span><span class="env-badge" style="margin-left:auto; background:${c.badge}; border-color:${c.border}; color:${c.text};">${hi.category}</span></div>
       <div class="env-measure" aria-label="Heat index ${hi.value_c} degrees Celsius">${hi.value_c!=null? hi.value_c.toFixed(1):'—'}<span class="env-unit">°C</span></div>
       <div class="env-bar" role="progressbar" aria-valuenow="${hi.value_c||0}" aria-valuemin="20" aria-valuemax="55" aria-label="Heat index"><div class="env-bar-fill" style="width:${pct}%; background:${c.bar};"></div></div>
       <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); margin-top:3px;"><span>20°C</span><span>55°C</span></div>
@@ -361,7 +361,7 @@ function renderEnvironment(weatherData, aqData, overall, lat, lon){
       <details class="env-expand"><summary>Details</summary><div style="font-size:12px; color:var(--text-secondary); line-height:1.5;">Heat Index is the apparent temperature felt by the body. Calculated from air temperature ${weatherData.main?.temp??'—'}°C and humidity ${weatherData.main?.humidity??'—'}% using the Rothfusz regression (NWS). PAGASA categories: &lt;27 Not Hazardous, 27–32 Caution, 33–41 Extreme Caution, 42–51 Danger, ≥52 Extreme Danger. Not a substitute for official PAGASA/medical advice.</div></details>
     </div>`;
   } else {
-    heatCard = `<div class="card env-card" style="opacity:0.9;"><div class="env-card-head"><div class="env-card-icon"><i data-lucide="thermometer" style="width:18px;height:18px;"></i></div><span style="font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-secondary);">Heat Index</span><span class="env-badge" style="background:#F9FAFB; border-color:#D0D5DD; color:#667085;">Unavailable</span></div><div style="font-size:13px; color:var(--text-secondary);">Heat index unavailable — temperature or humidity missing. Try again or check connection.</div></div>`;
+    heatCard = `<div class="card env-card" style="opacity:0.9;"><div class="env-card-head"><div class="env-card-icon"><i data-lucide="thermometer" style="width:18px;height:18px;"></i></div><span style="font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-secondary);">Heat Index</span><span class="env-badge" style="background:var(--panel-2); border-color:var(--line-soft); color:var(--text-secondary);">Unavailable</span></div><div style="font-size:13px; color:var(--text-secondary);">Heat index unavailable — temperature or humidity missing. Try again or check connection.</div></div>`;
   }
   // AQI card — primary, mainly shown (AQI numeric is main, PM2.5 secondary)
   let aqiCard="";
@@ -372,7 +372,7 @@ function renderEnvironment(weatherData, aqData, overall, lat, lon){
     // AQI (US EPA 0-300) is primary measure — PM2.5 is secondary context
     const pct = aqiVal!=null ? Math.max(4, Math.min(100, (aqiVal/300)*100)) : (pm25!=null? Math.max(4, Math.min(100, (pm25/90)*100)) : 0);
     aqiCard = `<div class="card env-card env-card--aqi" style="background:${c.tint}; border-color:${c.border};">
-      <div class="env-card-head"><div class="env-card-icon" style="color:#0e7490;"><i data-lucide="wind" style="width:20px;height:20px;"></i></div><span style="font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-secondary);">Air Quality — Primary</span><span class="env-badge" style="margin-left:auto; background:${c.badge}; border-color:${c.border}; color:${c.text};">${aqData.category}</span></div>
+      <div class="env-card-head"><div class="env-card-icon" style="color:#1f5fbf;"><i data-lucide="wind" style="width:20px;height:20px;"></i></div><span style="font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-secondary);">Air Quality — Primary</span><span class="env-badge" style="margin-left:auto; background:${c.badge}; border-color:${c.border}; color:${c.text};">${aqData.category}</span></div>
       ${aqiVal!=null ? `<div class="env-measure" aria-label="AQI ${aqiVal}">${aqiVal}<span class="env-unit"> US AQI</span></div>` : (pm25!=null? `<div class="env-measure">${Number(pm25).toFixed(1)}<span class="env-unit">µg/m³ PM2.5</span></div>` : `<div class="env-measure">—</div>`)}
       ${aqiVal!=null && pm25!=null ? `<div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">${Number(pm25).toFixed(1)} µg/m³ PM2.5 • ${aqData.dominant_pollutant||'PM2.5'}</div>` : (pm25!=null? `<div style="font-size:11px; color:var(--text-muted);">${Number(pm25).toFixed(1)} µg/m³ PM2.5 • ${aqData.dominant_pollutant||''}</div>` : ``)}
       ${aqiVal!=null ? `<div style="font-size:11px; color:var(--text-muted);">${aqData.aqi_scale||'US EPA'} • DENR PM2.5 category shown</div>` : ``}
@@ -382,7 +382,7 @@ function renderEnvironment(weatherData, aqData, overall, lat, lon){
       <details class="env-expand"><summary>Details</summary><div style="font-size:12px; color:var(--text-secondary); line-height:1.5;">DENR DAO 2020-14 PM2.5: 0–25 Good, 25.1–35 Fair, 35.1–45 Unhealthy for Sensitive Groups, 45.1–55 Very Unhealthy, 55.1–90 Acutely Unhealthy, &gt;91 Emergency. US AQI (0–500 EPA) shown as main value — PM2.5 µg/m³ is secondary with DENR category. Separate scales, correct units.</div></details>
     </div>`;
   } else {
-    aqiCard = `<div class="card env-card env-card--aqi" style="opacity:0.9;"><div class="env-card-head"><div class="env-card-icon"><i data-lucide="wind" style="width:20px;height:20px;"></i></div><span style="font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-secondary);">Air Quality — Primary</span><span class="env-badge" style="background:#F9FAFB; border-color:#D0D5DD; color:#667085;">Unavailable</span></div><div style="font-size:13px; color:var(--text-secondary);">Air quality unavailable for this location — API limit, offline, or unsupported area. Try again later.</div><div style="font-size:11px; color:var(--text-muted); margin-top:6px;">Provider: Open-Meteo Air Quality (no key, PH) → OpenWeather Air Pollution fallback. No fake data.</div></div>`;
+    aqiCard = `<div class="card env-card env-card--aqi" style="opacity:0.9;"><div class="env-card-head"><div class="env-card-icon"><i data-lucide="wind" style="width:20px;height:20px;"></i></div><span style="font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-secondary);">Air Quality — Primary</span><span class="env-badge" style="background:var(--panel-2); border-color:var(--line-soft); color:var(--text-secondary);">Unavailable</span></div><div style="font-size:13px; color:var(--text-secondary);">Air quality unavailable for this location — API limit, offline, or unsupported area. Try again later.</div><div style="font-size:11px; color:var(--text-muted); margin-top:6px;">Provider: Open-Meteo Air Quality (no key, PH) → OpenWeather Air Pollution fallback. No fake data.</div></div>`;
   }
   const overallIcon = overall?.source==="air" ? "wind" : (overall?.source==="heat" ? "thermometer-sun" : "shield-check");
   const overallText = overall?.category && overall.category!=="Unavailable" ? overall.category : "No risk data";
@@ -390,7 +390,7 @@ function renderEnvironment(weatherData, aqData, overall, lat, lon){
   envSection.className = `env-section ${tint} card`;
   envSection.innerHTML = `
     <div class="env-overall" role="status" aria-label="Overall outdoor safety ${overallText}">
-      <div class="env-overall-icon" style="background:${overall && overall.severity>=3 ? 'rgba(217,61,42,0.12)' : 'rgba(59,110,245,0.12)'}; color:${overall && overall.severity>=3 ? 'var(--red)' : 'var(--primary)'};"><i data-lucide="${overallIcon}" style="width:18px;height:18px;"></i></div>
+      <div class="env-overall-icon" style="background:${overall && overall.severity>=3 ? 'rgba(193,18,31,0.12)' : 'rgba(31,95,191,0.12)'}; color:${overall && overall.severity>=3 ? 'var(--red)' : 'var(--primary)'};"><i data-lucide="${overallIcon}" style="width:18px;height:18px;"></i></div>
       <div style="min-width:0; flex:1;">
         <div style="font-size:12px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; color:var(--text-secondary);">Overall outdoor safety</div>
         <div style="font-weight:800; font-size:15px; line-height:1.2;">${overallText}</div>
