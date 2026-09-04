@@ -24,6 +24,12 @@ def test_map_without_token_uses_osm_fallback(client, app):
     assert "mapbox-gl.js" not in html
     assert 'id="gpsBox"' not in html  # GPS panel only rendered with token
     assert "isolation:isolate" in html or "isolation: isolate" in html
+    # Tile-fallback message element always rendered
+    assert 'id="tileFallback"' in html
+    # CartoDB fallback URL wired in Leaflet fallback
+    assert "cartocdn.com" in html
+    assert "tileerror" in html
+    assert "switchedToCarto" in html
 
 def test_map_with_token_uses_mapbox(client, app):
     app.config["MAPBOX_TOKEN"] = "pk.test-token"
@@ -48,6 +54,9 @@ def test_map_with_token_uses_mapbox(client, app):
     assert 'LocateCtl' in html or 'Use my location' in html  # fallback locate control
     assert 'queryRenderedFeatures' in html  # POI tap lookup
     assert 'hz-quakes-layer' in html and 'hz-fires-layer' in html
+    # Mapbox error handler for invalid-token / tile failures
+    assert "map.on('error'" in html or 'map.on("error"' in html
+    assert 'id="tileFallback"' in html
 
 def test_home_and_detail_render_with_token(client, app):
     app.config["MAPBOX_TOKEN"] = "pk.test-token"
