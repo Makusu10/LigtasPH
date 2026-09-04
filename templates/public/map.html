@@ -293,7 +293,7 @@ function renderGroupList(){
   rows.forEach(r=>{
     const mine=groupState.myName && r.display_name && r.display_name.toLowerCase()===groupState.myName.toLowerCase();
     const row=document.createElement('div');
-    row.style.cssText='border:2px solid var(--line); border-radius:var(--radius); padding:6px 8px; font-size:12px; display:flex; justify-content:space-between; gap:8px; align-items:center;'+(mine?' border-color:var(--red); background:rgba(193,18,31,0.06);':'');
+    row.style.cssText='border:2px solid var(--line); border-radius:var(--radius); padding:6px 8px; font-size:12px; display:flex; justify-content:space-between; gap:8px; align-items:center;'+(mine?' border-color:var(--blue); background:rgba(37,99,168,0.08);':'');
     const acc=(r.accuracy!==null && r.accuracy!==undefined && r.accuracy!=='')?` • ±${Math.round(+r.accuracy)} m`:'';
     row.innerHTML=`<div style="min-width:0;"><div style="font-weight:700;">${esc(r.display_name)}${mine?' • you':''}</div><div style="color:var(--text-secondary);">${esc(timeAgo(r.shared_at))}${esc(acc)}</div></div><button class="btn btn-secondary" style="padding:4px 8px; font-size:11px; flex-shrink:0;">Locate</button>`;
     row.querySelector('button').addEventListener('click', ()=>{ if(groupState.locate) groupState.locate(r); });
