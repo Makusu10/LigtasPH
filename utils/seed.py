@@ -47,22 +47,47 @@ def seed_db():
         # history row example
         db.execute("INSERT INTO center_status_updates (center_id, prev_occupancy, new_occupancy, food_status, water_status, notes, admin_id) VALUES (1, 0, 1200, 'Adequate','Adequate','Initial seed',1)")
 
-    if not db.execute("SELECT 1 FROM emergency_hotlines LIMIT 1").fetchone():
-        hotlines = [
-            ("NDRRMC Marikina Rescue","DRRMO","161","Marikina","","Verified via LGU 2024-12-01","2024-12-01"),
-            ("Marikina Police Station","Police","(02) 8646-1631","Marikina","Shoe Ave, Marikina","LGU","2024-11-20"),
-            ("QC Disaster Risk Reduction (DRRMO)","DRRMO","122","Quezon City","","LGU","2024-12-02"),
-            ("QC Police District","Police","8925-8417","Quezon City","Camp Karingal","PNP","2024-11-15"),
-            ("Pasig Emergency Operations","DRRMO","(02) 8643-0000","Pasig","","LGU","2024-12-01"),
-            ("Pasig City Police","Police","(02) 8641-0433","Pasig","Pasig Blvd","PNP","2024-11-10"),
-            ("National Emergency Hotline","National","911","National","","NDRRMC","2024-01-01"),
-            ("Philippine Red Cross","Rescue","143","National","","PRC","2024-01-01"),
-            ("PAGASA Weather Hotline","Utility","(02) 8284-0800","National","","PAGASA","2024-01-01"),
-            ("Coast Guard Action Center","Rescue","(02) 8527-3877","National","","PCG","2024-01-01"),
-            ("BFP Marikina Fire Station","Fire","(02) 8646-0422","Marikina","","BFP","2024-11-25"),
-            ("Amang Rodriguez Hospital","Hospital","(02) 8941-5854","Marikina","Sumulong Hwy","DOH","2024-11-20"),
-        ]
-        for h in hotlines:
+    # Emergency hotlines — insert-missing (idempotent) so existing DBs pick
+    # up new entries on re-seed. Match key: (agency, contact_number).
+    hotlines = [
+        ("NDRRMC Marikina Rescue","DRRMO","161","Marikina","","Verified via LGU 2024-12-01","2024-12-01"),
+        ("Marikina Police Station","Police","(02) 8646-1631","Marikina","Shoe Ave, Marikina","LGU","2024-11-20"),
+        ("QC Disaster Risk Reduction (DRRMO)","DRRMO","122","Quezon City","","LGU","2024-12-02"),
+        ("QC Police District","Police","8925-8417","Quezon City","Camp Karingal","PNP","2024-11-15"),
+        ("Pasig Emergency Operations","DRRMO","(02) 8643-0000","Pasig","","LGU","2024-12-01"),
+        ("Pasig City Police","Police","(02) 8641-0433","Pasig","Pasig Blvd","PNP","2024-11-10"),
+        ("National Emergency Hotline","National","911","National","","NDRRMC","2024-01-01"),
+        ("Philippine Red Cross","Rescue","143","National","","PRC","2024-01-01"),
+        ("PAGASA Weather Hotline","Utility","(02) 8284-0800","National","","PAGASA","2024-01-01"),
+        ("Coast Guard Action Center","Rescue","(02) 8527-3877","National","","PCG","2024-01-01"),
+        ("BFP Marikina Fire Station","Fire","(02) 8646-0422","Marikina","","BFP","2024-11-25"),
+        ("Amang Rodriguez Hospital","Hospital","(02) 8941-5854","Marikina","Sumulong Hwy","DOH","2024-11-20"),
+        # Sourced from public directory (disasters2.jimdofree.com/emergency-numbers)
+        # on 2026-09-04 — added, not yet independently verified.
+        ("PNP Hotline Patrol","Police","117","National","","Public directory 2026-09-04, unverified","2026-09-04"),
+        ("PNP Hotline","Police","722-0650","National","","Public directory 2026-09-04, unverified","2026-09-04"),
+        ("NDRRMC Operations Center","DRRMO","(02) 911-1406","National","","Public directory 2026-09-04, unverified","2026-09-04"),
+        ("OCD – National Capital Region","DRRMO","(02) 421-1918","National","","Public directory 2026-09-04, unverified","2026-09-04"),
+        ("DSWD Disaster Response (text)","Rescue","0918-912-2813","National","","Public directory 2026-09-04, unverified","2026-09-04"),
+        ("Philippine Red Cross Trunkline","Rescue","(02) 527-0000","National","","Public directory 2026-09-04, unverified","2026-09-04"),
+        ("BFP NCR Direct Line","Fire","(02) 426-0219","National","","Public directory 2026-09-04, unverified","2026-09-04"),
+        ("MMDA Rescue Hotline","Rescue","136","National","","Public directory 2026-09-04, unverified","2026-09-04"),
+        ("MMDA Flood Control","Utility","(02) 882-0925","National","","Public directory 2026-09-04, unverified","2026-09-04"),
+        ("PAGASA Weather Forecasting","Utility","(02) 926-4258","National","","Public directory 2026-09-04, unverified","2026-09-04"),
+        ("PHIVOLCS Seismology","Utility","(02) 426-1468","National","","Public directory 2026-09-04, unverified","2026-09-04"),
+        ("DPWH Road Emergency","Utility","165-02","National","","Public directory 2026-09-04, unverified","2026-09-04"),
+        ("Manila Water Hotline","Utility","1627","National","","Public directory 2026-09-04, unverified","2026-09-04"),
+        ("DOTC Public Assistance","Utility","7890","National","","Public directory 2026-09-04, unverified","2026-09-04"),
+        ("Coast Guard Hotline (Globe)","Rescue","0917-724-3682","National","","Public directory 2026-09-04, unverified","2026-09-04"),
+        ("Makati C3 Command Center","DRRMO","(02) 870-1940","Makati","","Public directory 2026-09-04, unverified","2026-09-04"),
+        ("Mandaluyong Emergency Hotline","DRRMO","(02) 588-2200","Mandaluyong","","Public directory 2026-09-04, unverified","2026-09-04"),
+    ]
+    # Data fix: early seeds stored the Red Cross trunkline on the PAGASA row.
+    # Correct it in existing DBs (fresh DBs get the right number directly).
+    db.execute("UPDATE emergency_hotlines SET contact_number='(02) 8284-0800', verification_note='PAGASA', last_verified='2024-01-01' WHERE agency='PAGASA Weather Hotline' AND contact_number='(02) 527-0000'")
+    for h in hotlines:
+        dup = db.execute("SELECT 1 FROM emergency_hotlines WHERE agency=? AND contact_number=?", (h[0], h[2])).fetchone()
+        if not dup:
             db.execute("INSERT INTO emergency_hotlines (agency, category, contact_number, city, address_area, verification_note, last_verified) VALUES (?,?,?,?,?,?,?)", h)
 
     # weather_cache demo — includes hourly for offline visuals
