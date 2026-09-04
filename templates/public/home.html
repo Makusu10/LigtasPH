@@ -22,7 +22,7 @@
     <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Full</div><div style="font-size:28px; font-weight:800; color:var(--red);">{{ full }}</div><span class="badge badge-full">100%</span></div>
   </div>
   {% if last_updated %}
-    <p style="color:var(--text-secondary); font-size:12px; margin-top:8px;">Last updated: {{ last_updated }}</p>
+    <p style="color:var(--text-secondary); font-size:12px; margin-top:8px;">Last updated: {{ last_updated }}{% if unknown %} • {{ unknown }} center{{ 's' if unknown != 1 }} awaiting capacity data{% endif %}</p>
   {% endif %}
 </section>
 
@@ -37,6 +37,7 @@
     {% if centers %}
       <div style="display:flex; flex-direction:column; gap:10px;">
         {% for c in centers %}
+          {% if c['capacity'] is not none and c['current_occupancy'] is not none %}
           {% set pct = (c['current_occupancy']/c['capacity']*100) if c['capacity'] else 0 %}
           {% set avail = c['capacity']-c['current_occupancy'] %}
           <div style="border:1px solid var(--border); border-radius:8px; padding:10px 12px; display:flex; justify-content:space-between; gap:12px; align-items:center;">
@@ -46,6 +47,15 @@
             </div>
             <a href="{{ url_for('public.center_detail', center_id=c['id']) }}" class="btn btn-secondary" style="padding:6px 10px; font-size:12px;">View</a>
           </div>
+          {% else %}
+          <div style="border:1px solid var(--border); border-radius:8px; padding:10px 12px; display:flex; justify-content:space-between; gap:12px; align-items:center;">
+            <div>
+              <div style="font-weight:700;">{{ c['name'] }}</div>
+              <div style="color:var(--text-secondary); font-size:13px;">{{ c['city'] }} • capacity unreported</div>
+            </div>
+            <a href="{{ url_for('public.center_detail', center_id=c['id']) }}" class="btn btn-secondary" style="padding:6px 10px; font-size:12px;">View</a>
+          </div>
+          {% endif %}
         {% endfor %}
       </div>
     {% else %}
@@ -93,10 +103,10 @@
       const res = await fetch('/api/centers');
       const centers = await res.json();
       centers.slice(0,6).forEach(c=>{
-        let color = '#039855';
-        if(c.occupancy_pct>=100) color='#D92D20';
-        else if(c.occupancy_pct>=80) color='#F79009';
-        const html=`<b>${c.name}</b><br>${c.city}<br>${c.occupancy_status} • ${c.available_slots} slots`;
+        const known=c.occupancy_pct!==null&&c.occupancy_pct!==undefined;
+        let color = '#667085';
+        if(known){ color='#039855'; if(c.occupancy_pct>=100) color='#D92D20'; else if(c.occupancy_pct>=80) color='#F79009'; }
+        const html=`<b>${c.name}</b><br>${c.city}<br>${c.occupancy_status}${known ? ' • '+c.available_slots+' slots' : ''}`;
         if(useMb){
           const mEl=document.createElement('div'); mEl.innerHTML=dot(color);
           new mapboxgl.Marker({element:mEl}).setLngLat([c.lng,c.lat]).setPopup(new mapboxgl.Popup({offset:8}).setHTML(html)).addTo(map);

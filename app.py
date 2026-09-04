@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import click
 from flask import Flask, render_template
 from dotenv import load_dotenv
 
@@ -71,6 +72,17 @@ def create_app(env=None):
             init_db()
             seed_db()
             print("Database seeded.")
+
+    @app.cli.command("import-geojson")
+    @click.argument("path", required=False)
+    def import_geojson_cmd(path=None):
+        """Sprint 2: load data/ncr_evacuation_centers.geojson (idempotent)."""
+        import json as _json
+        from scripts.import_evac_centers import import_geojson, DEFAULT_PATH
+        src = path or str(DEFAULT_PATH)
+        with app.app_context():
+            stats = import_geojson(get_db(), src)
+            print(_json.dumps(stats, indent=2))
 
     # Blueprints — organized routes/
     from routes.public import bp as public_bp

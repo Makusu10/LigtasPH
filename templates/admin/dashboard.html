@@ -9,6 +9,9 @@
   <div class="card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; text-transform:uppercase;">Nearly Full</div><div style="font-size:24px; font-weight:800; color:var(--orange);">{{ nearly }}</div></div>
   <div class="card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; text-transform:uppercase;">Full</div><div style="font-size:24px; font-weight:800; color:var(--red);">{{ full }}</div></div>
 </div>
+{% if unknown %}
+<div class="card" style="margin-top:12px; border-color:#FEDF89; background:#FFFAEB;"><div style="font-size:13px;"><b>{{ unknown }}</b> center{{ 's' if unknown != 1 }} awaiting capacity data (Sprint 2 imports) — set capacity in <a href="{{ url_for('admin.centers') }}">Manage Centers</a>.</div></div>
+{% endif %}
 <div class="grid-3" style="margin-top:12px;">
   <div class="card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; text-transform:uppercase;">Total Capacity</div><div style="font-size:20px; font-weight:800;">{{ total_capacity }}</div></div>
   <div class="card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; text-transform:uppercase;">Total Occupancy</div><div style="font-size:20px; font-weight:800;">{{ total_occ }}</div></div>
@@ -25,7 +28,7 @@
     {% for c in recent %}
       <div style="border-bottom:1px solid var(--border); padding:8px 0; display:flex; justify-content:space-between; gap:8px;">
         <div><div style="font-weight:700;">{{ c['name'] }}</div><div style="color:var(--text-secondary); font-size:12px;">{{ c['city'] }} • {{ c['updated_at'] }}</div></div>
-        <span class="badge badge-unknown">{{ c['current_occupancy'] }}/{{ c['capacity'] }}</span>
+        <span class="badge badge-unknown">{{ c['current_occupancy'] if c['current_occupancy'] is not none else '—' }}/{{ c['capacity'] if c['capacity'] is not none else '—' }}</span>
       </div>
     {% else %}<p style="color:var(--text-secondary);">No centers.</p>{% endfor %}
   </div>

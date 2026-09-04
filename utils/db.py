@@ -26,8 +26,8 @@ CREATE TABLE IF NOT EXISTS evacuation_centers (
     province TEXT,
     lat REAL NOT NULL CHECK (lat BETWEEN -90 AND 90),
     lng REAL NOT NULL CHECK (lng BETWEEN -180 AND 180),
-    capacity INTEGER NOT NULL CHECK (capacity > 0),
-    current_occupancy INTEGER NOT NULL DEFAULT 0 CHECK (current_occupancy >= 0),
+    capacity INTEGER CHECK (capacity IS NULL OR capacity > 0),
+    current_occupancy INTEGER DEFAULT 0 CHECK (current_occupancy IS NULL OR current_occupancy >= 0),
     food_status TEXT NOT NULL DEFAULT 'Unknown' CHECK (food_status IN ('Unknown','Low','Adequate','High')),
     water_status TEXT NOT NULL DEFAULT 'Unknown' CHECK (water_status IN ('Unknown','Low','Adequate','High')),
     medicine_status TEXT NOT NULL DEFAULT 'Unknown' CHECK (medicine_status IN ('Unknown','Low','Adequate','High')),
@@ -36,6 +36,10 @@ CREATE TABLE IF NOT EXISTS evacuation_centers (
     operational_status TEXT NOT NULL DEFAULT 'Open' CHECK (operational_status IN ('Open','Closed','Temporarily Unavailable')),
     contact_number TEXT,
     notes TEXT,
+    source TEXT,
+    verified INTEGER NOT NULL DEFAULT 0 CHECK (verified IN (0,1)),
+    needs_review INTEGER NOT NULL DEFAULT 0 CHECK (needs_review IN (0,1)),
+    review_reason TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0,1)),
@@ -44,6 +48,22 @@ CREATE TABLE IF NOT EXISTS evacuation_centers (
 CREATE INDEX IF NOT EXISTS idx_center_city ON evacuation_centers(city);
 CREATE INDEX IF NOT EXISTS idx_center_archived ON evacuation_centers(archived);
 CREATE INDEX IF NOT EXISTS idx_center_updated ON evacuation_centers(updated_at);
+CREATE INDEX IF NOT EXISTS idx_center_review ON evacuation_centers(needs_review);
+
+CREATE TABLE IF NOT EXISTS staging_centers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    barangay TEXT,
+    city TEXT,
+    facility_type TEXT,
+    facility_status TEXT,
+    source TEXT,
+    confidence REAL,
+    review_reason TEXT NOT NULL DEFAULT 'unverified_location',
+    raw_json TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_staging_city ON staging_centers(city);
 
 CREATE TABLE IF NOT EXISTS center_status_updates (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -201,8 +221,77 @@ def _migrate_weather_cache(db):
     except Exception:
         pass
 
+def _migrate_centers(db):
+    """Sprint 2: nullable capacity/occupancy + provenance columns on
+    evacuation_centers, plus the staging_centers quarantine table.
+
+    SQLite cannot DROP NOT NULL via ALTER TABLE, so pre-Sprint-2 tables
+    are rebuilt (rename -> create -> copy -> drop), mirroring
+    _migrate_weather_cache. All existing rows are preserved; the new
+    columns take their defaults (capacity stays set, verified=0).
+    """
+    try:
+        cols = db.execute("PRAGMA table_info(evacuation_centers)").fetchall()
+        if not cols:
+            return
+        names = [c["name"] for c in cols]
+        cap = next((c for c in cols if c["name"] == "capacity"), None)
+        if "source" in names and "verified" in names and cap is not None and cap["notnull"] == 0:
+            return
+        db.executescript("""
+            ALTER TABLE evacuation_centers RENAME TO evacuation_centers_old;
+            CREATE TABLE evacuation_centers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                address TEXT NOT NULL,
+                barangay TEXT,
+                city TEXT NOT NULL,
+                municipality TEXT,
+                province TEXT,
+                lat REAL NOT NULL CHECK (lat BETWEEN -90 AND 90),
+                lng REAL NOT NULL CHECK (lng BETWEEN -180 AND 180),
+                capacity INTEGER CHECK (capacity IS NULL OR capacity > 0),
+                current_occupancy INTEGER DEFAULT 0 CHECK (current_occupancy IS NULL OR current_occupancy >= 0),
+                food_status TEXT NOT NULL DEFAULT 'Unknown' CHECK (food_status IN ('Unknown','Low','Adequate','High')),
+                water_status TEXT NOT NULL DEFAULT 'Unknown' CHECK (water_status IN ('Unknown','Low','Adequate','High')),
+                medicine_status TEXT NOT NULL DEFAULT 'Unknown' CHECK (medicine_status IN ('Unknown','Low','Adequate','High')),
+                hygiene_status TEXT NOT NULL DEFAULT 'Unknown' CHECK (hygiene_status IN ('Unknown','Low','Adequate','High')),
+                basic_needs_status TEXT NOT NULL DEFAULT 'Unknown' CHECK (basic_needs_status IN ('Unknown','Low','Adequate','High')),
+                operational_status TEXT NOT NULL DEFAULT 'Open' CHECK (operational_status IN ('Open','Closed','Temporarily Unavailable')),
+                contact_number TEXT,
+                notes TEXT,
+                source TEXT,
+                verified INTEGER NOT NULL DEFAULT 0 CHECK (verified IN (0,1)),
+                needs_review INTEGER NOT NULL DEFAULT 0 CHECK (needs_review IN (0,1)),
+                review_reason TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0,1)),
+                UNIQUE(name, address)
+            );
+            CREATE INDEX IF NOT EXISTS idx_center_city ON evacuation_centers(city);
+            CREATE INDEX IF NOT EXISTS idx_center_archived ON evacuation_centers(archived);
+            CREATE INDEX IF NOT EXISTS idx_center_updated ON evacuation_centers(updated_at);
+            CREATE INDEX IF NOT EXISTS idx_center_review ON evacuation_centers(needs_review);
+            INSERT INTO evacuation_centers
+                (id, name, address, barangay, city, municipality, province,
+                 lat, lng, capacity, current_occupancy, food_status, water_status,
+                 medicine_status, hygiene_status, basic_needs_status,
+                 operational_status, contact_number, notes, created_at, updated_at, archived)
+            SELECT id, name, address, barangay, city, municipality, province,
+                 lat, lng, capacity, current_occupancy, food_status, water_status,
+                 medicine_status, hygiene_status, basic_needs_status,
+                 operational_status, contact_number, notes, created_at, updated_at, archived
+            FROM evacuation_centers_old;
+            DROP TABLE evacuation_centers_old;
+        """)
+        db.commit()
+    except Exception:
+        pass
+
 def init_db():
     db = get_db()
     _migrate_weather_cache(db)
+    _migrate_centers(db)
     db.executescript(SCHEMA)
     db.commit()

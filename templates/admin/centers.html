@@ -11,14 +11,15 @@
     {% for c in centers %}
       <tr>
         <td style="font-weight:700;"><a href="{{ url_for('public.center_detail', center_id=c['id']) }}">{{ c['name'] }}</a></td>
-        <td>{{ c['city'] }}</td><td>{{ c['capacity'] }}</td><td>{{ c['current_occupancy'] }}</td>
+        <td>{{ c['city'] }}</td><td>{{ c['capacity'] if c['capacity'] is not none else 'Unreported' }}</td><td>{{ c['current_occupancy'] if c['current_occupancy'] is not none else '—' }}</td>
         <td><span class="badge badge-unknown">{{ c['operational_status'] }}</span> Food {{ c['food_status'] }} Water {{ c['water_status'] }}</td>
         <td style="font-size:12px;">{{ c['updated_at'] }}</td><td>{{ 'Yes' if c['archived'] else 'No' }}</td>
         <td>
           <details><summary style="cursor:pointer; font-size:12px;">Edit</summary>
           <form method="post" action="{{ url_for('admin.update_center', cid=c['id']) }}" style="display:flex; flex-direction:column; gap:4px; min-width:180px; margin-top:6px;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <label style="font-size:12px;">Occupancy <input type="number" name="current_occupancy" value="{{ c['current_occupancy'] }}" min="0" max="{{ c['capacity'] }}"></label>
+            <label style="font-size:12px;">Capacity <input type="number" name="capacity" value="{{ c['capacity'] or '' }}" min="1" placeholder="{{ 'required — set to enable occupancy' if c['capacity'] is none else '' }}"></label>
+            <label style="font-size:12px;">Occupancy <input type="number" name="current_occupancy" value="{{ c['current_occupancy'] or 0 }}" min="0" {% if c['capacity'] %}max="{{ c['capacity'] }}"{% endif %}></label>
             <label style="font-size:12px;">Operational <select name="operational_status">{% for s in ['Open','Closed','Temporarily Unavailable'] %}<option {% if c['operational_status']==s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></label>
             {% for f in ['food_status','water_status','medicine_status','hygiene_status','basic_needs_status'] %}
             <label style="font-size:12px;">{{ f }} <select name="{{ f }}">{% for s in ['Unknown','Low','Adequate','High'] %}<option {% if c[f]==s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></label>

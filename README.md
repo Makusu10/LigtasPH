@@ -2,7 +2,7 @@
 
 **LigtasPH** is a centralized disaster-information platform for residents of the Philippines. It locates official evacuation centers, tracks occupancy and supply status, shows current weather, and provides emergency hotlines per city/municipality. Admin portal for LGU/DRRMO to maintain centers, occupancy, supplies, and hotlines.
 
-> Sprint 1 MVP: Flask + SQLite + Vanilla JS + Leaflet/OSM + Inter + Lucide. Full Express → Flask cutover done. Development sample data flagged as "not verified live."
+> Sprint 2: real NCR evacuation-center dataset (`data/ncr_evacuation_centers.geojson`, 868 features → 836 live + 32 quarantined) loaded via `flask --app app import-geojson`. Imported rows carry `source/verified/needs_review` provenance; capacity stays NULL ("Status Unavailable") until an admin sets real numbers. Sprint 1 MVP (Flask + SQLite + Vanilla JS + Leaflet/OSM) remains the foundation.
 
 ---
 
@@ -34,11 +34,14 @@ cp .env.example .env
 # GEMINI_API_KEY optional, Open-Meteo (weather+air) needs no key; OpenWeather Air Pollution reuses same key
 ```
 
-### 4. Init DB & seed (sample centers/hotlines/weather_cache + admin hash)
+### 4. Init DB, seed & import real centers
 ```bash
 flask --app app init-db
 flask --app app seed
 # admin default from .env: admin / admin123 (hashed, not plaintext)
+# Sprint 2 real dataset (836 NCR centers + 32 quarantined for review):
+flask --app app import-geojson
+# idempotent: re-runs UPDATE geocoded fields, never clobber admin-set numbers
 ```
 
 ### 5. Run / Activate the Website
@@ -77,7 +80,7 @@ gunicorn wsgi:app                 # http://127.0.0.1:8000 (Render uses this; Pro
 
 **How to know it worked:**
 - Browser shows `LIGTASPH` nav: `Home | Evacuation Map | Evacuation Centers | Weather | Emergency Hotlines | Admin Login`
-- Home shows stats `total 7` (6 live +1 archived hidden) + map preview + recently updated.
+- Home shows stats `total 856` (836 imported + 20 seeded live, 1 archived hidden) + map preview + recently updated. Imported centers without admin-set capacity show `Status Unavailable` (never counted as Available).
 - Login to admin: `http://127.0.0.1:5000/admin/login` → `admin` / `admin123` → redirects to `/admin/dashboard` (protected route returns 302 when anon).
 
 **Deactivate venv when done:**
@@ -98,10 +101,11 @@ deactivate
 | Command | Description |
 | :--- | :--- |
 | `flask --app app run` | Flask dev server (auto reload) |
-| `flask --app app init-db` | Create 8 tables (FK ON, CHECKs, indexes) |
-| `flask --app app seed` | Seed 7 centers (Available/Nearly/Full/archived), 12 hotlines, 1 admin (hashed), weather_cache demo (incl. heat/AQI demo) |
+| `flask --app app init-db` | Create 10 tables (FK ON, CHECKs, indexes) |
+| `flask --app app seed` | Seed 21 demo centers (Available/Nearly/Full/archived), ~29 hotlines, 1 admin (hashed), weather_cache demo (incl. heat/AQI demo) |
+| `flask --app app import-geojson [path]` | Sprint 2: import 836 NCR centers + quarantine 32 (idempotent, default `data/ncr_evacuation_centers.geojson`) |
 | `gunicorn wsgi:app` | Production server (Render/PythonAnywhere) |
-| `pytest -q` | Run 83 tests (auth, API, weather, env heat/AQI 503, 404, sharing, hazards, admin CRUD) |
+| `pytest -q` | Run 137 tests (auth, API, weather, env heat/AQI 503, 404, sharing, hazards, admin CRUD, geojson import) |
 | `pip install -r requirements.txt` | Install Flask, Flask-WTF, Flask-Limiter, gunicorn, whitenoise, pytest |
 
 ---
@@ -124,14 +128,19 @@ deactivate
 ## 🏗️ Tech Stack & Architecture
 - **Frontend**: HTML5, CSS3 (Material 3 liquid-glass matte, Inter/Roboto, tokens --primary/#3b6ef5), Vanilla JS, Leaflet 1.9 + OSM, Lucide + Material Symbols, Visual weather Now + hourly + environmental (Heat/AQI) cards
 - **Backend**: Flask 3.x, Flask-WTF (CSRF), Flask-Limiter (5/15min lockout), Werkzeug hash, python-dotenv, whitenoise
-- **DB**: SQLite (`instance/ligtas.sqlite`, `PRAGMA foreign_keys=ON`), 8 tables: `administrators`, `evacuation_centers`, `center_status_updates`, `emergency_hotlines`, `weather_cache` (also caches `air-quality` 10m/1h), `emergency_groups`, `live_locations`, `hazards_cache`
+- **DB**: SQLite (`instance/ligtas.sqlite`, `PRAGMA foreign_keys=ON`), 10 tables: `administrators`, `evacuation_centers` (nullable capacity + `source/verified/needs_review/review_reason` provenance), `staging_centers` (quarantined imports), `center_status_updates`, `emergency_hotlines`, `weather_cache` (also caches `air-quality` 10m/1h), `emergency_groups`, `live_locations`, `hazards_cache`, `announcements`
 - **Weather**: `services/weather_service.py` → `cache<10min → OpenWeather (key, PH is_day) → Open-Meteo (no key, Asia/Manila + is_day + daily High/Low) → stale 1h →503`, never fabricates; Heat Index via Rothfusz (`utils/environment.py`)
 - **Air Quality**: `services/air_quality_service.py` → `cache10m → OpenWeather Air Pollution (if key) → Open-Meteo Air Quality (no key, PM2.5/US AQI) → stale 1h →503`; DENR DAO 2020-14 PM2.5 + US EPA AQI labeled separately
 - **Structure**: `app.py` (factory) + `wsgi.py`, `config.py`, `routes/{public,auth,admin,api}.py`, `models/`, `services/{weather_service,air_quality_service}`, `utils/{db,seed,validators,security,environment}`, `templates/{public,admin,errors,partials}`, `static/{css,js,images}`, `tests/`
 
 ---
 
-## 🗺️ Key Features (Sprint 1)
+## 🗺️ Key Features (Sprint 2 — real data)
+
+1. **Real NCR dataset**: 868 GeoJSON features → 836 live centers across all 17 LGUs (717 verified, 11 flagged `needs_review`) + 32 quarantined rows in `staging_centers` (no usable coordinates). Import via `flask --app app import-geojson`; re-runs update geocoded fields only, never clobber admin-set capacity/occupancy/contacts.
+2. **Provenance tracking**: every imported center carries `source` (e.g. `geojson:osm`), `verified`, `needs_review` + `review_reason`; city names normalized (`City of Manila` → `Manila`), addresses synthesized deterministically (`plan_addresses()`), GeoJSON `[lon, lat]` order asserted.
+3. **Honest unknown capacity**: imported capacity/occupancy is NULL until an admin sets real numbers — API, map, directory, detail, home, and admin dashboard all render `Status Unavailable` / "capacity unreported" instead of fake zeros. Admin edit form requires capacity before occupancy can be tracked.
+4. *(Sprint 1 features 5–12 below unchanged: weather, environmental safety, hotlines, admin, map, directory, detail, home.)*
 1. **Home** stats (total/available/nearly/full) + map preview + recently updated + last_updated + emergency notice
 2. **Evacuation Map** markers colored green/orange/red/gray + text label, search/filter city/status/supply, `fitBounds`, Use My Location, list view, popup with occupancy/supply/directions
 3. **Directory** searchable cards with progress bar + badges + sort (name/available/occupancy/recent) + empty state
@@ -151,7 +160,7 @@ deactivate
 
 ## 🧪 Testing
 ```bash
-pytest -q  # 83 passed: pages + protected redirect, api centers/hotlines/weather+env (200+400/503), detail 200/404 incl. closed-status, login 401/302+dashboard + lockout 403, environment boundaries, sharing (groups/locations/expiry), hazards (quakes/fires cache + 503), admin CRUD (occupancy audit, hotline create/archive, logout POST)
+pytest -q  # 137 passed: pages + protected redirect, api centers/hotlines/weather+env (200+400/503), detail 200/404 incl. closed-status, login 401/302+dashboard + lockout 403, environment boundaries, sharing (groups/locations/expiry), hazards (quakes/fires cache + 503), admin CRUD (occupancy audit, hotline create/archive, logout POST), geojson import (normalization, idempotency, quarantine, NULL-capacity status)
 ```
 
 ## Known MVP Limitations

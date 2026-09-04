@@ -83,17 +83,24 @@ function render(){
   if(filtered.length===0){ empty.style.display='block'; return; } else empty.style.display='none';
   filtered.forEach(c=>{
     const pct=c.occupancy_pct;
-    const color = pct>=100 ? '#D92D20' : pct>=80 ? '#F79009' : '#039855';
+    const known=pct!==null&&pct!==undefined;
+    const color = !known ? '#98A2B3' : pct>=100 ? '#D92D20' : pct>=80 ? '#F79009' : '#039855';
     const card=document.createElement('div');
     card.className='card';
+    const fig = known
+      ? `Capacity ${c.capacity} • Occupancy ${c.current_occupancy} • <b>${c.available_slots} slots</b> • ${pct}%`
+      : `Capacity unreported • <b>${c.occupancy_status}</b>`;
+    const bar = known
+      ? `<div style="background:#F9FAFB; border:1px solid var(--border); border-radius:8px; height:10px; overflow:hidden; margin:6px 0;"><div style="width:${Math.min(pct,100)}%; background:${color}; height:100%;"></div></div>`
+      : ``;
     card.innerHTML=`
       <div style="display:flex; justify-content:space-between; gap:8px; align-items:start;">
         <div style="font-weight:800;">${c.name}</div>
         <span class="badge badge-${c.occupancy_status==='Available'?'available':c.occupancy_status==='Nearly Full'?'nearly':c.occupancy_status==='Full'?'full':'unknown'}">${c.occupancy_status}</span>
       </div>
       <div style="color:var(--text-secondary); font-size:13px;">${c.address}, ${c.city}</div>
-      <div style="font-size:13px; margin:6px 0;">Capacity ${c.capacity} • Occupancy ${c.current_occupancy} • <b>${c.available_slots} slots</b> • ${pct}%</div>
-      <div style="background:#F9FAFB; border:1px solid var(--border); border-radius:8px; height:10px; overflow:hidden; margin:6px 0;"><div style="width:${Math.min(pct,100)}%; background:${color}; height:100%;"></div></div>
+      <div style="font-size:13px; margin:6px 0;">${fig}</div>
+      ${bar}
       <div style="display:flex; gap:6px; flex-wrap:wrap; margin:6px 0;">
         <span class="badge badge-unknown">Food ${c.food_status}</span><span class="badge badge-unknown">Water ${c.water_status}</span><span class="badge badge-unknown">Basic ${c.basic_needs_status}</span>
       </div>

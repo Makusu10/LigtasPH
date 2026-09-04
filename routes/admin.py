@@ -15,19 +15,22 @@ def dashboard():
     db = get_db()
     total = db.execute("SELECT COUNT(*) c FROM evacuation_centers WHERE archived=0").fetchone()["c"]
     centers = db.execute("SELECT * FROM evacuation_centers WHERE archived=0").fetchall()
-    total_capacity = sum(c["capacity"] for c in centers)
-    total_occ = sum(c["current_occupancy"] for c in centers)
-    available = nearly = full = low_supply = 0
+    total_capacity = sum((c["capacity"] or 0) for c in centers)
+    total_occ = sum((c["current_occupancy"] or 0) for c in centers)
+    available = nearly = full = low_supply = unknown = 0
     for c in centers:
-        pct = c["current_occupancy"]/c["capacity"]*100 if c["capacity"] else 0
-        if pct >=100: full+=1
-        elif pct>=80: nearly+=1
-        else: available+=1
+        if c["capacity"] is None or c["current_occupancy"] is None:
+            unknown += 1
+        else:
+            pct = c["current_occupancy"]/c["capacity"]*100 if c["capacity"] else 0
+            if pct >=100: full+=1
+            elif pct>=80: nearly+=1
+            else: available+=1
         if c["food_status"] in ("Low",) or c["water_status"] in ("Low",) or c["medicine_status"] in ("Low",):
             low_supply+=1
     recent = db.execute("SELECT * FROM evacuation_centers WHERE archived=0 ORDER BY updated_at DESC LIMIT 5").fetchall()
     stale = db.execute("SELECT * FROM evacuation_centers WHERE archived=0 AND julianday('now') - julianday(updated_at) > 7 ORDER BY updated_at ASC LIMIT 5").fetchall()
-    return render_template("admin/dashboard.html", total=total, available=available, nearly=nearly, full=full, total_capacity=total_capacity, total_occ=total_occ, low_supply=low_supply, recent=recent, stale=stale)
+    return render_template("admin/dashboard.html", total=total, available=available, nearly=nearly, full=full, unknown=unknown, total_capacity=total_capacity, total_occ=total_occ, low_supply=low_supply, recent=recent, stale=stale)
 
 @bp.route("/admin/centers")
 @login_required
@@ -163,12 +166,35 @@ def update_center(cid):
         flash("Center not found.", "danger")
         return redirect(url_for("admin.centers")), 404
     try:
-        occupancy = int(request.form.get("current_occupancy", c["current_occupancy"]))
+        occupancy = int(request.form.get("current_occupancy", c["current_occupancy"] or 0))
     except (TypeError, ValueError):
         flash("Occupancy must be a whole number.", "danger")
         return redirect(url_for("admin.centers")), 400
-    if not (0 <= occupancy <= c["capacity"]):
-        flash(f"Occupancy must be 0–{c['capacity']}.", "danger")
+    # Sprint 2 imports have capacity NULL until an admin sets real numbers.
+    cap_raw = (request.form.get("capacity") or "").strip()
+    if c["capacity"] is None:
+        if not cap_raw:
+            flash("Set capacity first — occupancy cannot be tracked without it.", "danger")
+            return redirect(url_for("admin.centers")), 400
+        try:
+            capacity = int(cap_raw)
+        except (TypeError, ValueError):
+            capacity = 0
+        if capacity <= 0:
+            flash("Capacity must be a positive whole number.", "danger")
+            return redirect(url_for("admin.centers")), 400
+    elif cap_raw:
+        try:
+            capacity = int(cap_raw)
+        except (TypeError, ValueError):
+            capacity = 0
+        if capacity <= 0 or capacity < occupancy:
+            flash(f"Capacity must be a whole number at least {occupancy}.", "danger")
+            return redirect(url_for("admin.centers")), 400
+    else:
+        capacity = c["capacity"]
+    if not (0 <= occupancy <= capacity):
+        flash(f"Occupancy must be 0–{capacity}.", "danger")
         return redirect(url_for("admin.centers")), 400
     supplies = {}
     for field in ("food_status", "water_status", "medicine_status", "hygiene_status", "basic_needs_status"):
@@ -187,11 +213,11 @@ def update_center(cid):
         return redirect(url_for("admin.centers")), 400
     notes = request.form.get("notes", c["notes"] or "").strip()[:2000]
     db.execute(
-        """UPDATE evacuation_centers SET current_occupancy=?, food_status=?, water_status=?,
+        """UPDATE evacuation_centers SET capacity=?, current_occupancy=?, food_status=?, water_status=?,
            medicine_status=?, hygiene_status=?, basic_needs_status=?, operational_status=?,
            contact_number=?, notes=?, updated_at=strftime('%Y-%m-%d %H:%M:%f','now') WHERE id=?""",
-        (occupancy, supplies["food_status"], supplies["water_status"], supplies["medicine_status"],
-         supplies["hygiene_status"], supplies["basic_needs_status"], operational, contact or None, notes or None, cid),
+        (capacity, occupancy, supplies["food_status"], supplies["water_status"], supplies["medicine_status"],
+          supplies["hygiene_status"], supplies["basic_needs_status"], operational, contact or None, notes or None, cid),
     )
     db.execute(
         """INSERT INTO center_status_updates (center_id, prev_occupancy, new_occupancy, food_status,

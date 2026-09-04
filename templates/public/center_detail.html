@@ -13,12 +13,16 @@
     <span id="occBadge" class="badge badge-{{ 'available' if status=='Available' else 'nearly' if status=='Nearly Full' else 'full' if status=='Full' else 'unknown' }}">{{ status }}</span>
   </div>
   <div class="grid-4">
-    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Capacity</div><div id="statCapacity" style="font-size:22px; font-weight:800;">{{ c['capacity'] }}</div></div>
-    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Occupancy</div><div id="statOcc" style="font-size:22px; font-weight:800;">{{ c['current_occupancy'] }}</div></div>
-    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Available Slots</div><div id="statAvail" style="font-size:22px; font-weight:800; color:var(--green);">{{ avail }}</div></div>
-    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Occupancy %</div><div id="statPct" style="font-size:22px; font-weight:800;">{{ pct }}%</div></div>
+    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Capacity</div><div id="statCapacity" style="font-size:22px; font-weight:800;">{{ c['capacity'] if c['capacity'] is not none else 'Unreported' }}</div></div>
+    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Occupancy</div><div id="statOcc" style="font-size:22px; font-weight:800;">{{ c['current_occupancy'] if c['current_occupancy'] is not none else 'Unreported' }}</div></div>
+    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Available Slots</div><div id="statAvail" style="font-size:22px; font-weight:800; color:var(--green);">{{ avail if avail is not none else 'Unreported' }}</div></div>
+    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Occupancy %</div><div id="statPct" style="font-size:22px; font-weight:800;">{{ pct ~ '%' if pct is not none else 'Unreported' }}</div></div>
   </div>
+  {% if pct is not none %}
   <div style="background:#F9FAFB; border:1px solid var(--border); border-radius:8px; height:14px; overflow:hidden;"><div id="occBar" style="width:{{ pct if pct<=100 else 100 }}%; background: {{ '#D92D20' if pct>=100 else '#F79009' if pct>=80 else '#039855' }}; height:100%;"></div></div>
+  {% else %}
+  <div style="background:#F9FAFB; border:1px solid var(--border); border-radius:8px; padding:8px 12px; color:var(--text-secondary); font-size:13px;">Occupancy not yet reported for this center — an admin needs to set its capacity.</div>
+  {% endif %}
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
     <span id="supFood" class="badge badge-unknown">Food {{ c['food_status'] }}</span>
     <span id="supWater" class="badge badge-unknown">Water {{ c['water_status'] }}</span>
@@ -74,12 +78,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
   function badgeClass(s){ return s==='Available'?'available':s==='Nearly Full'?'nearly':s==='Full'?'full':'unknown'; }
   function applyCenter(d){
     const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
-    set('statCapacity', d.capacity);
-    set('statOcc', d.current_occupancy);
-    set('statAvail', d.available_slots);
-    set('statPct', d.occupancy_pct+'%');
+    const num=(v)=> (v===null||v===undefined) ? 'Unreported' : v;
+    set('statCapacity', num(d.capacity));
+    set('statOcc', num(d.current_occupancy));
+    set('statAvail', num(d.available_slots));
+    set('statPct', d.occupancy_pct===null||d.occupancy_pct===undefined ? 'Unreported' : d.occupancy_pct+'%');
     const bar=document.getElementById('occBar');
-    if(bar){ bar.style.width=Math.min(d.occupancy_pct,100)+'%'; bar.style.background=d.occupancy_pct>=100?'#D92D20':d.occupancy_pct>=80?'#F79009':'#039855'; }
+    if(bar && d.occupancy_pct!==null && d.occupancy_pct!==undefined){ bar.style.width=Math.min(d.occupancy_pct,100)+'%'; bar.style.background=d.occupancy_pct>=100?'#D92D20':d.occupancy_pct>=80?'#F79009':'#039855'; }
     const badge=document.getElementById('occBadge');
     if(badge){ badge.textContent=d.occupancy_status; badge.className='badge badge-'+badgeClass(d.occupancy_status); }
     set('supFood','Food '+d.food_status); set('supWater','Water '+d.water_status);

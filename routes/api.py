@@ -14,6 +14,23 @@ _INVITE_ALPHABET = string.ascii_uppercase + string.digits
 def _new_invite_code(n=6):
     return "".join(secrets.choice(_INVITE_ALPHABET) for _ in range(n))
 
+def _occupancy_status(row):
+    """Return (pct, available_slots, status), tolerating unknown capacity.
+
+    Sprint 2 imports carry capacity NULL until an admin sets real numbers;
+    those rows report Status Unavailable with null figures instead of
+    crashing (None arithmetic) or masquerading as Available.
+    """
+    cap, occ = row["capacity"], row["current_occupancy"]
+    if cap is None or occ is None:
+        return None, None, "Status Unavailable"
+    pct = round(occ / cap * 100, 1) if cap else 0
+    avail = cap - occ
+    status = ("Full" if pct >= 100 else "Nearly Full" if pct >= 80
+              else "Available" if row["operational_status"] == "Open"
+              else "Status Unavailable")
+    return pct, avail, status
+
 @bp.route("/api/centers")
 def api_centers():
     db = get_db()
@@ -35,9 +52,7 @@ def api_centers():
     out=[]
     for c in centers:
         d=dict(c)
-        pct = round(c["current_occupancy"]/c["capacity"]*100,1) if c["capacity"] else 0
-        avail = c["capacity"] - c["current_occupancy"]
-        occ_status = "Full" if pct>=100 else "Nearly Full" if pct>=80 else "Available" if c["operational_status"]=="Open" else "Status Unavailable"
+        pct, avail, occ_status = _occupancy_status(c)
         d["occupancy_pct"]=pct; d["available_slots"]=avail; d["occupancy_status"]=occ_status
         if supply and supply not in (c["food_status"], c["water_status"], c["medicine_status"], c["hygiene_status"], c["basic_needs_status"]):
             continue
@@ -47,9 +62,10 @@ def api_centers():
     if sort=="name":
         out.sort(key=lambda x: x["name"].lower())
     elif sort=="available":
-        out.sort(key=lambda x: x["available_slots"], reverse=True)
+        # Unknown capacity sinks to the bottom, never masquerades as 0.
+        out.sort(key=lambda x: x["available_slots"] if x["available_slots"] is not None else -1, reverse=True)
     elif sort=="occupancy":
-        out.sort(key=lambda x: x["occupancy_pct"], reverse=True)
+        out.sort(key=lambda x: x["occupancy_pct"] if x["occupancy_pct"] is not None else -1, reverse=True)
     else:
         out.sort(key=lambda x: x["updated_at"], reverse=True)
     return jsonify(out)
@@ -73,9 +89,9 @@ def api_center_detail(cid):
     c=db.execute("SELECT * FROM evacuation_centers WHERE id=? AND archived=0", (cid,)).fetchone()
     if not c: return jsonify({"error":"Not found"}),404
     d=dict(c)
-    pct= round(c["current_occupancy"]/c["capacity"]*100,1) if c["capacity"] else 0
-    d["occupancy_pct"]=pct; d["available_slots"]=c["capacity"]-c["current_occupancy"]
-    d["occupancy_status"]="Full" if pct>=100 else "Nearly Full" if pct>=80 else "Available" if c["operational_status"]=="Open" else "Status Unavailable"
+    pct, avail, occ_status = _occupancy_status(c)
+    d["occupancy_pct"]=pct; d["available_slots"]=avail
+    d["occupancy_status"]=occ_status
     return jsonify(d)
 
 @bp.route("/api/hotlines")
