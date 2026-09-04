@@ -1,0 +1,26 @@
+# Render Blueprint for LigtasPH — permanent free hosting.
+# Deploy: dashboard.render.com → New → Blueprint → connect Makusu10/LigtasPH
+# (pick the Kus branch on first deploy, or main after you merge).
+# Fill the `sync: false` values in the dashboard when prompted.
+services:
+  - type: web
+    name: ligtasph
+    runtime: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn wsgi:app"
+    healthCheckPath: /
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: OPENWEATHER_API_KEY
+        sync: false
+      - key: MAPBOX_TOKEN
+        sync: false
+      - key: FIRMS_MAP_KEY
+        sync: false
