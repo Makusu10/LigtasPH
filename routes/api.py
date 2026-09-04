@@ -54,6 +54,19 @@ def api_centers():
         out.sort(key=lambda x: x["updated_at"], reverse=True)
     return jsonify(out)
 
+@bp.route("/api/centers/version")
+def api_centers_version():
+    db = get_db()
+    row = db.execute(
+        "SELECT MAX(updated_at) AS max_updated_at, COUNT(*) AS count "
+        "FROM evacuation_centers WHERE archived=0"
+    ).fetchone()
+    d = dict(row) if row else {}
+    return jsonify({
+        "max_updated_at": d.get("max_updated_at"),
+        "count": d.get("count", 0),
+    })
+
 @bp.route("/api/centers/<int:cid>")
 def api_center_detail(cid):
     db=get_db()

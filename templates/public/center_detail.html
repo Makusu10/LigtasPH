@@ -8,29 +8,30 @@
       <h1 style="margin:0;">{{ c['name'] }}</h1>
       <div style="color:var(--text-secondary);">{{ c['address'] }}, {{ c['barangay'] }}, {{ c['city'] }}, {{ c['province'] }}</div>
       <div style="color:var(--text-secondary); font-size:13px;">Lat {{ c['lat'] }}, Lng {{ c['lng'] }} • {{ c['operational_status'] }}</div>
+      <div id="liveStamp" role="status" style="color:var(--text-secondary); font-size:12px; margin-top:4px;">Live updates on • checking every 15s…</div>
     </div>
-    <span class="badge badge-{{ 'available' if status=='Available' else 'nearly' if status=='Nearly Full' else 'full' if status=='Full' else 'unknown' }}">{{ status }}</span>
+    <span id="occBadge" class="badge badge-{{ 'available' if status=='Available' else 'nearly' if status=='Nearly Full' else 'full' if status=='Full' else 'unknown' }}">{{ status }}</span>
   </div>
   <div class="grid-4">
-    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Capacity</div><div style="font-size:22px; font-weight:800;">{{ c['capacity'] }}</div></div>
-    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Occupancy</div><div style="font-size:22px; font-weight:800;">{{ c['current_occupancy'] }}</div></div>
-    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Available Slots</div><div style="font-size:22px; font-weight:800; color:var(--green);">{{ avail }}</div></div>
-    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Occupancy %</div><div style="font-size:22px; font-weight:800;">{{ pct }}%</div></div>
+    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Capacity</div><div id="statCapacity" style="font-size:22px; font-weight:800;">{{ c['capacity'] }}</div></div>
+    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Occupancy</div><div id="statOcc" style="font-size:22px; font-weight:800;">{{ c['current_occupancy'] }}</div></div>
+    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Available Slots</div><div id="statAvail" style="font-size:22px; font-weight:800; color:var(--green);">{{ avail }}</div></div>
+    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Occupancy %</div><div id="statPct" style="font-size:22px; font-weight:800;">{{ pct }}%</div></div>
   </div>
-  <div style="background:#F9FAFB; border:1px solid var(--border); border-radius:8px; height:14px; overflow:hidden;"><div style="width:{{ pct if pct<=100 else 100 }}%; background: {{ '#D92D20' if pct>=100 else '#F79009' if pct>=80 else '#039855' }}; height:100%;"></div></div>
+  <div style="background:#F9FAFB; border:1px solid var(--border); border-radius:8px; height:14px; overflow:hidden;"><div id="occBar" style="width:{{ pct if pct<=100 else 100 }}%; background: {{ '#D92D20' if pct>=100 else '#F79009' if pct>=80 else '#039855' }}; height:100%;"></div></div>
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
-    <span class="badge badge-unknown">Food {{ c['food_status'] }}</span>
-    <span class="badge badge-unknown">Water {{ c['water_status'] }}</span>
-    <span class="badge badge-unknown">Medicine {{ c['medicine_status'] }}</span>
-    <span class="badge badge-unknown">Hygiene {{ c['hygiene_status'] }}</span>
-    <span class="badge badge-unknown">Basic Needs {{ c['basic_needs_status'] }}</span>
+    <span id="supFood" class="badge badge-unknown">Food {{ c['food_status'] }}</span>
+    <span id="supWater" class="badge badge-unknown">Water {{ c['water_status'] }}</span>
+    <span id="supMed" class="badge badge-unknown">Medicine {{ c['medicine_status'] }}</span>
+    <span id="supHyg" class="badge badge-unknown">Hygiene {{ c['hygiene_status'] }}</span>
+    <span id="supBasic" class="badge badge-unknown">Basic Needs {{ c['basic_needs_status'] }}</span>
   </div>
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
     {% if c['contact_number'] %}<a href="tel:{{ c['contact_number'] }}" class="btn btn-secondary">Call {{ c['contact_number'] }}</a>{% endif %}
     <a href="https://www.google.com/maps/dir/?api=1&destination={{ c['lat'] }},{{ c['lng'] }}" target="_blank" rel="noopener" class="btn btn-primary">Get Directions</a>
   </div>
-  {% if c['notes'] %}<div style="background:#FFFAEB; border:1px solid #FEDF89; padding:10px 12px; border-radius:8px; color:#7A4D07;">Notes: {{ c['notes'] }}</div>{% endif %}
-  <div style="color:var(--text-secondary); font-size:12px;">Last updated: {{ c['updated_at'] }} • Created: {{ c['created_at'] }}</div>
+  {% if c['notes'] %}<div id="centerNotes" style="background:#FFFAEB; border:1px solid #FEDF89; padding:10px 12px; border-radius:8px; color:#7A4D07;">Notes: {{ c['notes'] }}</div>{% endif %}
+  <div id="updatedLine" style="color:var(--text-secondary); font-size:12px;">Last updated: {{ c['updated_at'] }} • Created: {{ c['created_at'] }}</div>
   <div id="detailMap" style="height:280px; border:1px solid var(--border); border-radius:8px;"></div>
 </div>
 {% endblock %}
@@ -64,6 +65,59 @@ document.addEventListener('DOMContentLoaded', ()=>{
     if(typeof L !== 'undefined') go();
     else load('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js').then(go).catch(()=>{});
   }
+  // Live updates: version check every 15s, re-fetch this center only on change.
+  const CENTER_ID={{ c['id'] }};
+  const LIVE_MS=15000;
+  let liveKey=null, liveFails=0;
+  const stampEl=document.getElementById('liveStamp');
+  const setStamp=(m)=>{ if(stampEl) stampEl.textContent=m; };
+  function badgeClass(s){ return s==='Available'?'available':s==='Nearly Full'?'nearly':s==='Full'?'full':'unknown'; }
+  function applyCenter(d){
+    const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+    set('statCapacity', d.capacity);
+    set('statOcc', d.current_occupancy);
+    set('statAvail', d.available_slots);
+    set('statPct', d.occupancy_pct+'%');
+    const bar=document.getElementById('occBar');
+    if(bar){ bar.style.width=Math.min(d.occupancy_pct,100)+'%'; bar.style.background=d.occupancy_pct>=100?'#D92D20':d.occupancy_pct>=80?'#F79009':'#039855'; }
+    const badge=document.getElementById('occBadge');
+    if(badge){ badge.textContent=d.occupancy_status; badge.className='badge badge-'+badgeClass(d.occupancy_status); }
+    set('supFood','Food '+d.food_status); set('supWater','Water '+d.water_status);
+    set('supMed','Medicine '+d.medicine_status); set('supHyg','Hygiene '+d.hygiene_status);
+    set('supBasic','Basic Needs '+d.basic_needs_status);
+    const ul=document.getElementById('updatedLine');
+    if(ul) ul.textContent='Last updated: '+d.updated_at+' • Created: '+d.created_at;
+    const nt=document.getElementById('centerNotes');
+    if(nt && d.notes) nt.textContent='Notes: '+d.notes;
+  }
+  async function checkLive(){
+    if(document.hidden) return;
+    try{
+      const vr=await fetch('/api/centers/version', {cache:'no-store'});
+      if(!vr.ok) throw new Error('version');
+      const v=await vr.json();
+      const key=(v.max_updated_at||'')+'|'+(v.count||0);
+      if(liveKey===null){ liveKey=key; return; }
+      if(key===liveKey) return;
+      const res=await fetch('/api/centers/'+CENTER_ID, {cache:'no-store'});
+      if(res.status===404){ setStamp('This center was archived.'); return; }
+      if(!res.ok) throw new Error('center');
+      applyCenter(await res.json());
+      liveKey=key; liveFails=0;
+      setStamp('Live updates on • updated just now');
+    }catch(e){
+      liveFails++;
+      if(liveFails>=2) setStamp('Reconnecting… showing last known data.');
+    }
+  }
+  (async()=>{
+    try{
+      const v=await (await fetch('/api/centers/version', {cache:'no-store'})).json();
+      liveKey=(v.max_updated_at||'')+'|'+(v.count||0);
+    }catch(e){}
+    setInterval(checkLive, LIVE_MS);
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkLive(); });
+  })();
 });
 </script>
 {% endblock %}

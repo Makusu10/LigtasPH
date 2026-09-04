@@ -2,20 +2,53 @@
 {% block title %}Evacuation Centers — LigtasPH{% endblock %}
 {% block content %}
 <h1 style="margin:0 0 8px;">Evacuation Centers</h1>
-<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; align-items:center;">
   <input id="q" placeholder="Search name, city, address" style="flex:1; min-width:220px;">
   <select id="city"><option value="">All cities</option></select>
   <select id="status"><option value="">All statuses</option><option>Available</option><option>Nearly Full</option><option>Full</option></select>
   <select id="sort"><option value="updated">Recently updated</option><option value="name">Name</option><option value="available">Available slots</option><option value="occupancy">Occupancy %</option></select>
 </div>
+<div id="liveStamp" role="status" style="font-size:12px; color:var(--text-secondary); margin-bottom:10px;">Live updates on • checking every 15s…</div>
 <div id="grid" class="grid-3"></div>
 <div id="empty" style="display:none; color:var(--text-secondary); padding:20px; text-align:center; border:1px dashed var(--border); border-radius:8px; margin-top:12px;">No centers match the selected filters. Clear filters or view all.</div>
 {% endblock %}
 {% block scripts %}
 <script>
 let all=[];
+let liveVersion=null, liveTimer=null, liveFailStreak=0;
+const LIVE_INTERVAL_MS=15000;
+function setLiveStamp(msg){ const el=document.getElementById('liveStamp'); if(el) el.textContent=msg; }
+async function checkLive(){
+  if(document.hidden) return;
+  try{
+    const res=await fetch('/api/centers/version', {cache:'no-store'});
+    if(!res.ok) throw new Error('version '+res.status);
+    const v=await res.json();
+    const key=(v.max_updated_at||'')+'|'+(v.count||0);
+    if(liveVersion===null){ liveVersion=key; setLiveStamp('Live updates on • checking every 15s…'); return; }
+    if(key!==liveVersion){
+      liveVersion=key;
+      await load();
+      setLiveStamp('Live updates on • updated just now');
+    }
+    liveFailStreak=0;
+  }catch(e){
+    liveFailStreak++;
+    setLiveStamp(liveFailStreak>=2 ? 'Reconnecting… showing last known data.' : 'Live updates on • checking every 15s…');
+  }
+}
+function startLive(){
+  if(liveTimer) return;
+  liveTimer=setInterval(checkLive, LIVE_INTERVAL_MS);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkLive(); });
+}
 document.addEventListener('DOMContentLoaded', async()=>{
   await load();
+  try{
+    const v=await (await fetch('/api/centers/version', {cache:'no-store'})).json();
+    liveVersion=(v.max_updated_at||'')+'|'+(v.count||0);
+  }catch(e){}
+  startLive();
   document.getElementById('q').addEventListener('input', render);
   document.getElementById('city').addEventListener('change', render);
   document.getElementById('city').addEventListener('change', (e)=>{ try{ localStorage.setItem('ligtasph_ann_city_v1', e.target.value || ''); }catch(_){} });

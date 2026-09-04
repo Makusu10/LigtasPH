@@ -35,6 +35,7 @@
     <div style="display:flex; gap:8px; margin:8px 0;">
       <button id="clearBtn" class="btn btn-secondary" style="flex:1;">Clear</button>
     </div>
+    <div id="liveStamp" role="status" style="font-size:11px; color:var(--text-secondary); margin-bottom:4px;">Live updates on</div>
     <div id="list" style="max-height:50vh; overflow:auto; display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--border); padding-top:8px;"></div>
     </div>
     <div id="tabRoutes" role="tabpanel" aria-labelledby="tabBtnRoutes" hidden>
@@ -103,6 +104,20 @@
     </fieldset>
     </div>
     </aside>
+    <section id="routeDock" class="card" aria-label="Turn-by-turn directions" hidden>
+      <div style="display:flex; justify-content:space-between; gap:8px; align-items:center;">
+        <div style="min-width:0;">
+          <strong style="font-size:13px;">Directions</strong>
+          <div id="routeDockSummary" role="status" style="font-size:12px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">No active route.</div>
+        </div>
+        <div style="display:flex; gap:6px; flex-shrink:0;">
+          <button id="routeDockToggle" class="btn btn-secondary" style="padding:4px 10px; font-size:12px;" aria-expanded="true">Hide steps</button>
+          <button id="routeDockDetails" class="btn btn-secondary" style="padding:4px 10px; font-size:12px;">Route options</button>
+          <button id="routeDockClose" class="btn btn-secondary" style="padding:4px 10px; font-size:12px;" aria-label="Clear route">✕</button>
+        </div>
+      </div>
+      <div id="routeDockSteps" style="max-height:22vh; overflow:auto; margin-top:8px; font-size:12px; border-top:1px solid var(--border); padding-top:6px;"></div>
+    </section>
   </div>
 </div>
 {% endblock %}
@@ -120,6 +135,13 @@
   #sidePanel{ position:absolute; top:76px; left:12px; bottom:12px; width:min(360px, calc(100% - 24px)); overflow-y:auto; z-index:1000; margin:0; }
   #sidePanel.collapsed{ display:none; }
   #panelOpen{ top:76px !important; z-index:1001 !important; }
+  /* Bottom turn-by-turn dock: separated from the side Details panel */
+  #routeDock{ position:absolute; bottom:12px; left:50%; transform:translateX(-50%);
+    width:min(640px, calc(100% - 24px)); z-index:1000; margin:0; max-height:32vh;
+    display:flex; flex-direction:column; overflow:hidden; }
+  #routeDock[hidden]{ display:none; }
+  #routeDock.min{ max-height:none; }
+  #routeDock.min #routeDockSteps{ display:none; }
   /* map controls clear the floating nav */
   #map .mapboxgl-ctrl-top-right{ top:70px; }
   #map .leaflet-top.leaflet-right{ margin-top:70px; }
@@ -141,6 +163,9 @@
     .map-shell{ min-height:480px; }
     #sidePanel{ top:auto; bottom:0; left:0; right:0; width:auto; max-height:46%; border-radius:16px 16px 0 0; }
     #panelOpen{ top:auto !important; bottom:12px; }
+    /* Keep the bottom dock above the bottom-sheet Details panel */
+    #routeDock{ width:calc(100% - 16px); z-index:1002; bottom:12px; }
+    #routeDock #routeDockSteps{ max-height:24vh; }
     body:has(.map-shell) .demo-banner{ display:none; }
   }
 </style>
@@ -288,7 +313,47 @@ async function loadCenters(){
   allCenters = await res.json();
   const cities = [...new Set(allCenters.map(c=>c.city))].sort();
   const sel=document.getElementById('cityFilter');
-  cities.forEach(ci=>{ const o=document.createElement('option'); o.textContent=ci; o.value=ci; sel.appendChild(o); });
+  const cur=sel ? sel.value : '';
+  if(sel){
+    sel.innerHTML='<option value="">All cities</option>';
+    cities.forEach(ci=>{ const o=document.createElement('option'); o.textContent=ci; o.value=ci; sel.appendChild(o); });
+    if(cur && cities.includes(cur)) sel.value=cur;
+  }
+}
+// Live center updates: version check every 15s, full re-fetch only on
+// change. Re-render preserves filters + camera (render fits bounds once).
+let liveVersion=null, liveTimer=null, liveFailStreak=0;
+const LIVE_INTERVAL_MS=15000;
+function setLiveStamp(msg){ const el=document.getElementById('liveStamp'); if(el) el.textContent=msg||''; }
+async function checkCentersLive(refresh){
+  if(document.hidden) return;
+  try{
+    const res=await fetch('/api/centers/version', {cache:'no-store'});
+    if(!res.ok) throw new Error('version '+res.status);
+    const v=await res.json();
+    const key=(v.max_updated_at||'')+'|'+(v.count||0);
+    if(liveVersion===null){ liveVersion=key; return; }
+    if(key!==liveVersion){
+      liveVersion=key;
+      await loadCenters();
+      try{ refresh(); }catch(e){}
+      setLiveStamp('Updated just now');
+      setTimeout(()=>setLiveStamp(''), 5000);
+    }
+    liveFailStreak=0;
+  }catch(e){
+    liveFailStreak++;
+    if(liveFailStreak>=2) setLiveStamp('Reconnecting…');
+  }
+}
+async function initCentersLive(refresh){
+  try{
+    const v=await (await fetch('/api/centers/version', {cache:'no-store'})).json();
+    liveVersion=(v.max_updated_at||'')+'|'+(v.count||0);
+  }catch(e){}
+  if(liveTimer) return;
+  liveTimer=setInterval(()=>checkCentersLive(refresh), LIVE_INTERVAL_MS);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkCentersLive(refresh); });
 }
 function bindFilterInputs(render){
   document.getElementById('q').addEventListener('input', render);
@@ -331,7 +396,36 @@ function debounceHazards(refresh){
   });
 }
 // route helpers are engine-specific; this no-op is replaced in Mapbox mode
-function clearRoute(){}
+function clearRoute(){ try{ hideRouteDock(); }catch(e){} }
+// ---------- bottom turn-by-turn dock (separated from the Details side panel) ----------
+function setDockSummary(msg){ const el=document.getElementById('routeDockSummary'); if(el) el.textContent=msg||'No active route.'; }
+function showRouteDock(){ const d=document.getElementById('routeDock'); if(d) d.removeAttribute('hidden'); }
+function hideRouteDock(){ const d=document.getElementById('routeDock'); if(d) d.setAttribute('hidden',''); }
+function setDockSteps(html){
+  const box=document.getElementById('routeDockSteps');
+  if(!box) return;
+  box.innerHTML=html||'';
+  showRouteDock();
+}
+function bindRouteDock(){
+  const close=document.getElementById('routeDockClose');
+  if(close) close.addEventListener('click', ()=>{ try{ clearRoute(); }catch(e){} hideRouteDock(); });
+  const toggle=document.getElementById('routeDockToggle');
+  const dock=document.getElementById('routeDock');
+  if(toggle && dock) toggle.addEventListener('click', ()=>{
+    const min=dock.classList.toggle('min');
+    toggle.textContent=min?'Show steps':'Hide steps';
+    toggle.setAttribute('aria-expanded', String(!min));
+  });
+  const details=document.getElementById('routeDockDetails');
+  if(details) details.addEventListener('click', ()=>{
+    const panel=document.getElementById('sidePanel');
+    if(panel) panel.classList.remove('collapsed');
+    const open=document.getElementById('panelOpen');
+    if(open) open.style.display='none';
+    try{ switchPanelTab('routes'); }catch(e){}
+  });
+}
 // Engine mode badge (Mapbox vs OSM fallback) — instant triage for "I can't see X" reports.
 function setMapMode(mode){ const el=document.getElementById('mapMode'); if(el) el.textContent=mode; }
 // Panel collapse is engine-agnostic; each engine sets notifyMapResize.
@@ -453,7 +547,7 @@ async function initMapbox(){
                'fill-opacity':0.35,'fill-outline-color':'#7c2d12'}});
     });
   }
-  function routeStatus(msg){ setStatus('routeStatus', msg); }
+  function routeStatus(msg){ setStatus('routeStatus', msg); try{ setDockSummary(msg); if(msg) showRouteDock(); }catch(e){} }
   let navProfile='driving', destPin=null, followMode=false, navSession=null, suggestAbort=null, suggestTimer=null;
   const PH_BBOX='116.0,4.0,127.0,22.0'; // bias search to the Philippines
   function newSession(){ try{ navSession=crypto.randomUUID(); }catch(e){ navSession='sess-'+Date.now(); } }
@@ -463,6 +557,7 @@ async function initMapbox(){
     if(destPin){ destPin.remove(); destPin=null; }
     const st=document.getElementById('navSteps'); if(st){ st.style.display='none'; st.innerHTML=''; }
     routeStatus('');
+    try{ hideRouteDock(); setDockSummary(''); }catch(e){}
   };
   async function ensureUserPos(){
     if(userPos) return userPos;
@@ -521,6 +616,7 @@ async function initMapbox(){
     }).join('');
     box.innerHTML=`<div style="font-weight:700; margin-bottom:2px;">Turn-by-turn (${steps.length} steps)</div>`+rows;
     box.style.display='block';
+    try{ setDockSteps(`<div style="font-weight:700; margin-bottom:2px;">Turn-by-turn (${steps.length} steps)</div>`+rows); }catch(e){}
   }
   function profileLabel(){ return navProfile==='walking'?'walk':navProfile==='cycling'?'bike':'drive'; }
   // Generalized routing: any origin → any destination, any profile.
@@ -864,6 +960,7 @@ async function initMapbox(){
   bindNavControls();
   map.on('load', ()=>{ render(); });
   render();
+  initCentersLive(render);
 }
 
 // ================= LEAFLET/OSM FALLBACK (unchanged behavior) =================
@@ -924,7 +1021,7 @@ function initFallback(){
       }
     });
     _quakeLayer=L.layerGroup().addTo(_map); _fireLayer=L.layerGroup().addTo(_map);
-    loadCenters().then(renderFb);
+    loadCenters().then(renderFb).then(()=>initCentersLive(renderFb));
     bindFilterInputs(renderFb);
     document.getElementById('locBtn').addEventListener('click', useLocationFb);
     debounceHazards(refreshHazardsFb);
@@ -1043,6 +1140,7 @@ function useLocationFb(){
 document.addEventListener('DOMContentLoaded', ()=>{
   bindPanelToggle();
   bindPanelTabs();
+  try{ bindRouteDock(); }catch(e){}
   if(USE_MAPBOX){ initMapbox().catch(e=>{ console.warn('Mapbox failed, falling back to OSM:', e); initFallback(); }); }
   else { initFallback(); }
 });

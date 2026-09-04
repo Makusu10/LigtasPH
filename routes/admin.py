@@ -189,7 +189,7 @@ def update_center(cid):
     db.execute(
         """UPDATE evacuation_centers SET current_occupancy=?, food_status=?, water_status=?,
            medicine_status=?, hygiene_status=?, basic_needs_status=?, operational_status=?,
-           contact_number=?, notes=?, updated_at=datetime('now') WHERE id=?""",
+           contact_number=?, notes=?, updated_at=strftime('%Y-%m-%d %H:%M:%f','now') WHERE id=?""",
         (occupancy, supplies["food_status"], supplies["water_status"], supplies["medicine_status"],
          supplies["hygiene_status"], supplies["basic_needs_status"], operational, contact or None, notes or None, cid),
     )
@@ -211,7 +211,7 @@ def archive_center(cid):
     db = get_db()
     action = (request.form.get("action", "archive") or "archive").strip()
     archived = 0 if action == "unarchive" else 1
-    cur = db.execute("UPDATE evacuation_centers SET archived=?, updated_at=datetime('now') WHERE id=?", (archived, cid))
+    cur = db.execute("UPDATE evacuation_centers SET archived=?, updated_at=strftime('%Y-%m-%d %H:%M:%f','now') WHERE id=?", (archived, cid))
     db.commit()
     if cur.rowcount == 0:
         flash("Center not found.", "danger")
