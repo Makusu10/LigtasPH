@@ -54,15 +54,37 @@
   </div>
 </section>
 {% endblock %}
+{% block head %}
+{% if mapbox_token %}
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.29.0/mapbox-gl.css" rel="stylesheet">
+{% endif %}
+{% endblock %}
 {% block scripts %}
+{% if mapbox_token %}
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.29.0/mapbox-gl.js"></script>
+{% else %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+{% endif %}
 <script>
-  // Minimal preview map - load centers via API
+  // Minimal preview map - load centers via API (Mapbox when configured, else OSM)
   document.addEventListener('DOMContentLoaded', async ()=>{
     const el = document.getElementById('previewMap');
     if(!el) return;
-    const map = L.map(el, {zoomControl:false}).setView([14.6308,121.0968], 11);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);
+    const token = {{ mapbox_token|tojson }};
+    let map, useMb = !!(token && typeof mapboxgl !== 'undefined');
+    const bounds = [];
+    if(useMb){
+      mapboxgl.accessToken = token;
+      map = new mapboxgl.Map({container: el, style:'mapbox://styles/mapbox/streets-v12', center:[121.0968,14.6308], zoom:11, interactive:false});
+    }else{
+      if(typeof L === 'undefined'){
+        await new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); }).catch(()=>{});
+        if(typeof L === 'undefined') return;
+      }
+      map = L.map(el, {zoomControl:false}).setView([14.6308,121.0968], 11);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);
+    }
+    const dot=(color)=>`<div style="background:${color};width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></div>`;
     try{
       const res = await fetch('/api/centers');
       const centers = await res.json();
@@ -70,11 +92,21 @@
         let color = '#039855';
         if(c.occupancy_pct>=100) color='#D92D20';
         else if(c.occupancy_pct>=80) color='#F79009';
-        const icon = L.divIcon({html:`<div style="background:${color};width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></div>`, className:'', iconSize:[14,14]});
-        L.marker([c.lat,c.lng], {icon}).addTo(map).bindPopup(`<b>${c.name}</b><br>${c.city}<br>${c.occupancy_status} • ${c.available_slots} slots`);
+        const html=`<b>${c.name}</b><br>${c.city}<br>${c.occupancy_status} • ${c.available_slots} slots`;
+        if(useMb){
+          const mEl=document.createElement('div'); mEl.innerHTML=dot(color);
+          new mapboxgl.Marker({element:mEl}).setLngLat([c.lng,c.lat]).setPopup(new mapboxgl.Popup({offset:8}).setHTML(html)).addTo(map);
+          bounds.push([c.lng,c.lat]);
+        }else{
+          const icon = L.divIcon({html:dot(color), className:'', iconSize:[14,14]});
+          L.marker([c.lat,c.lng], {icon}).addTo(map).bindPopup(html);
+          bounds.push(L.marker([c.lat,c.lng]));
+        }
       });
-      if(centers.length) {
-        const group = L.featureGroup(centers.slice(0,6).map(c=>L.marker([c.lat,c.lng])));
+      if(useMb){
+        if(bounds.length){ const b=new mapboxgl.LngLatBounds(); bounds.forEach(p=>b.extend(p)); try{ map.fitBounds(b,{padding:30, maxZoom:12}); }catch(e){} }
+      }else if(bounds.length) {
+        const group = L.featureGroup(bounds);
         try{ map.fitBounds(group.getBounds().pad(0.2)); }catch(e){}
       }
     }catch(e){ console.warn(e); }
