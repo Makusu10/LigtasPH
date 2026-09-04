@@ -26,6 +26,10 @@ def create_app(env=None):
     app.config["OPENWEATHER_API_KEY"] = os.getenv("OPENWEATHER_API_KEY", app.config.get("OPENWEATHER_API_KEY",""))
     app.config["FIRMS_MAP_KEY"] = os.getenv("FIRMS_MAP_KEY", app.config.get("FIRMS_MAP_KEY", ""))
     app.config["MAPBOX_TOKEN"] = os.getenv("MAPBOX_TOKEN", app.config.get("MAPBOX_TOKEN", ""))
+    if cfg_name == "testing":
+        # A developer .env key must not leak into the suite: tests such as
+        # test_api_weather_no_cache_503 expect a 503 when providers fail.
+        app.config["OPENWEATHER_API_KEY"] = ""
 
     Path(app.config["DATABASE"]).parent.mkdir(parents=True, exist_ok=True)
 

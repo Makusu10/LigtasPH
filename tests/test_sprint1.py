@@ -37,14 +37,31 @@ def test_admin_protected_redirect(client):
     assert client.get("/admin/dashboard").status_code == 302
     assert client.get("/admin/centers").status_code == 302
 
-def test_api_centers_returns_6(client):
+def test_api_centers_cover_all_ncr_lgus(client):
+    # Seed spans the whole NCR province: 20 open centers (archived
+    # excluded) across all 17 LGUs. Replaces the old returns_6 assertion.
     r = client.get("/api/centers")
     assert r.status_code == 200
     data = r.get_json()
-    assert len(data) == 6  # archived excluded
+    assert len(data) == 20  # archived excluded
     assert "occupancy_pct" in data[0]
     assert "occupancy_status" in data[0]
     assert "available_slots" in data[0]
+    cities = {c["city"] for c in data}
+    assert len(cities) == 17
+    for lgu in ("Manila", "Caloocan", "Pateros", "Marikina", "Quezon City", "Pasig"):
+        assert lgu in cities
+
+def test_api_ncr_lgus(client):
+    r = client.get("/api/ncr-lgus")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert len(data) == 17
+    names = {l["name"] for l in data}
+    assert names == {c for c in names}  # unique
+    assert {"Manila", "Pateros", "Navotas", "Muntinlupa"} <= names
+    for l in data:
+        assert -90 <= l["lat"] <= 90 and -180 <= l["lon"] <= 180
 
 def test_api_hotlines_filter(client):
     r = client.get("/api/hotlines?city=Marikina")

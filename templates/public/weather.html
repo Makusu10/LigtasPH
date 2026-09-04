@@ -2,11 +2,14 @@
 {% block title %}Weather — LigtasPH{% endblock %}
 {% block content %}
 <h1 style="margin:0 0 4px;">Weather</h1>
-<p style="color:var(--text-secondary); margin:0 0 16px; font-size:14px;">OpenWeather (primary, free key) → Open-Meteo (no key, hourly visuals) — key never exposed. Visuals update with location.</p>
+<p style="color:var(--text-secondary); margin:0 0 16px; font-size:14px;">OpenWeather (primary, free key) → Open-Meteo (no key, hourly visuals) — key never exposed. Pick any of the 17 NCR LGUs or use your location.</p>
 
 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
   <button id="locBtn" class="btn btn-secondary" type="button"><i data-lucide="locate-fixed" style="width:16px;height:16px;"></i> Use My Location</button>
-  <input id="cityInput" placeholder="City (e.g. Marikina)" style="flex:1; min-width:160px;" aria-label="City">
+  <select id="lguSelect" aria-label="NCR city or municipality" style="min-width:170px;">
+    <option value="">NCR: choose LGU…</option>
+  </select>
+  <input id="cityInput" placeholder="Or type a city" style="flex:1; min-width:140px;" aria-label="City">
   <button id="fetchBtn" class="btn btn-primary" type="button"><i data-lucide="search" style="width:16px;height:16px;"></i> Fetch Weather</button>
 </div>
 
@@ -47,6 +50,15 @@
   </div>
   <div id="hourlyStrip" class="hourly-strip" role="list"></div>
 </div>
+
+<div class="card" style="margin-top:16px;" aria-label="Official cross-check sources">
+  <h2 style="margin:0 0 4px; font-size:14px; font-weight:800; letter-spacing:-0.01em;">Cross-check official sources</h2>
+  <p style="color:var(--text-secondary); margin:0 0 10px; font-size:13px;">Model data above can differ from ground observations. Verify against the officials before acting:</p>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <a class="btn btn-secondary" style="padding:6px 10px; font-size:12px;" href="https://www.pagasa.dost.gov.ph/" target="_blank" rel="noopener">PAGASA — official forecasts &amp; advisories</a>
+    <a class="btn btn-secondary" style="padding:6px 10px; font-size:12px;" href="https://ligtas.cair.ph/home/" target="_blank" rel="noopener">LIGTAS — school hazard map</a>
+  </div>
+</div>
 {% endblock %}
 {% block scripts %}
 <script>
@@ -85,11 +97,36 @@ document.getElementById('locBtn').addEventListener('click', ()=>{
 });
 document.getElementById('fetchBtn').addEventListener('click', ()=>{
   const city=document.getElementById('cityInput').value.trim();
-  if(city) fetchWeather(null,null,city);
-  else fetchWeather(14.6308,121.0968,null);
+  if(!city){ fetchWeather(14.6308,121.0968,null); return; }
+  // Typed input matching a known NCR LGU resolves to its coordinates;
+  // anything else falls back to the default grid with the typed label.
+  const hit=NCR_LGUS.find(l=>l.name.toLowerCase()===city.toLowerCase());
+  if(hit) fetchWeather(hit.lat, hit.lon, hit.name);
+  else fetchWeather(null,null,city);
 });
 document.getElementById('cityInput').addEventListener('keydown', e=>{
   if(e.key==='Enter'){ document.getElementById('fetchBtn').click(); }
+});
+// NCR-wide presets: one dropdown covering all 17 LGUs (single source of
+// truth is /api/ncr-lgus, shared with seed coverage).
+let NCR_LGUS=[];
+fetch('/api/ncr-lgus').then(r=>r.json()).then(lgus=>{
+  NCR_LGUS=lgus;
+  const sel=document.getElementById('lguSelect');
+  lgus.forEach(l=>{
+    const o=document.createElement('option');
+    o.value=`${l.lat},${l.lon}`;
+    o.textContent=l.name;
+    sel.appendChild(o);
+  });
+}).catch(()=>{});
+document.getElementById('lguSelect').addEventListener('change', e=>{
+  const v=e.target.value;
+  if(!v) return;
+  const [lat, lon]=v.split(',').map(Number);
+  const name=e.target.options[e.target.selectedIndex].textContent;
+  document.getElementById('cityInput').value='';
+  fetchWeather(lat, lon, name);
 });
 
 async function fetchWeather(lat, lon, city){
@@ -98,8 +135,12 @@ async function fetchWeather(lat, lon, city){
   skeleton.style.display='block';
   statusEl.textContent='Fetching weather…';
   let url='/api/environment?';
-  if(city) url+=`city=${encodeURIComponent(city)}&lat=14.6308&lon=121.0968`;
-  else url+=`lat=${lat}&lon=${lon}`;
+  // Always send real coordinates when we have them — the backend fetches
+  // the provider at lat/lon and uses city only as the display/cache label.
+  // (Previously the city branch hardcoded Marikina's coords for every city.)
+  if(lat!=null && lon!=null) url+=`lat=${lat}&lon=${lon}`;
+  else url+=`lat=14.6308&lon=121.0968`;
+  if(city) url+=`&city=${encodeURIComponent(city)}`;
   try{
     const res=await fetch(url);
     const env=await res.json();
@@ -187,6 +228,7 @@ function renderCard(data, lat, lon, city){
     <div style="font-size:13px; color:var(--text-secondary); margin-bottom:10px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
       <i data-lucide="map-pin" style="width:14px;height:14px;"></i>
       <span style="font-weight:600; color:var(--text);">${displayName}</span>
+      ${(!isCoordsName(rawName) && rawName && rawName!==displayName) ? `<span style="color:var(--text-secondary); font-size:12px;">• via ${esc(rawName)}</span>` : ''}
       ${coordsText ? `<span style="color:var(--text-secondary);">• ${coordsText}</span>` : ''}
       <span style="margin-left:auto; font-size:11px;">${fetched}</span>
     </div>
@@ -205,6 +247,7 @@ function renderCard(data, lat, lon, city){
 
     <div style="margin-top:12px; color:var(--text-secondary); font-size:11px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
       <span>Source: ${source} ${data._stale ? '• stale' : ''}</span>
+      ${(data.precipitation_probability!=null || data.precipitation_mm!=null) ? `<span>• Rain ${data.precipitation_probability!=null ? data.precipitation_probability+'% chance' : '—'}${data.precipitation_mm!=null ? ` (${data.precipitation_mm} mm)` : ''}</span>` : ''}
       ${data._demo ? '<span style="color:var(--orange);">• demo cached — connect for live</span>' : ''}
     </div>
 
@@ -268,6 +311,7 @@ function renderHourly(hourly){
       <div style="margin:6px 0; color:var(--primary);"><i data-lucide="${icon}" style="width:20px;height:20px;"></i></div>
       <div class="h-temp">${temp}°</div>
       <div style="font-size:11px; color:var(--text-secondary);">${h.desc||''}</div>
+      ${h.pop!=null ? `<div style="font-size:11px; color:var(--primary);">💧${h.pop}%</div>` : ''}
     `;
     hourlyStrip.appendChild(cardEl);
   });

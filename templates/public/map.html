@@ -96,7 +96,9 @@
         <span><i style="display:inline-block; width:10px; height:10px; background:#dc2626; border-radius:2px;"></i> High</span>
       </div>
       <div style="font-size:11px; color:var(--text-secondary);">Source: Project NOAH (DOST). SSA4 = worst-case advisory.</div>
+      <div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">Rings: purple ≈ quake felt area by magnitude • red ≈ 1 km fire watch. Estimates, not official danger zones.</div>
       <div id="hzStatus" role="status" style="color:var(--text-secondary); font-size:12px; margin-top:6px;"></div>
+      <button id="showHazardsBtn" class="btn btn-secondary" style="width:100%; margin-top:6px; padding:6px 8px; font-size:12px;" disabled>Show hazards on map</button>
     </fieldset>
     </div>
     </aside>
@@ -154,7 +156,7 @@ const MAPBOX_TOKEN = {{ mapbox_token|tojson }};
 const USE_MAPBOX = !!(MAPBOX_TOKEN && typeof mapboxgl !== 'undefined');
 // ---------- shared state & helpers (engine-agnostic) ----------
 let allCenters=[];
-let hzAbort={quake:null, fire:null}, hzTimer=null, lastFires=[];
+let hzAbort={quake:null, fire:null}, hzTimer=null, lastFires=[], lastQuakes=[];
 function badgeClass(s){ return s==='Available'?'available':s==='Nearly Full'?'nearly':s==='Full'?'full':'unknown'; }
 function statusColor(s){ return s==='Available'?'#039855':s==='Nearly Full'?'#F79009':s==='Full'?'#D92D20':'#667085'; }
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -227,6 +229,9 @@ function updateHazardsBadge(){
   const n=Object.values(sel).filter(Boolean).length;
   const badge=document.getElementById('hzBadge');
   if(badge) badge.textContent=n?` • ${n} on`:'';
+  // The Show-hazards button only makes sense with a layer switched on.
+  const sh=document.getElementById('showHazardsBtn');
+  if(sh) sh.disabled=!n;
 }
 function bindPanelTabs(){
   [['tabBtnCenters','centers'],['tabBtnHazards','hazards'],['tabBtnRoutes','routes']].forEach(([id,name])=>{
@@ -291,6 +296,26 @@ function bindFilterInputs(render){
   document.getElementById('supplyFilter').addEventListener('change', render);
   document.getElementById('clearBtn').addEventListener('click', ()=>{ document.getElementById('q').value=''; document.getElementById('statusFilter').value=''; document.getElementById('supplyFilter').value=''; document.getElementById('cityFilter').value=''; if(USE_MAPBOX) clearRoute(); render();});
 }
+// ---------- detected-hazard area overlays (estimated, illustrative) ----------
+// Quake ring radius doubles per magnitude unit from a 15 km M3 baseline:
+// M4≈30, M5≈60, M6≈120, M7≈240 km. A rough felt-area guide, NOT an
+// official danger zone. Fire ring is a fixed ~1 km watch perimeter.
+function quakeRadiusKm(mag){ const m=+mag||0; return Math.round(15*Math.pow(2, Math.max(0, m-3))); }
+function fireRadiusKm(){ return 1; }
+// Destination-point circle polygon (lon/lat degrees) for Mapbox fill layers.
+function circlePolygon(lon, lat, radiusKm, steps){
+  steps=steps||48;
+  const coords=[], R=6371, lat1=lat*Math.PI/180, lon1=lon*Math.PI/180, d=radiusKm/R;
+  for(let i=0;i<=steps;i++){
+    const brng=(i/steps)*2*Math.PI;
+    const lat2=Math.asin(Math.sin(lat1)*Math.cos(d)+Math.cos(lat1)*Math.sin(d)*Math.cos(brng));
+    const lon2=lon1+Math.atan2(Math.sin(brng)*Math.sin(d)*Math.cos(lat1), Math.cos(d)-Math.sin(lat1)*Math.sin(lat2));
+    coords.push([lon2*180/Math.PI, lat2*180/Math.PI]);
+  }
+  return coords;
+}
+const QUAKE_RING_NOTE='<div style="font-size:11px;color:#667085;">Purple ring ≈ estimated felt area (illustrative, not official).</div>';
+const FIRE_RING_NOTE='<div style="font-size:11px;color:#667085;">Red ring ≈ 1 km watch perimeter (illustrative).</div>';
 function debounceHazards(refresh){
   const wrapped=()=>{ updateHazardsBadge(); refresh(); };
   ['hzQuake','hzFire','hzHeat','hzFlood','hzSlide','hzSurge'].forEach(id=>{
@@ -373,13 +398,21 @@ async function initMapbox(){
   let groupMarkers = [];
   let groupTimer = null;
   const quakeSrcId='hz-quakes', fireSrcId='hz-fires';
+  const quakeAreaSrcId='hz-quake-area', fireAreaSrcId='hz-fire-area';
 
   function ensureHazardLayers(){
     if(!map.getSource(quakeSrcId)){
       map.addSource(quakeSrcId, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
       map.addLayer({id:'hz-quakes-layer', type:'circle', source:quakeSrcId,
-        paint:{'circle-radius':['interpolate',['linear'],['get','mag'],3,6,9,20],
-               'circle-color':'#9333ea','circle-opacity':0.55,'circle-stroke-color':'#fff','circle-stroke-width':1}});
+        paint:{'circle-radius':['max', 6, ['interpolate',['linear'],['get','mag'],3,6,9,20]],
+               'circle-color':'#9333ea','circle-opacity':0.75,'circle-stroke-color':'#fff','circle-stroke-width':1}});
+    }
+    if(!map.getSource(quakeAreaSrcId)){
+      map.addSource(quakeAreaSrcId, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
+      map.addLayer({id:'hz-quake-area-layer', type:'fill', source:quakeAreaSrcId,
+        layout:{visibility:'none'},
+        paint:{'fill-color':'#9333ea','fill-opacity':0.14,'fill-outline-color':'#6b21a8'}},
+        'hz-quakes-layer');
     }
     if(!map.getSource(fireSrcId)){
       map.addSource(fireSrcId, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
@@ -390,6 +423,13 @@ async function initMapbox(){
         paint:{'heatmap-weight':['interpolate',['linear'],['get','brightness'],300,0.3,450,1],
                'heatmap-intensity':1,'heatmap-radius':28,'heatmap-opacity':0.6,
                'heatmap-color':['interpolate',['linear'],['heatmap-density'],0,'rgba(254,249,195,0)',0.4,'#f97316',0.8,'#dc2626']}});
+    }
+    if(!map.getSource(fireAreaSrcId)){
+      map.addSource(fireAreaSrcId, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
+      map.addLayer({id:'hz-fire-area-layer', type:'fill', source:fireAreaSrcId,
+        layout:{visibility:'none'},
+        paint:{'fill-color':'#dc2626','fill-opacity':0.14,'fill-outline-color':'#991b1b'}},
+        'hz-fires-layer');
     }
   }
   // Project NOAH fill layers (one source per hazard; surge source swaps SSA1-4).
@@ -615,24 +655,50 @@ async function initMapbox(){
     }
   }
   function hzCenter(){ const c=map.getCenter(); return {lat:+c.lat.toFixed(4), lon:+c.lng.toFixed(4)}; }
+  function inViewCount(feats){
+    try{
+      const bb=map.getBounds();
+      return feats.filter(f=>{ try{ return bb.contains(f.geometry.coordinates); }catch(e){ return false; } }).length;
+    }catch(e){ return -1; }
+  }
+  // Manual camera fit to loaded detections — distant events (often 100+
+  // km away) otherwise sit outside the viewport while counts look healthy.
+  function zoomToHazards(){
+    const sel=hazardSelection();
+    const b=new mapboxgl.LngLatBounds();
+    let n=0;
+    if(sel.quake) (lastQuakes||[]).forEach(q=>{ b.extend([q.lon,q.lat]); n++; });
+    if(sel.fire||sel.heat) (lastFires||[]).forEach(f=>{ b.extend([f.lon,f.lat]); n++; });
+    if(!n){ hzStatus('No hazard data loaded yet — turn a layer on first.'); return; }
+    try{ map.fitBounds(b,{padding:80, maxZoom:10}); hzStatus(`Showing ${n} hazard point(s).`); }
+    catch(e){ hzStatus('Could not frame hazards — try panning manually.'); }
+  }
   async function refreshHazards(){
     ensureHazardLayers();
     const sel=hazardSelection();
     const showQ=sel.quake, showF=sel.fire, showH=sel.heat;
     map.getSource(quakeSrcId).setData({type:'FeatureCollection', features:[]});
     map.getSource(fireSrcId).setData({type:'FeatureCollection', features:[]});
+    map.getSource(quakeAreaSrcId).setData({type:'FeatureCollection', features:[]});
+    map.getSource(fireAreaSrcId).setData({type:'FeatureCollection', features:[]});
     map.setLayoutProperty('hz-quakes-layer','visibility', showQ?'visible':'none');
     map.setLayoutProperty('hz-fires-layer','visibility', showF?'visible':'none');
     map.setLayoutProperty('hz-heat-layer','visibility', (showH)?'visible':'none');
+    map.setLayoutProperty('hz-quake-area-layer','visibility', showQ?'visible':'none');
+    map.setLayoutProperty('hz-fire-area-layer','visibility', showF?'visible':'none');
     const {lat, lon}=hzCenter();
     const jobs=[];
     if(showQ){
       if(hzAbort.quake) hzAbort.quake.abort(); hzAbort.quake=new AbortController();
       hzStatus('Loading earthquakes…');
       jobs.push(fetchQuakes(lat, lon, hzAbort.quake.signal).then(data=>{
-        const feats=(data.quakes||[]).slice(0,200).map(q=>({type:'Feature', properties:{mag:q.mag||0, place:q.place||'Earthquake', depth:q.depth_km, url:q.url}, geometry:{type:'Point', coordinates:[q.lon,q.lat]}}));
+        lastQuakes=(data.quakes||[]).slice(0,200);
+        const feats=lastQuakes.map(q=>({type:'Feature', properties:{mag:q.mag||0, place:q.place||'Earthquake', depth:q.depth_km, url:q.url}, geometry:{type:'Point', coordinates:[q.lon,q.lat]}}));
         map.getSource(quakeSrcId).setData({type:'FeatureCollection', features:feats});
-        hzStatus(quakeStatusText(data));
+        const areaFeats=(data.quakes||[]).slice(0,200).map(q=>({type:'Feature', properties:{mag:q.mag||0, place:q.place||'Earthquake', depth:q.depth_km, url:q.url, radius:quakeRadiusKm(q.mag)}, geometry:{type:'Polygon', coordinates:[circlePolygon(q.lon,q.lat,quakeRadiusKm(q.mag))]}}));
+        map.getSource(quakeAreaSrcId).setData({type:'FeatureCollection', features:areaFeats});
+        const _qin=inViewCount(feats);
+        hzStatus(_qin<0?quakeStatusText(data):`${quakeStatusText(data)} • ${_qin}/${feats.length} in view`);
       }).catch(e=>{ if(e.name!=='AbortError') hzStatus('Earthquakes unavailable — retry shortly.'); }));
     }
     if(showF || showH){
@@ -642,7 +708,10 @@ async function initMapbox(){
         lastFires=data.fires||[];
         const feats=lastFires.slice(0,500).map(f=>({type:'Feature', properties:{brightness:+f.brightness||320, confidence:f.confidence||'n/a', date:f.date||'', time:f.time||''}, geometry:{type:'Point', coordinates:[f.lon,f.lat]}}));
         map.getSource(fireSrcId).setData({type:'FeatureCollection', features:feats});
-        hzStatus(fireStatusText(data, showH));
+        const fireAreaFeats=lastFires.slice(0,500).map(f=>({type:'Feature', properties:{brightness:+f.brightness||320, confidence:f.confidence||'n/a', date:f.date||'', time:f.time||''}, geometry:{type:'Polygon', coordinates:[circlePolygon(f.lon,f.lat,fireRadiusKm())]}}));
+        map.getSource(fireAreaSrcId).setData({type:'FeatureCollection', features:fireAreaFeats});
+        const _fin=inViewCount(feats);
+        hzStatus(_fin<0?fireStatusText(data, showH):`${fireStatusText(data, showH)} • ${_fin}/${feats.length} in view`);
       }).catch(e=>{ if(e.name!=='AbortError') hzStatus(e.code===503?'Fires unavailable — missing FIRMS key or provider down.':'Fires unavailable — retry shortly.'); }));
     }
     // ---- Project NOAH static polygons (local files, keyless) ----
@@ -665,13 +734,27 @@ async function initMapbox(){
     await Promise.all(jobs);
   }
   // quake/fire popups on click
+  function quakePopupHTML(p){
+    return `<div style="min-width:200px"><div style="font-weight:800;">M${esc(p.mag)} — ${esc(p.place)}</div><div style="font-size:12px;color:#667085;">Depth ${esc(p.depth??'?')} km • Est. felt radius ${esc(p.radius??quakeRadiusKm(p.mag))} km • <a href="${esc(p.url||'#')}" target="_blank" rel="noopener">USGS</a></div>${QUAKE_RING_NOTE}</div>`;
+  }
+  function firePopupHTML(p){
+    return `<div style="font-size:12px;"><b>Active fire</b> (${esc(p.confidence)})<br>Brightness ${esc(p.brightness)} • ${esc(p.date)} ${esc(p.time)}</div>${FIRE_RING_NOTE}`;
+  }
   map.on('click','hz-quakes-layer',(e)=>{
-    const p=e.features[0].properties;
-    new mapboxgl.Popup().setLngLat(e.lngLat).setHTML(`<div style="min-width:200px"><div style="font-weight:800;">M${esc(p.mag)} — ${esc(p.place)}</div><div style="font-size:12px;color:#667085;">Depth ${esc(p.depth??'?')} km • <a href="${esc(p.url||'#')}" target="_blank" rel="noopener">USGS</a></div></div>`).addTo(map);
+    if(!e.features || !e.features.length) return;
+    new mapboxgl.Popup().setLngLat(e.lngLat).setHTML(quakePopupHTML(e.features[0].properties)).addTo(map);
+  });
+  map.on('click','hz-quake-area-layer',(e)=>{
+    if(!e.features || !e.features.length) return;
+    new mapboxgl.Popup().setLngLat(e.lngLat).setHTML(quakePopupHTML(e.features[0].properties)).addTo(map);
   });
   map.on('click','hz-fires-layer',(e)=>{
-    const p=e.features[0].properties;
-    new mapboxgl.Popup().setLngLat(e.lngLat).setHTML(`<div style="font-size:12px;"><b>Active fire</b> (${esc(p.confidence)})<br>Brightness ${esc(p.brightness)} • ${esc(p.date)} ${esc(p.time)}</div>`).addTo(map);
+    if(!e.features || !e.features.length) return;
+    new mapboxgl.Popup().setLngLat(e.lngLat).setHTML(firePopupHTML(e.features[0].properties)).addTo(map);
+  });
+  map.on('click','hz-fire-area-layer',(e)=>{
+    if(!e.features || !e.features.length) return;
+    new mapboxgl.Popup().setLngLat(e.lngLat).setHTML(firePopupHTML(e.features[0].properties)).addTo(map);
   });
   // Project NOAH polygon popups (same handler for all three layers).
   ['noah-flood-layer','noah-slide-layer','noah-surge-layer'].forEach(lid=>{
@@ -686,7 +769,7 @@ async function initMapbox(){
       const style=map.getStyle();
       if(!style || !style.layers) return;
       // Hazard hits keep their dedicated popups.
-      const hz=map.queryRenderedFeatures(e.point, {layers:['hz-quakes-layer','hz-fires-layer','noah-flood-layer','noah-slide-layer','noah-surge-layer'].filter(id=>map.getLayer(id))});
+      const hz=map.queryRenderedFeatures(e.point, {layers:['hz-quakes-layer','hz-quake-area-layer','hz-fires-layer','hz-fire-area-layer','noah-flood-layer','noah-slide-layer','noah-surge-layer'].filter(id=>map.getLayer(id))});
       if(hz.length) return;
       const poiLayers=style.layers.filter(l=>l.type==='symbol' && /poi|place/i.test(l.id||'')).map(l=>l.id);
       if(!poiLayers.length) return;
@@ -763,6 +846,7 @@ async function initMapbox(){
     try{ geo.trigger(); }catch(e){ gpsStatus(gpsErrorHint()); }
   });
   debounceHazards(refreshHazards);
+  document.getElementById('showHazardsBtn').addEventListener('click', zoomToHazards);
   map.on('moveend', ()=>{ clearTimeout(hzTimer); hzTimer=setTimeout(refreshHazards, 500); });
   document.getElementById('btn2d').addEventListener('click', ()=>set3D(false));
   document.getElementById('btn3d').addEventListener('click', ()=>set3D(true));
@@ -816,6 +900,7 @@ function initFallback(){
     bindFilterInputs(renderFb);
     document.getElementById('locBtn').addEventListener('click', useLocationFb);
     debounceHazards(refreshHazardsFb);
+  document.getElementById('showHazardsBtn').addEventListener('click', zoomToHazardsFb);
     _map.on('moveend', ()=>{ clearTimeout(hzTimer); hzTimer=setTimeout(refreshHazardsFb, 500); });
   }).catch(()=>{ hzStatus('Map failed to load — check your connection and reload.'); });
 }
@@ -838,6 +923,22 @@ function renderFb(){
   }
 }
 function hzCenterFb(){ const c=_map.getCenter(); return {lat:+c.lat.toFixed(4), lon:+c.lng.toFixed(4)}; }
+function inViewCountFb(pts){
+  try{
+    const bb=_map.getBounds();
+    return pts.filter(p=>{ try{ return bb.contains([p.lat??p[0], p.lon??p[1]]); }catch(e){ return false; } }).length;
+  }catch(e){ return -1; }
+}
+// Manual camera fit to loaded detections — see Mapbox zoomToHazards.
+function zoomToHazardsFb(){
+  const layers=[];
+  _quakeLayer.eachLayer(l=>layers.push(l));
+  _fireLayer.eachLayer(l=>layers.push(l));
+  Object.values(_noahLayers).forEach(l=>{ if(l) layers.push(l); });
+  if(!layers.length){ hzStatus('No hazard data loaded yet — turn a layer on first.'); return; }
+  try{ _map.fitBounds(L.featureGroup(layers).getBounds().pad(0.15)); hzStatus(`Showing ${layers.length} hazard marker(s).`); }
+  catch(e){ hzStatus('Could not frame hazards — try panning manually.'); }
+}
 async function refreshHazardsFb(){
   const selFb=hazardSelection();
   const showQ=selFb.quake, showF=selFb.fire, showH=selFb.heat;
@@ -853,11 +954,14 @@ async function refreshHazardsFb(){
     hzStatus('Loading earthquakes…');
     jobs.push(fetchQuakes(lat, lon, hzAbort.quake.signal).then(data=>{
       (data.quakes||[]).slice(0,200).forEach(q=>{
+        L.circle([q.lat,q.lon], {radius:quakeRadiusKm(q.mag)*1000, color:'#9333ea', weight:1, opacity:0.6, fillOpacity:0.12}).addTo(_quakeLayer)
+          .bindPopup(`<div style="min-width:200px"><div style="font-weight:800;">M${q.mag??'?'} — ${esc(q.place||'Earthquake')}</div><div style="font-size:12px;color:#667085;">Depth ${q.depth_km??'?'} km • Est. felt radius ${quakeRadiusKm(q.mag)} km • <a href="${q.url||'#'}" target="_blank" rel="noopener">USGS</a></div>${QUAKE_RING_NOTE}</div>`);
         const size=10+Math.min(14,(q.mag||0)*2);
         const m=L.marker([q.lat,q.lon], {icon:L.divIcon({html:`<div class="quake-pulse" style="width:${size}px;height:${size}px;"></div>`, className:'', iconSize:[size,size]}), title:`M${q.mag} ${q.place||''}`}).addTo(_quakeLayer);
         m.bindPopup(`<div style="min-width:200px"><div style="font-weight:800;">M${q.mag??'?'} — ${esc(q.place||'Earthquake')}</div><div style="font-size:12px;color:#667085;">Depth ${q.depth_km??'?'} km • <a href="${q.url||'#'}" target="_blank" rel="noopener">USGS</a></div></div>`);
       });
-      hzStatus(quakeStatusText(data));
+      const _qfb=inViewCountFb((data.quakes||[]).slice(0,200));
+      hzStatus(_qfb<0?quakeStatusText(data):`${quakeStatusText(data)} • ${_qfb} in view`);
     }).catch(e=>{ if(e.name!=='AbortError') hzStatus('Earthquakes unavailable — retry shortly.'); }));
   }
   if(showF || showH){
@@ -866,6 +970,8 @@ async function refreshHazardsFb(){
     jobs.push(fetchFires(lat, lon, hzAbort.fire.signal).then(data=>{
       lastFires=data.fires||[];
       lastFires.slice(0,500).forEach(f=>{
+        L.circle([f.lat,f.lon], {radius:fireRadiusKm()*1000, color:'#dc2626', weight:1, opacity:0.6, fillOpacity:0.12}).addTo(_fireLayer)
+          .bindPopup(`<div style="font-size:12px;"><b>Active fire</b> (${esc(f.confidence||'n/a')})<br>Brightness ${f.brightness} • ${esc(f.date||'')} ${esc(f.time||'')}</div>${FIRE_RING_NOTE}`);
         const m=L.marker([f.lat,f.lon], {icon:L.divIcon({html:'<div class="fire-dot">🔥</div>', className:'', iconSize:[18,18]}), title:`Fire ${f.confidence||''}`}).addTo(_fireLayer);
         m.bindPopup(`<div style="font-size:12px;"><b>Active fire</b> (${esc(f.confidence||'n/a')})<br>Brightness ${f.brightness} • ${esc(f.date||'')} ${esc(f.time||'')}</div>`);
       });
@@ -873,7 +979,8 @@ async function refreshHazardsFb(){
         const pts=lastFires.map(f=>{ const b=+f.brightness||320; const i=Math.min(1,Math.max(0.25,(b-300)/150)); return [f.lat,f.lon,i]; });
         _heatLayer=L.heatLayer(pts, {radius:28, blur:18, maxZoom:11, minOpacity:0.45, gradient:{0.2:'#fef9c3',0.5:'#f97316',0.8:'#dc2626'}}).addTo(_map);
       }
-      hzStatus(fireStatusText(data, showH));
+      const _ffb=inViewCountFb(lastFires.slice(0,500));
+      hzStatus(_ffb<0?fireStatusText(data, showH):`${fireStatusText(data, showH)} • ${_ffb} in view`);
     }).catch(e=>{ if(e.name!=='AbortError') hzStatus(e.code===503?'Fires unavailable — missing FIRMS key or provider down.':'Fires unavailable — retry shortly.'); }));
   }
   // ---- Project NOAH static polygons (local files, keyless) ----

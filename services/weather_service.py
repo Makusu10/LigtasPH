@@ -11,13 +11,24 @@ from flask import current_app
 
 OPENWEATHER_URL = "https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={key}&units=metric"
 # Use Asia/Manila for PH-time background + is_day + high/low
-OPENMETEO_URL = "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,is_day&timezone=Asia%2FManila"
-OPENMETEO_HOURLY_URL = "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=Asia%2FManila"
+OPENMETEO_URL = "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,precipitation_probability,wind_speed_10m,weather_code,is_day&timezone=Asia%2FManila"
+OPENMETEO_HOURLY_URL = "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,precipitation_probability&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=Asia%2FManila"
 
+# Complete WMO weather-code table (https://open-meteo.com/en/docs).
+# Every code maps to a label so the UI never shows a raw "WMO 96".
 WMO_MAP = {
     0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
-    45: "Fog", 48: "Depositing rime fog", 51: "Light drizzle", 61: "Slight rain",
-    63: "Moderate rain", 65: "Heavy rain", 80: "Slight showers", 95: "Thunderstorm"
+    45: "Fog", 48: "Depositing rime fog",
+    51: "Light drizzle", 53: "Moderate drizzle", 55: "Dense drizzle",
+    56: "Light freezing drizzle", 57: "Dense freezing drizzle",
+    61: "Slight rain", 63: "Moderate rain", 65: "Heavy rain",
+    66: "Light freezing rain", 67: "Heavy freezing rain",
+    71: "Slight snowfall", 73: "Moderate snowfall", 75: "Heavy snowfall",
+    77: "Snow grains",
+    80: "Slight showers", 81: "Moderate showers", 82: "Violent showers",
+    85: "Slight snow showers", 86: "Heavy snow showers",
+    95: "Thunderstorm", 96: "Thunderstorm with slight hail",
+    99: "Thunderstorm with heavy hail",
 }
 
 def _fetch_json(url, timeout=5):
@@ -84,6 +95,10 @@ def fetch_open_meteo(lat, lon, city=None):
     is_day = cur.get("is_day", 1)
     # Prefer city name when provided, else lat,lon string
     display_name = city if city else f"{lat},{lon}"
+    temp = cur.get("temperature_2m")
+    # apparent_temperature is the model's true "feels like" (accounts for
+    # humidity/wind); fall back to raw temp only if the provider omits it.
+    feels = cur.get("apparent_temperature", temp)
     payload = {
         "source": "open-meteo",
         "name": display_name,
@@ -92,7 +107,9 @@ def fetch_open_meteo(lat, lon, city=None):
         "lon": lon,
         "is_day": int(is_day) if is_day is not None else 1,
         "weather": [{"description": WMO_MAP.get(code, f"WMO {code}"), "icon": "02d", "code": code}],
-        "main": {"temp": cur.get("temperature_2m"), "humidity": cur.get("relative_humidity_2m"), "feels_like": cur.get("temperature_2m")},
+        "main": {"temp": temp, "humidity": cur.get("relative_humidity_2m"), "feels_like": feels},
+        "precipitation_mm": cur.get("precipitation"),
+        "precipitation_probability": cur.get("precipitation_probability"),
         "wind": {"speed": cur.get("wind_speed_10m")},
         "fetched_at": cur.get("time", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
     }
@@ -105,10 +122,11 @@ def fetch_open_meteo(lat, lon, city=None):
         humids = hourly.get("relative_humidity_2m", [])[:24]
         winds = hourly.get("wind_speed_10m", [])[:24]
         codes = hourly.get("weather_code", [])[:24]
+        pops = (hourly.get("precipitation_probability", []) or [])[:24]
         if times and temps:
             payload["hourly"] = [
-                {"time": t, "temp": tp, "humidity": hm, "wind": w, "code": c, "desc": WMO_MAP.get(c, f"WMO {c}")}
-                for t, tp, hm, w, c in zip(times, temps, humids, winds, codes)
+                {"time": t, "temp": tp, "humidity": hm, "wind": w, "code": c, "desc": WMO_MAP.get(c, f"WMO {c}"), "pop": (pops[i] if i < len(pops) else None)}
+                for i, (t, tp, hm, w, c) in enumerate(zip(times, temps, humids, winds, codes))
             ]
             # High/Low from hourly if daily missing
             try:

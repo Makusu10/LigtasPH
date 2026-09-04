@@ -70,6 +70,33 @@ def test_map_page_references_noah_overlays():
         assert token in html, f"map.html missing {token}"
 
 
+def test_map_hazard_visibility_helpers():
+    # Detections often sit far outside the viewport while counts look
+    # healthy: Show-hazards button, dot floor, and in-view hints.
+    root = Path(__file__).resolve().parent.parent
+    html = (root / "templates" / "public" / "map.html").read_text()
+    for token in ("showHazardsBtn", "zoomToHazards", "zoomToHazardsFb",
+                  "inViewCount", "inViewCountFb", "in view",
+                  "'max', 6", "quake-pulse"):
+        assert token in html, f"map.html missing visibility token {token}"
+    css = (root / "static" / "css" / "main.css").read_text()
+    assert ".quake-pulse" in css
+    assert "#9333ea" in css  # quake purple matches Mapbox markers
+
+
+def test_map_hazard_area_overlays():
+    # Detected hazards (quakes/fires) render estimated affected-area rings
+    # in both engines, with popups disclosing the estimate.
+    html = (Path(__file__).resolve().parent.parent
+            / "templates" / "public" / "map.html").read_text()
+    for token in ("circlePolygon", "quakeRadiusKm", "fireRadiusKm",
+                  "hz-quake-area-layer", "hz-fire-area-layer",
+                  "hz-quake-area", "hz-fire-area",
+                  "QUAKE_RING_NOTE", "FIRE_RING_NOTE",
+                  "L.circle", "Est. felt radius"):
+        assert token in html, f"map.html missing area-overlay token {token}"
+
+
 def test_map_page_has_panel_tabs():
     html = (Path(__file__).resolve().parent.parent
             / "templates" / "public" / "map.html").read_text()
