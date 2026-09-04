@@ -109,6 +109,17 @@ def create_app(env=None):
     except Exception as e:
         app.logger.warning("CSRF exempt failed: %s", e)
 
+    # Kill stale-page syndrome: phone browsers aggressively heuristic-cache
+    # HTML/JSON (no validators sent), hiding new tabs like Group/Routes.
+    # Static assets keep their own cache headers — only dynamic responses.
+    @app.after_request
+    def no_cache_dynamic(resp):
+        if (resp.mimetype or "").startswith(("text/html", "application/json")):
+            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            resp.headers["Pragma"] = "no-cache"
+            resp.headers["Expires"] = "0"
+        return resp
+
     # Error handlers
     @app.errorhandler(400)
     def bad_request(e): return render_template("errors/400.html"), 400

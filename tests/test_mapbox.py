@@ -70,3 +70,11 @@ def test_config_reads_mapbox_token_env(monkeypatch):
     # BaseConfig binds at import; check factory propagation instead
     app = create_app("testing")
     assert app.config["MAPBOX_TOKEN"] == "pk.from-env"
+
+def test_dynamic_pages_send_no_cache(client):
+    # Phones heuristic-cache headerless HTML/JSON and hide new tabs (Group).
+    for path in ("/", "/map", "/api/centers"):
+        r = client.get(path)
+        assert r.status_code == 200
+        cc = r.headers.get("Cache-Control", "")
+        assert "no-store" in cc, f"{path} missing no-store: {cc!r}"
