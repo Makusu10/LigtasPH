@@ -72,128 +72,151 @@ The platform combines verified evacuation centers, occupancy and relief-supply m
 
 ## Architecture and system design
 
+The main diagram separates runtime requests from storage and third-party data providers. Initialization and GeoJSON ingestion are shown separately because those operations run through Flask CLI commands rather than the normal request path.
+
+### Runtime architecture
+
 ```mermaid
-flowchart TB
+flowchart LR
     subgraph Client["Client tier"]
-        direction LR
-        Browser["Responsive web interface<br/>HTML5, CSS3, and JavaScript"]
-        Leaflet["Leaflet 1.9 map<br/>Mapbox or OpenStreetMap"]
-        Poller["Center update poller<br/>GET /api/centers/version"]
-        GPS["Device geolocation<br/>Family location sharing"]
-    end
-
-    subgraph Server["Flask application server"]
         direction TB
-        Factory["Application factory<br/>app.py: create_app()"]
-
-        subgraph Middleware["Security and request middleware"]
-            direction LR
-            CSRF["Flask-WTF<br/>CSRF protection"]
-            RateLimit["Flask-Limiter<br/>Rate limiting"]
-            Session["Session security<br/>Authentication and lockout"]
-            Validation["Input validation<br/>Coordinates, forms, and payloads"]
-        end
-
-        subgraph Routes["Route blueprints"]
-            direction LR
-            PublicBP["Public blueprint<br/>Pages and directories"]
-            AuthBP["Authentication blueprint<br/>Login and logout"]
-            AdminBP["Admin blueprint<br/>Centers, hotlines, and alerts"]
-            ApiBP["API blueprint<br/>REST endpoints"]
-        end
-
-        subgraph Services["Service layer"]
-            direction LR
-            WeatherService["Weather service<br/>Forecast and cache fallback"]
-            AirService["Air-quality service<br/>PM2.5 and AQI"]
-            HazardService["Hazard service<br/>Earthquakes and active fires"]
-            EnvironmentUtils["Environment utilities<br/>Heat index and classifications"]
-        end
-
-        subgraph DataAccess["Data-access and processing layer"]
-            direction LR
-            DatabaseUtils["Database utilities<br/>Connections, schema, and migrations"]
-            Seeder["Seed and initialization<br/>Admin, hotlines, and defaults"]
-            Importer["GeoJSON importer<br/>Normalize, deduplicate, and quarantine"]
-        end
+        WebUI["Responsive web interface"]
+        MapUI["Leaflet map"]
+        Poller["Center update poller"]
+        LocationUI["Family location sharing"]
     end
 
-    subgraph Storage["Local data and static hazard layers"]
-        direction LR
-        SQLite[("SQLite database<br/>WAL mode and foreign keys")]
-        CentersFile[("NCR evacuation-center GeoJSON<br/>868 source records")]
-        NOAHLayers[("DOST Project NOAH GeoJSON<br/>Flood, landslide, and storm surge")]
+    subgraph Application["Flask application"]
+        direction TB
+
+        AppFactory["Application factory<br/>create_app()"]
+
+        subgraph Middleware["Security middleware"]
+            direction LR
+            CSRF["CSRF protection"]
+            RateLimit["Rate limiting"]
+            Auth["Authentication<br/>and account lockout"]
+            Validation["Input validation"]
+        end
+
+        subgraph Blueprints["Route blueprints"]
+            direction LR
+            PublicRoutes["Public routes"]
+            AuthRoutes["Authentication routes"]
+            AdminRoutes["Administration routes"]
+            APIRoutes["REST API routes"]
+        end
+
+        subgraph ServiceLayer["Service layer"]
+            direction LR
+            Weather["Weather service"]
+            AirQuality["Air-quality service"]
+            Hazards["Hazard service"]
+            Environment["Environmental<br/>classification"]
+        end
+
+        DataAccess["Database access layer"]
     end
 
-    subgraph Providers["External data providers"]
-        direction LR
-        OpenWeather["OpenWeather<br/>Weather and air pollution"]
-        OpenMeteo["Open-Meteo<br/>Weather and air-quality fallback"]
-        USGS["USGS<br/>Earthquake feed"]
-        FIRMS["NASA FIRMS<br/>Thermal anomaly feed"]
-        MapProviders["Map tile providers<br/>Mapbox and OpenStreetMap"]
+    subgraph Storage["Local storage"]
+        direction TB
+        Database[("SQLite database<br/>WAL mode")]
+        NOAH[("Project NOAH<br/>GeoJSON layers")]
     end
 
-    Browser --> Factory
-    Leaflet --> ApiBP
-    Poller --> ApiBP
-    GPS --> ApiBP
+    subgraph External["External providers"]
+        direction TB
+        WeatherAPIs["OpenWeather<br/>Open-Meteo"]
+        HazardAPIs["USGS<br/>NASA FIRMS"]
+        MapTiles["Mapbox<br/>OpenStreetMap"]
+    end
 
-    Factory --> Middleware
-    Factory --> Routes
-    Factory --> Services
-    Factory --> DataAccess
+    WebUI --> PublicRoutes
+    MapUI --> APIRoutes
+    Poller --> APIRoutes
+    LocationUI --> APIRoutes
 
-    CSRF --> PublicBP
-    CSRF --> AdminBP
-    RateLimit --> AuthBP
-    Session --> AuthBP
-    Session --> AdminBP
-    Validation --> PublicBP
-    Validation --> AdminBP
-    Validation --> ApiBP
+    AppFactory -. "Registers" .-> Middleware
+    AppFactory -. "Registers" .-> Blueprints
+    Middleware --> Blueprints
 
-    PublicBP --> WeatherService
-    PublicBP --> AirService
-    PublicBP --> DatabaseUtils
-    AdminBP --> DatabaseUtils
-    ApiBP --> WeatherService
-    ApiBP --> AirService
-    ApiBP --> HazardService
-    ApiBP --> DatabaseUtils
+    PublicRoutes --> ServiceLayer
+    PublicRoutes --> DataAccess
+    AdminRoutes --> DataAccess
+    APIRoutes --> ServiceLayer
+    APIRoutes --> DataAccess
 
-    WeatherService --> EnvironmentUtils
-    AirService --> EnvironmentUtils
-    WeatherService --> DatabaseUtils
-    AirService --> DatabaseUtils
-    HazardService --> DatabaseUtils
+    Weather --> Environment
+    AirQuality --> Environment
+    ServiceLayer --> DataAccess
+    DataAccess --> Database
 
-    DatabaseUtils --> SQLite
-    Seeder --> SQLite
-    CentersFile --> Importer
-    Importer --> SQLite
+    NOAH -. "Loaded by client" .-> MapUI
+    MapUI -. "Tile requests" .-> MapTiles
 
-    NOAHLayers -. "Loaded by map client" .-> Leaflet
-    Leaflet -. "Requests map tiles" .-> MapProviders
+    Weather -. "Primary and fallback" .-> WeatherAPIs
+    AirQuality -. "Primary and fallback" .-> WeatherAPIs
+    Hazards -. "Live telemetry" .-> HazardAPIs
 
-    WeatherService -. "Primary" .-> OpenWeather
-    WeatherService -. "Fallback" .-> OpenMeteo
-    AirService -. "Primary" .-> OpenMeteo
-    AirService -. "Fallback" .-> OpenWeather
-    HazardService -. "Earthquake telemetry" .-> USGS
-    HazardService -. "Fire telemetry" .-> FIRMS
-
-    classDef client fill:#e8f4fd,stroke:#1976d2,color:#102a43;
-    classDef app fill:#f3e8ff,stroke:#7e57c2,color:#2d1b46;
+    classDef client fill:#e3f2fd,stroke:#1976d2,color:#102a43;
+    classDef route fill:#ede7f6,stroke:#673ab7,color:#261447;
     classDef security fill:#fff3e0,stroke:#ef6c00,color:#4e2600;
+    classDef service fill:#e8eaf6,stroke:#3f51b5,color:#17204f;
     classDef storage fill:#e8f5e9,stroke:#388e3c,color:#173b1a;
     classDef external fill:#fce4ec,stroke:#c2185b,color:#4a1027;
 
-    class Browser,Leaflet,Poller,GPS client;
-    class Factory,PublicBP,AuthBP,AdminBP,ApiBP,WeatherService,AirService,HazardService,EnvironmentUtils,DatabaseUtils,Seeder,Importer app;
-    class CSRF,RateLimit,Session,Validation security;
-    class SQLite,CentersFile,NOAHLayers storage;
-    class OpenWeather,OpenMeteo,USGS,FIRMS,MapProviders external;
+    class WebUI,MapUI,Poller,LocationUI client;
+    class AppFactory,PublicRoutes,AuthRoutes,AdminRoutes,APIRoutes route;
+    class CSRF,RateLimit,Auth,Validation security;
+    class Weather,AirQuality,Hazards,Environment,DataAccess service;
+    class Database,NOAH storage;
+    class WeatherAPIs,HazardAPIs,MapTiles external;
+```
+
+### Database initialization and data ingestion
+
+```mermaid
+flowchart LR
+    CLI["Flask CLI"]
+
+    Init["init-db"]
+    Seed["seed"]
+    Import["import-geojson"]
+
+    Source[("NCR evacuation-center<br/>GeoJSON dataset")]
+    Normalize["Normalize and<br/>deduplicate records"]
+    Review{"Coordinates<br/>valid?"}
+
+    Live[("evacuation_centers<br/>836 live records")]
+    Staging[("staging_centers<br/>32 quarantined records")]
+    Supporting[("Administrators,<br/>hotlines, and defaults")]
+
+    CLI --> Init
+    CLI --> Seed
+    CLI --> Import
+
+    Init --> Live
+    Init --> Staging
+    Init --> Supporting
+
+    Seed --> Supporting
+
+    Source --> Import
+    Import --> Normalize
+    Normalize --> Review
+
+    Review -- "Yes" --> Live
+    Review -- "No" --> Staging
+
+    classDef command fill:#ede7f6,stroke:#673ab7,color:#261447;
+    classDef process fill:#e3f2fd,stroke:#1976d2,color:#102a43;
+    classDef decision fill:#fff3e0,stroke:#ef6c00,color:#4e2600;
+    classDef data fill:#e8f5e9,stroke:#388e3c,color:#173b1a;
+
+    class CLI,Init,Seed,Import command;
+    class Normalize process;
+    class Review decision;
+    class Source,Live,Staging,Supporting data;
 ```
 
 ## Quick start
