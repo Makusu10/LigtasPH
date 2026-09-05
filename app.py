@@ -1,10 +1,15 @@
 import os
+import datetime as _dt
 from pathlib import Path
 import click
 from flask import Flask, render_template
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Process boot time — exposed via /api/status as build_id so clients can
+# invalidate stale offline caches after a server restart/update.
+STARTED_AT = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 from config import config_by_name
 from utils.db import get_db, close_db, init_db
@@ -27,6 +32,7 @@ def create_app(env=None):
     app.config["OPENWEATHER_API_KEY"] = os.getenv("OPENWEATHER_API_KEY", app.config.get("OPENWEATHER_API_KEY",""))
     app.config["FIRMS_MAP_KEY"] = os.getenv("FIRMS_MAP_KEY", app.config.get("FIRMS_MAP_KEY", ""))
     app.config["MAPBOX_TOKEN"] = os.getenv("MAPBOX_TOKEN", app.config.get("MAPBOX_TOKEN", ""))
+    app.config["STARTED_AT"] = STARTED_AT
     if cfg_name == "testing":
         # A developer .env key must not leak into the suite: tests such as
         # test_api_weather_no_cache_503 expect a 503 when providers fail.

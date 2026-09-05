@@ -1,6 +1,29 @@
 {% extends 'base.html' %}
 {% block title %}Home — LigtasPH{% endblock %}
 {% block content %}
+<div id="home-ann-banner" class="card sev-info" hidden role="status">
+  <div id="home-ann-body">
+    <div id="home-ann-title" style="font-weight:800; font-size:15px;"></div>
+    <p id="home-ann-msg" class="clamped"></p>
+    <div id="home-ann-meta"></div>
+  </div>
+  <div id="home-ann-actions">
+    <button id="home-ann-expand" class="btn btn-secondary" style="padding:6px 12px; font-size:12px;" hidden>Show more</button>
+    <button id="home-ann-dismiss" class="btn btn-primary" style="padding:6px 12px; font-size:12px;">Dismiss</button>
+  </div>
+</div>
+<button id="ann-bell" aria-label="Announcement history" aria-expanded="false" title="Announcements">
+  <span class="material-symbols-rounded" style="font-size:22px;">notifications</span>
+  <span id="ann-bell-count" hidden>0</span>
+</button>
+<div id="ann-history" class="card" hidden role="dialog" aria-label="Announcement history">
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;">
+    <h2 style="margin:0; font-size:15px;">Announcements</h2>
+    <button id="ann-dismiss-all" class="btn btn-secondary" style="padding:4px 10px; font-size:11px;">Dismiss all</button>
+  </div>
+  <div style="font-size:12px; color:var(--text-secondary); margin-bottom:6px;">Newest first, including expired.</div>
+  <div id="ann-history-items"></div>
+</div>
 <section class="card" style="padding:24px; display:grid; gap:14px;">
   <div style="display:flex; gap:12px; align-items:center;">
     <span class="nav-brand-mark" style="width:36px;height:36px; font-size:14px;">LP</span>
@@ -73,6 +96,7 @@
 {% endif %}
 {% endblock %}
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/home_banner.js') }}" defer></script>
 {% if mapbox_token %}
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.29.0/mapbox-gl.js"></script>
 {% else %}

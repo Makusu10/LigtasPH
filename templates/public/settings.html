@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}Settings — LigtasPH{% endblock %}
+{% block content %}
+<h1 style="margin:0 0 4px;">Settings</h1>
+<p style="color:var(--text-secondary); margin:0 0 16px; font-size:13px;">Stored on this device only. Works offline. Nothing here leaves your browser.</p>
+
+<div class="card" style="margin-bottom:12px;">
+  <h2 style="margin:0 0 4px; font-size:16px;">Appearance</h2>
+  <p style="color:var(--text-secondary); font-size:13px; margin:0 0 10px;">Applies to the whole app, including admin pages. Map tiles stay light.</p>
+  <div id="themeSeg" style="display:flex; gap:8px; flex-wrap:wrap;" role="radiogroup" aria-label="Theme">
+    <button class="btn btn-secondary" data-theme-opt="system" style="flex:1; min-width:120px;" role="radio">System</button>
+    <button class="btn btn-secondary" data-theme-opt="light" style="flex:1; min-width:120px;" role="radio">Light</button>
+    <button class="btn btn-secondary" data-theme-opt="dark" style="flex:1; min-width:120px;" role="radio">Dark</button>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:12px;">
+  <h2 style="margin:0 0 4px; font-size:16px;">Location</h2>
+  <p style="color:var(--text-secondary); font-size:13px; margin:0 0 10px;">Used for radius-targeted alerts, nearby centers, and local weather. The actual Allow / Block switch lives in your browser's site settings — this page only manages what the app saved.</p>
+  <div style="font-size:13px; margin-bottom:10px;">Browser permission: <strong id="geoState">checking…</strong></div>
+  <div style="font-size:13px; margin-bottom:10px;">Saved position: <strong id="savedPos">none</strong></div>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <button id="geoUse" class="btn btn-primary">Use my location</button>
+    <button id="geoClear" class="btn btn-secondary">Clear saved location</button>
+  </div>
+  <div id="geoMsg" style="font-size:13px; margin-top:8px; color:var(--text-secondary);" role="status"></div>
+</div>
+
+<div class="card" style="margin-bottom:12px;">
+  <h2 style="margin:0 0 4px; font-size:16px;">Announcement popups</h2>
+  <p style="color:var(--text-secondary); font-size:13px; margin:0 0 10px;">Emergency banners from your LGU / admins. Dismissed banners stay hidden for that message only.</p>
+  <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
+    <button id="annToggle" class="btn btn-secondary" aria-pressed="true">Popups: On</button>
+    <button id="annReshow" class="btn btn-secondary">Show dismissed again</button>
+  </div>
+  <div><label for="setCity">My city (for city-targeted alerts)</label>
+    <select id="setCity" style="max-width:320px;"><option value="">— not set —</option></select>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:12px;">
+  <h2 style="margin:0 0 4px; font-size:16px;">Data sources</h2>
+  <p style="color:var(--text-secondary); font-size:13px; margin:0 0 10px;">Which live providers this server uses. API keys themselves are managed by admins, never shown here.</p>
+  <div id="provRow" style="display:flex; gap:8px; flex-wrap:wrap;"><span class="badge badge-unknown">checking…</span></div>
+</div>
+
+<div class="card">
+  <h2 style="margin:0 0 4px; font-size:16px;">Device data</h2>
+  <p style="color:var(--text-secondary); font-size:13px; margin:0 0 10px;">Cached feeds refresh automatically after an app update (server build <span id="buildId">…</span>).</p>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <button id="wipeCache" class="btn btn-secondary">Clear cached data</button>
+  </div>
+  <div id="wipeMsg" style="font-size:13px; margin-top:8px; color:var(--text-secondary);" role="status"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/settings.js') }}" defer></script>
+{% endblock %}

@@ -210,3 +210,101 @@ input:focus, select:focus, textarea:focus { border-color:var(--primary); backgro
   .splash-mark,.splash-word,.splash-tag,.splash-bar{ animation:none; }
   #splash.splash-hide{ transition-duration:.15s; }
 }
+
+/* Dark mode — enabled via <html data-theme="dark"> (see prefs.js).
+ * Light theme above is untouched; every rule here is scoped under the
+ * attribute so the default rendering is byte-identical. Map tiles stay
+ * light by design (see Settings). */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --primary: #7aa2ff;
+  --primary-soft: #1c2a4d;
+  --primary-container: #23365e;
+  --navy: #e8edf7;
+  --red: #f97066;
+  --orange: #fdb022;
+  --green: #32d583;
+  --bg: #0b1220;
+  --bg-gradient: radial-gradient(1200px 600px at 10% -10%, #16233f 0%, transparent 60%),
+                 radial-gradient(1000px 500px at 90% 0%, #0e2a28 0%, transparent 55%),
+                 linear-gradient(180deg, #0d1526 0%, #0a101d 100%);
+  --surface: #141d31;
+  --glass: rgba(20,29,49,0.72);
+  --glass-strong: rgba(26,36,59,0.88);
+  --glass-border: rgba(255,255,255,0.10);
+  --glass-shadow: 0 8px 32px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.4);
+  --glass-shadow-strong: 0 12px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4);
+  --text: #e8edf7;
+  --text-secondary: #a8b3c7;
+  --text-muted: #75829a;
+  --border: rgba(255,255,255,0.09);
+  --border-strong: rgba(255,255,255,0.16);
+}
+[data-theme="dark"] .nav { background: rgba(13,21,38,0.78); box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 4px 20px rgba(0,0,0,0.35); }
+[data-theme="dark"] .nav-links a:hover { background: rgba(122,162,255,0.14); color: var(--primary); }
+[data-theme="dark"] .nav-links a[aria-current="page"] { background: var(--primary-container); color: #fff; }
+[data-theme="dark"] th { background: rgba(255,255,255,0.04); }
+[data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea { background: rgba(255,255,255,0.06); color: var(--text); }
+[data-theme="dark"] input:focus, [data-theme="dark"] select:focus, [data-theme="dark"] textarea:focus { background: rgba(255,255,255,0.09); border-color: var(--primary); box-shadow: 0 0 0 3px rgba(122,162,255,0.18); }
+[data-theme="dark"] select option { background: #141d31; color: #e8edf7; }
+[data-theme="dark"] .btn-secondary:hover { background: rgba(255,255,255,0.10); border-color: rgba(122,162,255,0.3); }
+[data-theme="dark"] .card:hover { border-color: rgba(255,255,255,0.16); }
+/* Pastel alert surfaces stay readable: darken text-side, keep hue */
+[data-theme="dark"] .flash-danger { background: rgba(122,39,26,0.45); color:#fda29b; border-color: rgba(253,162,155,0.35); }
+[data-theme="dark"] .flash-warning { background: rgba(122,77,7,0.45); color:#fedf89; border-color: rgba(254,223,137,0.35); }
+[data-theme="dark"] .flash-info { background: rgba(24,73,169,0.45); color:#b2ddff; border-color: rgba(178,221,255,0.35); }
+[data-theme="dark"] .flash-success { background: rgba(5,79,49,0.5); color:#a6f4c5; border-color: rgba(166,244,197,0.35); }
+[data-theme="dark"] .demo-banner { background: rgba(122,77,7,0.35); border-color: rgba(254,223,137,0.35); color:#fedf89; }
+[data-theme="dark"] .badge-available { background:rgba(5,79,49,0.5); color:#a6f4c5; border-color:rgba(166,244,197,0.35); }
+[data-theme="dark"] .badge-nearly { background:rgba(122,77,7,0.4); color:#fedf89; border-color:rgba(254,223,137,0.35); }
+[data-theme="dark"] .badge-full { background:rgba(122,39,26,0.45); color:#fda29b; border-color:rgba(253,162,155,0.35); }
+[data-theme="dark"] .badge-unknown { background:rgba(255,255,255,0.07); color:var(--text-secondary); }
+/* Weather day card would glare in dark mode — give it a dusk treatment */
+[data-theme="dark"] .weather-now.day { background: linear-gradient(135deg, rgba(26,36,59,0.9) 0%, rgba(35,54,94,0.85) 55%, rgba(30,58,138,0.75) 100%); color:#e8edf7; }
+[data-theme="dark"] .weather-now.day .weather-now-temp, [data-theme="dark"] .weather-now.day .weather-now-desc { color:#fff; }
+[data-theme="dark"] .weather-now.day .now-label, [data-theme="dark"] .weather-now.day .weather-now-feels, [data-theme="dark"] .weather-now.day .weather-now-hilo { color:#a8b3c7; }
+[data-theme="dark"] .weather-icon-wrap { background: rgba(122,162,255,0.12); border-color: rgba(122,162,255,0.3); }
+[data-theme="dark"] .weather-bar, [data-theme="dark"] .env-bar { background: rgba(255,255,255,0.12); }
+[data-theme="dark"] .skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.06) 75%); background-size:200% 100%; }
+[data-theme="dark"] .env-card-icon { background: rgba(255,255,255,0.07); }
+/* Env tint washes need a darker base to stay legible */
+[data-theme="dark"] .env-tint-green { background: linear-gradient(135deg, rgba(5,79,49,0.4) 0%, rgba(5,79,49,0.15) 100%); }
+[data-theme="dark"] .env-tint-yellow { background: linear-gradient(135deg, rgba(122,77,7,0.4) 0%, rgba(122,77,7,0.15) 100%); }
+[data-theme="dark"] .env-tint-orange { background: linear-gradient(135deg, rgba(154,52,18,0.45) 0%, rgba(154,52,18,0.18) 100%); }
+[data-theme="dark"] .env-tint-red { background: linear-gradient(135deg, rgba(127,29,29,0.5) 0%, rgba(127,29,29,0.2) 100%); }
+[data-theme="dark"] .env-tint-purple { background: linear-gradient(135deg, rgba(88,28,135,0.45) 0%, rgba(88,28,135,0.18) 100%); }
+/* Footer + hourly scrollbars use hardcoded light values inline */
+[data-theme="dark"] body > footer { background: rgba(13,21,38,0.78) !important; }
+[data-theme="dark"] .hourly-strip::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); }
+/* Announcement modal is JS-injected; vars keep it themed (see announcements.js) */
+/* Home announcement banner + bell history (see home_banner.js) */
+#home-ann-banner{ display:flex; gap:12px; align-items:flex-start; border-left-width:5px; margin-bottom:16px; }
+#home-ann-banner[hidden]{ display:none; }
+#home-ann-banner.sev-critical{ border-left-color:var(--red); }
+#home-ann-banner.sev-warning{ border-left-color:var(--orange); }
+#home-ann-banner.sev-info{ border-left-color:var(--primary); }
+#home-ann-body{ flex:1; min-width:0; }
+#home-ann-msg{ font-size:14px; line-height:1.5; margin:2px 0 0; }
+#home-ann-msg.clamped{ display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; }
+#home-ann-meta{ font-size:12px; color:var(--text-secondary); margin-top:6px; }
+#home-ann-actions{ display:flex; gap:8px; flex:0 0 auto; flex-wrap:wrap; }
+#ann-bell{ position:fixed; right:16px; top:76px; z-index:600; width:44px; height:44px; border-radius:50%;
+  display:grid; place-items:center; cursor:pointer; background:var(--glass-strong);
+  border:1px solid var(--glass-border); box-shadow:var(--glass-shadow); color:var(--text); }
+#ann-bell:hover{ box-shadow:var(--glass-shadow-strong); }
+#ann-bell-count{ position:absolute; top:-4px; right:-4px; min-width:20px; height:20px; padding:0 5px;
+  border-radius:999px; background:var(--red); color:#fff; font-size:11px; font-weight:800;
+  display:grid; place-items:center; }
+#ann-bell-count[hidden]{ display:none; }
+#ann-history{ position:fixed; right:16px; top:128px; width:min(370px, calc(100vw - 32px)); max-height:min(62vh, 520px);
+  overflow-y:auto; z-index:600; }
+#ann-history[hidden]{ display:none; }
+.ann-hist-item{ border-bottom:1px solid var(--border); padding:10px 0; display:flex; gap:10px; }
+.ann-hist-item:last-child{ border-bottom:none; }
+.ann-hist-dot{ width:10px; height:10px; border-radius:50%; flex:0 0 auto; margin-top:5px; }
+.ann-hist-item.is-dismissed{ opacity:0.6; }
+@media (max-width:768px){ #ann-bell{ top:auto; bottom:16px; } #ann-history{ top:auto; bottom:68px; } }
+/* Weather page: backend severity tints are light pastels — in dark mode the
+   card wash is dropped (severity cue survives via border + badge). */
+[data-theme="dark"] .env-card.env-tinted { background: var(--glass) !important; }
+[data-theme="dark"] .cond-badge { background: rgba(24,73,169,0.5) !important; border-color: rgba(178,221,255,0.4) !important; color: #b2ddff !important; }

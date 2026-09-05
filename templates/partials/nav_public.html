@@ -10,6 +10,7 @@
       <a href="{{ url_for('public.centers_page') }}" {% if request.endpoint=='public.centers_page' %}aria-current="page"{% endif %}>Evacuation Centers</a>
       <a href="{{ url_for('public.weather_page') }}" {% if request.endpoint=='public.weather_page' %}aria-current="page"{% endif %}>Weather</a>
       <a href="{{ url_for('public.hotlines_page') }}" {% if request.endpoint=='public.hotlines_page' %}aria-current="page"{% endif %}>Emergency Hotlines</a>
+      <a href="{{ url_for('public.settings_page') }}" {% if request.endpoint=='public.settings_page' %}aria-current="page"{% endif %}>Settings</a>
       <a href="{{ url_for('auth.admin_login') }}">Admin Login</a>
     </div>
     <button id="navToggle" class="nav-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="mobileMenu">
@@ -22,6 +23,7 @@
     <a href="{{ url_for('public.centers_page') }}">Evacuation Centers</a>
     <a href="{{ url_for('public.weather_page') }}">Weather</a>
     <a href="{{ url_for('public.hotlines_page') }}">Emergency Hotlines</a>
+    <a href="{{ url_for('public.settings_page') }}">Settings</a>
     <a href="{{ url_for('auth.admin_login') }}">Admin Login</a>
   </div>
 </nav>

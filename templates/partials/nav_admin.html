@@ -6,6 +6,7 @@
       <a href="{{ url_for('admin.centers') }}">Centers</a>
       <a href="{{ url_for('admin.hotlines') }}">Hotlines</a>
       <a href="{{ url_for('admin.announcements') }}">Announcements</a>
+      <a href="{{ url_for('admin.api_keys') }}">API Keys</a>
       <a href="{{ url_for('public.home') }}">Public Site</a>
       <form method="post" action="{{ url_for('auth.admin_logout') }}" style="display:inline;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="btn btn-secondary" style="padding:6px 10px; font-size:13px;">Logout ({{ session.get('username','') }})</button></form>
     </div>
@@ -16,6 +17,7 @@
     <a href="{{ url_for('admin.centers') }}">Centers</a>
     <a href="{{ url_for('admin.hotlines') }}">Hotlines</a>
     <a href="{{ url_for('admin.announcements') }}">Announcements</a>
+    <a href="{{ url_for('admin.api_keys') }}">API Keys</a>
     <form method="post" action="{{ url_for('auth.admin_logout') }}" style="display:inline;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="btn btn-secondary" style="padding:6px 10px; font-size:13px;">Logout</button></form>
   </div>
 </nav>
