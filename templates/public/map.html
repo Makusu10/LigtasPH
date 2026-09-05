@@ -4,7 +4,8 @@
 <div class="map-fullbleed">
   <div class="map-shell">
     <div id="map"></div>
-    <div id="tileFallback" role="status" aria-live="polite" style="display:none; position:absolute; bottom:16px; left:50%; transform:translateX(-50%); z-index:1002; background:rgba(244,246,248,0.90); border:1px solid rgba(20,40,63,0.16); border-radius:var(--radius); padding:8px 14px; font-size:12px; max-width:380px; text-align:center; box-shadow:var(--hard-shadow); pointer-events:none; -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);">Map background blocked — try hotspot or disable adblocker. Center dots still work.</div>
+<div id="tileFallback" role="status" aria-live="polite" style="display:none; position:absolute; bottom:16px; left:50%; transform:translateX(-50%); z-index:1002; background:rgba(255,255,255,0.95); border:1px solid var(--border); border-radius:10px; padding:8px 14px; font-size:12px; max-width:380px; text-align:center; box-shadow:0 2px 10px rgba(0,0,0,0.12); pointer-events:none;">Map background blocked — try hotspot or disable adblocker. Center dots still work.</div>
+    <div id="hazardToast" class="hazard-toast" role="alert" aria-live="assertive" hidden></div>
     <button id="panelOpen" class="btn btn-secondary" style="display:none; position:absolute; top:12px; left:12px; z-index:1001; padding:8px 12px; font-size:13px;" aria-label="Show details panel">☰ Details</button>
     <aside id="sidePanel" class="card" aria-label="Map details and filters">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -21,18 +22,18 @@
       <button id="tabBtnGroup" role="tab" aria-selected="false" aria-controls="tabGroup" class="btn btn-secondary" style="flex:1; padding:6px 4px; font-size:12px;">Group<span id="groupBadge"></span></button>
     </div>
     <div id="tabCenters" role="tabpanel" aria-labelledby="tabBtnCenters">
-    <label for="q">Search</label>
+    <label for="q">Search (name, barangay, city)</label>
     <input id="q" placeholder="e.g. Marikina, Sports Center" style="margin-bottom:8px;">
     <label for="cityFilter">City</label>
     <select id="cityFilter" style="margin-bottom:8px;"><option value="">All cities</option></select>
-    <label for="statusFilter">Occupancy Status</label>
-    <select id="statusFilter" style="margin-bottom:8px;">
-      <option value="">All</option><option>Available</option><option>Nearly Full</option><option>Full</option><option>Status Unavailable</option>
+    <label for="typeFilter">Facility Type</label>
+    <select id="typeFilter" style="margin-bottom:8px;"><option value="">All types</option></select>
+    <label for="facStatusFilter">Facility Status</label>
+    <select id="facStatusFilter" style="margin-bottom:8px;">
+      <option value="">All</option><option value="PERMANENT">Permanent</option><option value="TEMPORARY">Temporary</option>
     </select>
-    <label for="supplyFilter">Supply Status</label>
-    <select id="supplyFilter" style="margin-bottom:8px;">
-      <option value="">All</option><option>Adequate</option><option>High</option><option>Low</option><option>Unknown</option>
-    </select>
+    <label style="display:flex; gap:6px; align-items:center; margin-bottom:8px;"><input type="checkbox" id="dataQa"> Field-verification only (needs review / unverified)</label>
+    <button id="nearestBtn" class="btn btn-primary" style="width:100%; margin-bottom:8px;">Take me to nearest center</button>
     <div style="display:flex; gap:8px; margin:8px 0;">
       <button id="clearBtn" class="btn btn-secondary" style="flex:1;">Clear</button>
     </div>
@@ -44,6 +45,7 @@
     <div id="viewToggle" style="display:flex; gap:8px; margin:0 0 8px;">
       <button id="btn2d" class="btn btn-secondary" style="flex:1;">2D</button>
       <button id="btn3d" class="btn btn-secondary" style="flex:1;">3D</button>
+      <button id="btnSat" class="btn btn-secondary" style="flex:1;">Satellite</button>
     </div>
     <fieldset id="gpsBox" style="border:2px solid var(--line); border-radius:var(--radius); padding:8px 10px; margin:0 0 8px; font-size:13px;">
       <legend style="font-size:12px; font-weight:700; padding:0 4px;">GPS &amp; group</legend>
@@ -68,6 +70,11 @@
           <button data-profile="walking" class="btn btn-secondary" style="flex:1; padding:6px 4px; font-size:12px;">Walk</button>
           <button data-profile="cycling" class="btn btn-secondary" style="flex:1; padding:6px 4px; font-size:12px;">Bike</button>
         </div>
+        <div id="routeHazardModes" style="display:flex; gap:6px; margin:4px 0;" role="group" aria-label="Route preference">
+          <button data-hz="fast" class="btn btn-primary" style="flex:1; padding:6px 4px; font-size:12px;">Fastest</button>
+          <button data-hz="safe" class="btn btn-secondary" style="flex:1; padding:6px 4px; font-size:12px;">Safest (avoid NOAH)</button>
+        </div>
+        <div id="routeHazardReadout" role="status" style="font-size:11px; color:var(--text-secondary); margin:2px 0 4px; display:none;"></div>
         <div style="display:flex; gap:6px; margin:4px 0;">
           <button id="navGo" class="btn btn-primary" style="flex:1; padding:6px 8px; font-size:12px;">Go</button>
           <button id="followBtn" class="btn btn-secondary" style="flex:1; padding:6px 8px; font-size:12px;" aria-pressed="false">Follow: off</button>
@@ -122,10 +129,12 @@
         </select>
       </label>
       <div style="display:flex; gap:8px; font-size:11px; color:var(--text-secondary); margin:2px 0 4px;">
-        <span><i style="display:inline-block; width:10px; height:10px; background:#facc15; border-radius:var(--radius);"></i> Low</span>
-        <span><i style="display:inline-block; width:10px; height:10px; background:#f97316; border-radius:var(--radius);"></i> Moderate</span>
-        <span><i style="display:inline-block; width:10px; height:10px; background:#dc2626; border-radius:var(--radius);"></i> High</span>
+<span><i style="display:inline-block; width:10px; height:10px; background:#facc15; border-radius:2px;"></i> Low</span>
+        <span><i style="display:inline-block; width:10px; height:10px; background:#f97316; border-radius:2px;"></i> Moderate</span>
+        <span><i style="display:inline-block; width:10px; height:10px; background:#dc2626; border-radius:2px;"></i> High</span>
+        <span><i style="display:inline-block; width:10px; height:10px; background:#7C3AED; border-radius:2px;"></i> Landslide</span>
       </div>
+      <div style="font-size:11px; color:var(--text-secondary);">Hazard data as of the latest Project NOAH export — verify with official NOAH/PAGASA advisories before relying on this for evacuation decisions.</div>
       <div style="font-size:11px; color:var(--text-secondary);">Source: Project NOAH (DOST). SSA4 = worst-case advisory.</div>
       <div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">Rings: purple ≈ quake felt area by magnitude • red ≈ 1 km fire watch. Estimates, not official danger zones.</div>
       <div id="hzStatus" role="status" style="color:var(--text-secondary); font-size:12px; margin-top:6px;"></div>
@@ -153,8 +162,11 @@
 {% block head %}
 {% if mapbox_token %}
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.29.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://unpkg.com/kdbush@4.0.2/kdbush.js"></script>
 {% else %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="">
 {% endif %}
 <style>
   /* Truly full-screen map: break out of .container, nav + banner float over the map */
@@ -171,6 +183,11 @@
   #routeDock[hidden]{ display:none; }
   #routeDock.min{ max-height:none; }
   #routeDock.min #routeDockSteps{ display:none; }
+  /* Non-blocking hazard-alert toast */
+  .hazard-toast{ position:absolute; top:80px; top:78px; left:50%; transform:translateX(-50%); z-index:1100;
+    background:rgba(127,29,29,0.96); color:#fff; border-radius:10px; padding:10px 16px; font-size:13px;
+    max-width:min(420px, 92vw); text-align:center; box-shadow:0 6px 24px rgba(0,0,0,0.25); pointer-events:none; }
+  .hazard-toast[hidden]{ display:none; }
   /* map controls clear the floating nav */
   #map .mapboxgl-ctrl-top-right{ top:70px; }
   #map .leaflet-top.leaflet-right{ margin-top:70px; }
@@ -201,6 +218,7 @@
 {% else %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin=""></script>
 {% endif %}
 <script>
 const MAPBOX_TOKEN = {{ mapbox_token|tojson }};
@@ -211,48 +229,334 @@ let hzAbort={quake:null, fire:null}, hzTimer=null, lastFires=[], lastQuakes=[];
 function badgeClass(s){ return s==='Available'?'available':s==='Nearly Full'?'nearly':s==='Full'?'full':'unknown'; }
 function statusColor(s){ return s==='Available'?'#25743a':s==='Nearly Full'?'#d9991a':s==='Full'?'#c1121f':'#67757c'; }
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function haversine(lat1, lon1, lat2, lon2){
+  const R=6371000, toR=Math.PI/180;
+  const dLat=(lat2-lat1)*toR, dLon=(lon2-lon1)*toR;
+  const a=Math.sin(dLat/2)**2 + Math.cos(lat1*toR)*Math.cos(lat2*toR)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+function evacKey(c){ return String(c.name||'').toLowerCase()+'|'+String(c.city||'').toLowerCase(); }
 function centerFig(c){
   if(c.occupancy_pct===null||c.occupancy_pct===undefined) return `Capacity unreported • ${esc(c.occupancy_status)}`;
   return `Capacity ${c.capacity} • Occupancy ${c.current_occupancy} • Available ${c.available_slots} • ${c.occupancy_pct}%`;
 }
-function centerPopupHTML(c, routeBtn){
+function centerPopupHTML(c, routeBtn, opts){
+  const live = c.live;
+  const hz = opts && opts.hazard;
+  const danger = (hz && hz.maxSev>=2)
+    ? `<div style="margin:6px 0; font-size:12px; color:#B42318; background:#FEF3F2; border:1px solid #FECDCA; border-radius:6px; padding:6px 8px;">⚠️ Within ${hz.name?esc(hz.name):''} ${hz.zone?esc(hz.zone):''}</div>`
+    : '';
+  const supp = live
+    ? `<div style="margin:6px 0; font-size:12px;">${centerFig(live)}<br><span class="badge badge-${badgeClass(live.occupancy_status)}">${esc(live.occupancy_status)}</span></div>`
+    : `<div style="margin:6px 0; font-size:12px; color:var(--text-secondary);">Live supply data not yet available.</div>`;
+  const crowd = getCrowd(evacKey(c));
+  const crowdLine = crowd ? `<div style="font-size:12px; margin-top:4px;">Crowd report: <b>${esc(crowd.status)}</b>${crowd.note?' — '+esc(crowd.note):''} <small style="color:var(--text-secondary);">(${timeAgoRaw(crowd.at)})</small></div>` : '';
+  const badges = [
+    `<span class="badge" style="background:rgba(59,110,245,0.12); color:#1d4ed8;">${esc(c.facility_type)}</span>`,
+    `<span class="badge" style="background:${c.facility_status==='PERMANENT'?'rgba(2,122,72,0.12); color:#027A48':'rgba(217,45,32,0.10); color:#B42318'};">${esc(c.facility_status)}</span>`,
+    c.verified && c.confidence===1
+      ? `<span class="badge" style="background:rgba(2,122,72,0.12); color:#027A48;">✓ Verified</span>`
+      : (c.needs_review || !c.verified ? `<span class="badge" style="background:#FEF0C7; color:#B54708;">Needs review</span>` : `<span class="badge" style="background:#FEF0C7; color:#B54708;">Unverified</span>`)
+  ].join(' ');
+  const unc = (c.uncertainty_radius_m) ? `<div style="font-size:11px; color:var(--text-secondary);">Geocode uncertainty ±${Math.round(+c.uncertainty_radius_m)} m</div>` : '';
+  const liveTag = c.live
+    ? `<div style="font-size:11px; color:var(--text-secondary);">Live: updated ${esc(c.live.updated_at)}</div>`
+    : `<div style="font-size:11px; color:var(--text-secondary);">No live telemetry — report status below.</div>`;
   return `<div style="min-width:220px">
     <div style="font-weight:800;">${esc(c.name)}</div>
-    <div style="color:var(--text-secondary); font-size:13px;">${esc(c.address)}, ${esc(c.city)}</div>
-    <div style="margin:8px 0; font-size:13px;">${centerFig(c)}<br><span class="badge badge-${badgeClass(c.occupancy_status)}">${esc(c.occupancy_status)}</span></div>
-    <div style="font-size:12px;">Food ${esc(c.food_status)} • Water ${esc(c.water_status)} • Basic ${esc(c.basic_needs_status)}</div>
-    <div style="font-size:12px; color:var(--text-secondary);">Updated ${esc(c.updated_at)}</div>
-    <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;"><a href="/centers/${c.id}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">View Details</a>${routeBtn||''}<a href="https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}" target="_blank" rel="noopener" class="btn btn-primary" style="padding:6px 8px; font-size:12px;">Get Directions</a></div>
+    <div style="color:var(--text-secondary); font-size:13px;">${esc(c.barangay?c.barangay+', ':'' )}${esc(c.city)}</div>
+    <div style="margin:6px 0;">${badges}</div>
+    ${supp}${crowdLine}${danger}${unc}${liveTag}
+    <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+      ${c.id?`<a href="/centers/${c.id}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">Details</a>`:''}
+      ${routeBtn||''}
+      <button data-report="${esc(c.name)}::${esc(c.city)}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">Report status</button>
+    </div>
   </div>`;
+}
+// ---------- crowd-sourced center status (localStorage, no fabricated telemetry) ----------
+const CROWD_KEY='ligtasph_crowd_v1';
+function getCrowd(key){
+  try{ const m=JSON.parse(localStorage.getItem(CROWD_KEY)||'{}'); return m[key]||null; }catch(e){ return null; }
+}
+function setCrowd(key, status, note){
+  let m={}; try{ m=JSON.parse(localStorage.getItem(CROWD_KEY)||'{}'); }catch(e){ m={}; }
+  if(status==='Clear'){ delete m[key]; }
+  else { m[key]={status, note:note||'', at:new Date().toISOString()}; }
+  try{ localStorage.setItem(CROWD_KEY, JSON.stringify(m)); }catch(e){}
+  return m[key]||null;
+}
+function timeAgoRaw(s){
+  try{ const t=new Date(String(s||'').replace(' ','T')).getTime(); if(isNaN(t)) return 'n/a';
+    const mins=Math.max(0, Math.round((Date.now()-t)/60000));
+    if(mins<1) return 'just now'; if(mins<60) return mins+' min ago';
+    const h=Math.floor(mins/60); return h+(h===1?' hr ago':' hrs ago');
+  }catch(e){ return 'n/a'; }
 }
 function getFiltered(){
   const q=document.getElementById('q').value.toLowerCase();
   const city=document.getElementById('cityFilter').value;
-  const status=document.getElementById('statusFilter').value;
-  const supply=document.getElementById('supplyFilter').value;
+  const type=document.getElementById('typeFilter').value;
+  const fac=document.getElementById('facStatusFilter').value;
+  const qa=document.getElementById('dataQa').checked;
   return allCenters.filter(c=>{
-    if(q && !(c.name.toLowerCase().includes(q) || c.city.toLowerCase().includes(q) || c.address.toLowerCase().includes(q))) return false;
+    if(c.lat===null||c.lng===null) return false;
+    if(q && !((c.name||'').toLowerCase().includes(q) || (c.city||'').toLowerCase().includes(q) || (c.barangay||'').toLowerCase().includes(q) || (c.facility_type||'').toLowerCase().includes(q))) return false;
     if(city && c.city!==city) return false;
-    if(status && c.occupancy_status!==status) return false;
-    if(supply && ![c.food_status,c.water_status,c.medicine_status,c.hygiene_status,c.basic_needs_status].includes(supply)) return false;
+    if(type && c.facility_type!==type) return false;
+    if(fac && (c.facility_status||'')!==fac) return false;
+    if(qa && !(c.needs_review || !c.verified)) return false;
     return true;
   });
 }
-function renderList(filtered, onLocate){
+function renderList(filtered, handlers){
+  handlers=handlers||{};
   const list=document.getElementById('list'); list.innerHTML='';
   if(filtered.length===0){ list.innerHTML='<div style="color:var(--text-secondary); font-size:13px; padding:8px;">No centers match. Clear filters or view all.</div>'; return; }
   filtered.forEach(c=>{
+    const crowd=getCrowd(evacKey(c));
     const row=document.createElement('div');
-    row.style.cssText='border:2px solid var(--line); border-radius:var(--radius); padding:8px 10px; display:flex; justify-content:space-between; gap:8px; align-items:center;';
-    row.innerHTML=`<div><div style="font-weight:700; font-size:13px;">${esc(c.name)}</div><div style="color:var(--text-secondary); font-size:12px;">${esc(c.city)} • ${c.occupancy_pct===null||c.occupancy_pct===undefined ? 'capacity unreported' : c.available_slots+' slots • '+c.occupancy_pct+'%'}</div><span class="badge badge-${badgeClass(c.occupancy_status)}">${esc(c.occupancy_status)}</span></div><button class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">Locate</button>`;
-    row.querySelector('button').addEventListener('click', ()=>onLocate(c));
+row.style.cssText='border:1px solid var(--border); border-radius:8px; padding:8px 10px; display:flex; justify-content:space-between; gap:8px; align-items:center;';
+    row.innerHTML=`<div><div style="font-weight:700; font-size:13px;">${esc(c.name)}</div><div style="color:var(--text-secondary); font-size:12px;">${esc(c.city)} • ${esc(c.facility_type)} • ${esc(c.facility_status)}</div><span class="badge" style="background:${c.facility_status==='PERMANENT'?'rgba(2,122,72,0.12); color:#027A48':'rgba(217,45,32,0.10); color:#B42318'};">${esc(c.facility_status)}</span> ${crowd?`<span class="badge" style="background:rgba(120,53,15,0.10); color:#92400E;">Crowd: ${esc(crowd.status)}</span>`:''}</div><div style="display:flex; gap:6px; flex-direction:column;">${handlers.onRoute?`<button data-lrow-route class="btn btn-secondary" style="padding:4px 8px; font-size:11px;">Route here</button>`:''}<button data-lrow-locate class="btn btn-secondary" style="padding:4px 8px; font-size:11px;">Locate</button></div>`;
+    const r=row.querySelector('[data-lrow-route]');
+    if(r) r.addEventListener('click', ()=>{ if(handlers.onRoute) handlers.onRoute(c); });
+    row.querySelector('[data-lrow-locate]').addEventListener('click', ()=>{ if(handlers.onLocate) handlers.onLocate(c); });
     list.appendChild(row);
   });
 }
 function hzStatus(msg){ setStatus('hzStatus', msg); }
 function setStatus(id, msg){ const el=document.getElementById(id); if(el) el.textContent=msg||''; }
+function showHazardToast(msg, ms){
+  const t=document.getElementById('hazardToast'); if(!t) return;
+  t.textContent=msg; t.removeAttribute('hidden');
+  clearTimeout(showHazardToast._t);
+  showHazardToast._t=setTimeout(()=>{ t.setAttribute('hidden',''); }, ms||4000);
+}
+// ---------- Sprint-2 evacuation-center data layer (GL-native, clustered) ----------
+// CONFIG POINT: property names in your NOAH export may differ from the
+// assumed {hazard, level, advisory}. Adjust HAZARD_PROP to match.
+const HAZARD_PROP={hazard:'hazard', level:'level', advisory:'advisory'};
+const HAZARD_NAME={'flood':'Flood','landslide':'Landslide','storm-surge':'Storm surge','storm_surge':'Storm surge','storm surge':'Storm surge'};
+const ROUTE_SAMPLE_M=75, REROUTE_BUFFER_M=200, REROUTE_THROTTLE_MS=5000, REROUTE_MIN_MOVE_M=150;
+let EVAC_FC=null, kIndex=null, kdbushLib=null, hazardIndex=null, MUNI_BBOXES=null;
+try{ kdbushLib = (typeof KDBush!=='undefined') ? KDBush : null; }catch(e){ kdbushLib=null; }
+// feature id promotion: each geojson feature gets fid = original index
+let _fidCounter=0;
+function normalizeEvac(f){
+  const p=(f&&f.properties)||{};
+  const g=(f&&f.geometry)||null;
+  const hasGeo = g && g.type==='Point' && Array.isArray(g.coordinates) && g.coordinates.length===2;
+  return {
+    fid: _fidCounter++,
+    name:p.name||'Unnamed center',
+    city:p.municipality_input||p.municipality||'Unknown',
+    barangay:p.barangay_resolved||p.barangay_input||'',
+    lng:hasGeo?g.coordinates[0]:null,
+    lat:hasGeo?g.coordinates[1]:null,
+    facility_type:p.facility_type||'Unknown',
+    facility_status:(p.facility_status||'UNKNOWN').toUpperCase(),
+    geocode_provider:p.geocode_provider||'',
+    confidence:(p.confidence===null||p.confidence===undefined)?null:+p.confidence,
+    verified:!!p.verified,
+    uncertainty_radius_m:p.uncertainty_radius_m||null,
+    needs_review:!!p.needs_review,
+    review_reason:p.review_reason||'',
+    live:null,
+  };
+}
+async function loadCenters(){
+  _fidCounter=0;
+  const res=await fetch('/api/evac-centers.geojson', {cache:'no-cache'});
+  if(!res.ok) throw new Error('evac geojson '+res.status);
+  EVAC_FC=await res.json();
+  allCenters=(EVAC_FC.features||[]).map(normalizeEvac).filter(c=>c.lat!==null&&c.lng!==null);
+  // optional live enrichment from the seeded DB (matching by name+city)
+  try{
+    const lr=await fetch('/api/centers', {cache:'no-store'});
+    if(lr.ok){
+      const live=await lr.json();
+      const byKey={};
+      (live||[]).forEach(c=>{ byKey[String(c.name||'').toLowerCase()+'|'+String(c.city||'').toLowerCase()]=c; });
+      allCenters.forEach(c=>{ if(byKey[evacKey(c)]) c.live=byKey[evacKey(c)]; });
+    }
+  }catch(e){}
+  await populateCityOptions();
+  await populateTypeOptions();
+  buildSpatialIndex();
+  buildMuniBBoxes();
+}
+function populateCityOptions(){
+  const sel=document.getElementById('cityFilter'); if(!sel) return;
+  const cities=[...new Set(allCenters.map(c=>c.city))].sort();
+  const cur=sel.value;
+  sel.innerHTML='<option value="">All cities</option>';
+  cities.forEach(ci=>{ const o=document.createElement('option'); o.textContent=ci; o.value=ci; sel.appendChild(o); });
+  let want='';
+  try{ want=new URLSearchParams(location.search).get('city') || localStorage.getItem('ligtasph_ann_city_v1') || ''; }catch(e){}
+  if(want && cities.includes(want)) sel.value=want;
+  else if(cur && cities.includes(cur)) sel.value=cur;
+}
+function populateTypeOptions(){
+  const sel=document.getElementById('typeFilter'); if(!sel) return;
+  const types=[...new Set(allCenters.map(c=>c.facility_type).filter(Boolean))].sort();
+  sel.innerHTML='<option value="">All types</option>';
+  types.forEach(t=>{ const o=document.createElement('option'); o.textContent=t; o.value=t; sel.appendChild(o); });
+}
+function buildSpatialIndex(){
+  kIndex=null;
+  if(!kdbushLib) return;
+  try{
+    const idx=new kdbushLib(allCenters.length);
+    allCenters.forEach((c,i)=>{ idx.add(c.lng, c.lat); allCenters[i]._xi=i; });
+    idx.finish();
+    kIndex=idx;
+  }catch(e){ kIndex=null; }
+}
+// Nearest k centers via spatial index (O(log n) query + haversine re-rank).
+function knearest(lng, lat, k){
+  if(kIndex){
+    let ids=[], d=0.005;
+    while(ids.length<k && d<0.5){
+      ids=kIndex.range(lng-d, lat-d, lng+d, lat+d);
+      d*=2;
+    }
+    return ids.map(i=>({c:allCenters[i], d:haversine(lat,lng,allCenters[i].lat,allCenters[i].lng)}))
+      .sort((a,b)=>a.d-b.d).slice(0,k).map(a=>a.c);
+  }
+  return allCenters.map(c=>({c, d:haversine(lat,lng,c.lat,c.lng)})).sort((a,b)=>a.d-b.d).slice(0,k).map(a=>a.c);
+}
+function buildMuniBBoxes(){
+  MUNI_BBOXES={};
+  allCenters.forEach(c=>{
+    const b=MUNI_BBOXES[c.city]||[c.lng,c.lat,c.lng,c.lat];
+    b[0]=Math.min(b[0],c.lng); b[1]=Math.min(b[1],c.lat); b[2]=Math.max(b[2],c.lng); b[3]=Math.max(b[3],c.lat);
+    MUNI_BBOXES[c.city]=b;
+  });
+}
+function cityBBox(city){
+  const b=MUNI_BBOXES&&MUNI_BBOXES[city];
+  if(!b) return null;
+  return {west:b[0], south:b[1], east:b[2], north:b[3]};
+}
+// ---------- NOAH hazard spatial index (pre-tiled grid; avoids polygon brute force) ----------
+function severityOf(p){
+  const lv=String(p[HAZARD_PROP.level]||'').toLowerCase();
+  if(lv.indexOf('high')>=0) return 3;
+  if(lv.indexOf('moderate')>=0||lv.indexOf('medium')>=0) return 2;
+  if(lv.indexOf('low')>=0) return 1;
+  const adv=String(p[HAZARD_PROP.advisory]||'');
+  if(/ssa[34]/i.test(adv)) return 3;
+  if(/ssa2/i.test(adv)) return 2;
+  return 1;
+}
+function hazardLabel(hz){ return HAZARD_NAME[hz]||hz||'Hazard'; }
+function ringContains(ring, lng, lat){
+  let inside=false;
+  for(let i=0, j=ring.length-1;i<ring.length;j=i++){
+    const xi=ring[i][0], yi=ring[i][1], xj=ring[j][0], yj=ring[j][1];
+    if(((yi>lat)!==(yj>lat)) && (lng < (xj-xi)*(lat-yi)/(yj-yi)+xi)) inside=!inside;
+  }
+  return inside;
+}
+function polygonContains(coords, lng, lat){
+  if(!coords || !coords.length || !ringContains(coords[0], lng, lat)) return false;
+  for(let h=1;h<coords.length;h++){ if(ringContains(coords[h], lng, lat)) return false; }
+  return true;
+}
+function geomContains(g, lng, lat){
+  if(!g) return false;
+  if(g.type==='Polygon') return Array.isArray(g.coordinates) && polygonContains(g.coordinates, lng, lat);
+  if(g.type==='MultiPolygon') return (g.coordinates||[]).some(p=>polygonContains(p, lng, lat));
+  return false;
+}
+function geomBBox(g){
+  let w=Infinity, s=Infinity, e=-Infinity, n=-Infinity;
+  (function walk(cs){
+    if(typeof cs[0]==='number'){ w=Math.min(w,cs[0]); s=Math.min(s,cs[1]); e=Math.max(e,cs[0]); n=Math.max(n,cs[1]); return; }
+    cs.forEach(c=>walk(c));
+  })((g&&g.coordinates)||[]);
+  return [w,s,e,n];
+}
+class HazardGrid {
+  constructor(cellDeg){ this.cell=cellDeg; this.buckets=new Map(); this.feats=[]; }
+  _key(lng,lat){ return Math.floor(lng/this.cell)+':'+Math.floor(lat/this.cell); }
+  add(feat){
+    const fidx=this.feats.length;
+    const bb=geomBBox(feat.geometry);
+    if(!isFinite(bb[0])) return;
+    const i0=Math.floor(bb[0]/this.cell), i1=Math.floor(bb[2]/this.cell);
+    const j0=Math.floor(bb[1]/this.cell), j1=Math.floor(bb[3]/this.cell);
+    for(let i=i0;i<=i1;i++) for(let j=j0;j<=j1;j++){
+      const key=i+':'+j;
+      let arr=this.buckets.get(key); if(!arr){ arr=[]; this.buckets.set(key,arr); }
+      arr.push(fidx);
+    }
+    this.feats.push({bbox:bb, geometry:feat.geometry, properties:feat.properties||{}});
+  }
+  query(lng, lat){
+    const ids=this.buckets.get(this._key(lng,lat))||[];
+    const zones=[];
+    let maxSev=0;
+    for(const fidx of ids){
+      const f=this.feats[fidx];
+      if(lng<f.bbox[0]||lng>f.bbox[2]||lat<f.bbox[1]||lat>f.bbox[3]) continue;
+      if(!geomContains(f.geometry, lng, lat)) continue;
+      const sev=severityOf(f.properties);
+      if(sev>maxSev) maxSev=sev;
+      zones.push({severity:sev, name:hazardLabel(f.properties[HAZARD_PROP.hazard]), level:String(f.properties[HAZARD_PROP.level]||'').toUpperCase(), advisory:f.properties[HAZARD_PROP.advisory]||''});
+    }
+    return {zones, maxSev};
+  }
+}
+function buildHazardIndex(features){
+  const gi=new HazardGrid(0.002);
+  (features||[]).forEach(f=>{ if(f&&f.geometry) gi.add(f); });
+  hazardIndex=gi;
+}
+// Route sampling + hazard scoring (Turf-free: linear interpolation + haversine).
+function sampleLine(coords, stepM){
+  const pts=[];
+  if(!coords||coords.length<2) return pts;
+  pts.push([coords[0][0], coords[0][1]]);
+  let carry=0;
+  for(let i=1;i<coords.length;i++){
+    const x1=coords[i-1][0], y1=coords[i-1][1];
+    const x2=coords[i][0], y2=coords[i][1];
+    const seg=haversine(y1,x1,y2,x2);
+    if(seg<=0) continue;
+    let traversed=0;
+    while(carry+(seg-traversed)>=stepM){
+      const need=stepM-carry;
+      const t=need/(seg-traversed);
+      const lp=x1+(x2-x1)*t, lq=y1+(y2-y1)*t;
+      pts.push([lp,lq]);
+      traversed+=need; carry=0;
+    }
+    carry+=(seg-traversed);
+  }
+  return pts;
+}
+function scoreRouteGeometry(geometry){
+  if(!hazardIndex) return {maxSev:0, hazardKm:0, hazardPct:0, zones:[]};
+  const samples=sampleLine((geometry&&geometry.coordinates)||[], ROUTE_SAMPLE_M);
+  let hit=0, maxSev=0;
+  const zoneMap={};
+  samples.forEach(p=>{
+    const r=hazardIndex.query(p[0], p[1]);
+    if(r.maxSev>0) hit++;
+    if(r.maxSev>maxSev) maxSev=r.maxSev;
+    r.zones.forEach(z=>{ const key=z.name+' '+z.level; if(!zoneMap[key]) zoneMap[key]={...z}; });
+  });
+  return {maxSev, hazardKm:hit*ROUTE_SAMPLE_M/1000, hazardPct:samples.length? hit/samples.length:0, zones:Object.values(zoneMap)};
+}
+function hazardName(score){
+  if(!score) return 'Unavailable';
+  if(score.maxSev>=3) return 'High';
+  if(score.maxSev===2) return 'Medium';
+  if(score.maxSev===1) return 'Low';
+  return 'Low';
+}
 // ---------- emergency group location sharing (engine-agnostic) ----------
-// groupState.draw is set by whichever map engine booted (Mapbox or Leaflet).
 const groupState={code:'', name:'', myName:'', sharing:false, shareTimer:null, refreshTimer:null, draw:null, rows:[]};
 function groupStatusMsg(m){ setStatus('groupStatus', m); }
 function timeAgo(s){
@@ -416,7 +720,6 @@ function updateHazardsBadge(){
   const n=Object.values(sel).filter(Boolean).length;
   const badge=document.getElementById('hzBadge');
   if(badge) badge.textContent=n?` • ${n} on`:'';
-  // The Show-hazards button only makes sense with a layer switched on.
   const sh=document.getElementById('showHazardsBtn');
   if(sh) sh.disabled=!n;
 }
@@ -425,7 +728,6 @@ function bindPanelTabs(){
     const b=document.getElementById(id);
     if(b) b.addEventListener('click', ()=>switchPanelTab(name));
   });
-  // Routes tab content (GPS box) is server-rendered only with a Mapbox token.
   if(!document.getElementById('gpsBox')){
     const rb=document.getElementById('tabBtnRoutes');
     if(rb) rb.style.display='none';
@@ -456,7 +758,7 @@ async function fetchNoah(id){
   const name=noahFileFor(id);
   if(!name) throw new Error('unknown noah layer');
   if(noahCache[name]) return noahCache[name];
-  const res=await fetch(`/static/noah/${name}.geojson`);
+  const res=await fetch(`/static/noah/${name}.geojson`, {cache:'no-cache'});
   if(!res.ok) throw new Error(name+' '+res.status);
   const data=await res.json();
   noahCache[name]=data;
@@ -469,24 +771,18 @@ function noahLabel(feat){
   const adv=p.advisory?` (${p.advisory})`:'';
   return `<div style="min-width:180px"><div style="font-weight:800; text-transform:capitalize;">${esc(hz)} — ${esc(lv)}${esc(adv)}</div><div style="font-size:12px;color:var(--text-secondary);">Source: Project NOAH (DOST)</div></div>`;
 }
-async function loadCenters(){
-  const res = await fetch('/api/centers');
-  allCenters = await res.json();
-  const cities = [...new Set(allCenters.map(c=>c.city))].sort();
-  const sel=document.getElementById('cityFilter');
-  const cur=sel ? sel.value : '';
-  if(sel){
-    sel.innerHTML='<option value="">All cities</option>';
-    cities.forEach(ci=>{ const o=document.createElement('option'); o.textContent=ci; o.value=ci; sel.appendChild(o); });
-    // Deep link from home hero (?city=).
-    let want='';
-    try{ want=new URLSearchParams(location.search).get('city') || localStorage.getItem('ligtasph_ann_city_v1') || ''; }catch(e){}
-    if(want && cities.includes(want)) sel.value=want;
-    else if(cur && cities.includes(cur)) sel.value=cur;
-  }
+// Build the routing hazard index from the three NOAH sources (flood + landslide
+// + current SSA advisory). Loaded silently at startup so hazard-aware routing
+// works with or without the visual layers toggled on.
+async function loadRoutingHazards(){
+  try{
+    const [flood, slide, surge]=await Promise.all([fetchNoah('flood'), fetchNoah('slide'), fetchNoah('surge')]);
+    const merged=[...(flood.features||[]), ...(slide.features||[]), ...(surge.features||[])];
+    buildHazardIndex(merged);
+    return merged.length;
+  }catch(e){ try{ buildHazardIndex(null); }catch(_){} return 0; }
 }
-// Live center updates: version check every 15s, full re-fetch only on
-// change. Re-render preserves filters + camera (render fits bounds once).
+// ---------- live (unused for GL mode; kept for fallback + stamp) ----------
 let liveVersion=null, liveTimer=null, liveFailStreak=0;
 const LIVE_INTERVAL_MS=15000;
 function setLiveStamp(msg){ const el=document.getElementById('liveStamp'); if(el) el.textContent=msg||''; }
@@ -500,7 +796,7 @@ async function checkCentersLive(refresh){
     if(liveVersion===null){ liveVersion=key; return; }
     if(key!==liveVersion){
       liveVersion=key;
-      await loadCenters();
+      try{ await loadCenters(); }catch(e){}
       try{ refresh(); }catch(e){}
       setLiveStamp('Updated just now');
       setTimeout(()=>setLiveStamp(''), 5000);
@@ -521,19 +817,24 @@ async function initCentersLive(refresh){
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkCentersLive(refresh); });
 }
 function bindFilterInputs(render){
-  document.getElementById('q').addEventListener('input', render);
+  const q=document.getElementById('q');
+  let deb=null;
+  q.addEventListener('input', ()=>{ clearTimeout(deb); deb=setTimeout(render, 200); });
   document.getElementById('cityFilter').addEventListener('change', render);
-  document.getElementById('statusFilter').addEventListener('change', render);
-  document.getElementById('supplyFilter').addEventListener('change', render);
-  document.getElementById('clearBtn').addEventListener('click', ()=>{ document.getElementById('q').value=''; document.getElementById('statusFilter').value=''; document.getElementById('supplyFilter').value=''; document.getElementById('cityFilter').value=''; if(USE_MAPBOX) clearRoute(); render();});
+  document.getElementById('typeFilter').addEventListener('change', render);
+  document.getElementById('facStatusFilter').addEventListener('change', render);
+  document.getElementById('dataQa').addEventListener('change', render);
+  document.getElementById('clearBtn').addEventListener('click', ()=>{
+    document.getElementById('q').value=''; document.getElementById('cityFilter').value='';
+    document.getElementById('typeFilter').value=''; document.getElementById('facStatusFilter').value='';
+    document.getElementById('dataQa').checked=false;
+    if(USE_MAPBOX) clearRoute();
+    render();
+  });
 }
 // ---------- detected-hazard area overlays (estimated, illustrative) ----------
-// Quake ring radius doubles per magnitude unit from a 15 km M3 baseline:
-// M4≈30, M5≈60, M6≈120, M7≈240 km. A rough felt-area guide, NOT an
-// official danger zone. Fire ring is a fixed ~1 km watch perimeter.
 function quakeRadiusKm(mag){ const m=+mag||0; return Math.round(15*Math.pow(2, Math.max(0, m-3))); }
 function fireRadiusKm(){ return 1; }
-// Destination-point circle polygon (lon/lat degrees) for Mapbox fill layers.
 function circlePolygon(lon, lat, radiusKm, steps){
   steps=steps||48;
   const coords=[], R=6371, lat1=lat*Math.PI/180, lon1=lon*Math.PI/180, d=radiusKm/R;
@@ -555,12 +856,11 @@ function debounceHazards(refresh){
   });
   const ssa=document.getElementById('hzSSA');
   if(ssa) ssa.addEventListener('change', ()=>{
-    // Drop cached surge files so the newly selected advisory loads fresh.
     Object.keys(noahCache).forEach(k=>{ if(k.startsWith('stormsurge_')) delete noahCache[k]; });
     wrapped();
+    try{ loadRoutingHazards(); }catch(e){}
   });
 }
-// route helpers are engine-specific; this no-op is replaced in Mapbox mode
 function clearRoute(){ try{ hideRouteDock(); }catch(e){} }
 // ---------- bottom turn-by-turn dock (separated from the Details side panel) ----------
 function setDockSummary(msg){ const el=document.getElementById('routeDockSummary'); if(el) el.textContent=msg||'No active route.'; }
@@ -591,9 +891,7 @@ function bindRouteDock(){
     try{ switchPanelTab('routes'); }catch(e){}
   });
 }
-// Engine mode badge (Mapbox vs OSM fallback) — instant triage for "I can't see X" reports.
 function setMapMode(mode){ const el=document.getElementById('mapMode'); if(el) el.textContent=mode; }
-// Panel collapse is engine-agnostic; each engine sets notifyMapResize.
 let notifyMapResize = ()=>{};
 function bindPanelToggle(){
   const panel=document.getElementById('sidePanel'), open=document.getElementById('panelOpen'), close=document.getElementById('panelClose');
@@ -615,11 +913,9 @@ async function initMapbox(){
     style: 'mapbox://styles/mapbox/streets-v12',
     center: [121.0968, 14.6308],
     zoom: 11,
-    fadeDuration: 0 // no white fade-in flash on tiles
+    fadeDuration: 0
   });
-  // Re-sync canvas size once the style loads (prevents blank/white areas).
   map.on('load', ()=>{ try{ map.resize(); }catch(e){} });
-  // Tile/style error handler — show guidance when Mapbox tiles fail to load.
   map.on('error', (e)=>{
     const msg=(e.error && e.error.message)||'';
     if(/token|forbidden|unauthorized/i.test(msg)){
@@ -634,7 +930,7 @@ async function initMapbox(){
     trackUserLocation: true, showUserHeading: true, showAccuracyCircle: true
   });
   map.addControl(geo, 'top-right');
-  let userPos = null, userAcc = null; // [lng, lat], accuracy meters
+  let userPos = null, userAcc = null;
   function gpsStatus(msg){ setStatus('gpsStatus', msg); }
   function gpsErrorHint(e){
     if(!window.isSecureContext) return 'GPS blocked: browsers only allow location on HTTPS or localhost — not plain HTTP.';
@@ -642,15 +938,42 @@ async function initMapbox(){
     if(e && e.code===3) return 'GPS timed out — move outdoors or near a window, then retry.';
     return 'GPS unavailable — type a start point instead, routing still works.';
   }
+  let lastReverseGeo=0, reverseGeoCity=null;
+  let cityAutoDetected=false;
+  async function reverseGeocodeCity(lng, lat){
+    // Throttled reverse geocode: resolves the user's municipality once.
+    if(Date.now()-lastReverseGeo<20000) return;
+    lastReverseGeo=Date.now();
+    try{
+      const res=await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?types=place,region&language=en&limit=1&access_token=${encodeURIComponent(MAPBOX_TOKEN)}`);
+      if(!res.ok) return;
+      const data=await res.json();
+      const f=(data.features||[])[0];
+      if(!f) return;
+      let city=null;
+      const ctx=((f.context||[]).find(c=>c.id.startsWith('place.')||(c.id.startsWith('region.')&&!c.id.includes('metro'))))||null;
+      city=(ctx&&ctx.short_code)||f.text||null;
+      if(!city) return;
+      const norm=(city.indexOf('city of')!==-1 || /manila|caloocan|las piñas|las pinas|pasay|mandaluyong|marikina|muntinlupa|navotas|paranaque|pasig|pateros|quezon|san juan|taguig|valenzuela/i.test(city)) ? city : city;
+      reverseGeoCity=norm;
+      cityAutoDetected=true;
+      if(!document.getElementById('cityFilter').value){
+        const opts=[...document.getElementById('cityFilter').options].map(o=>o.value);
+        const match=opts.find(o=>o.toLowerCase()===norm.toLowerCase());
+        if(match){ document.getElementById('cityFilter').value=match; try{ refreshView(); }catch(e){} }
+        gpsStatus(`GPS fix ✓ ±${Math.round(userAcc||0)} m • ${match||norm} detected`);
+      }
+    }catch(e){}
+  }
   geo.on('geolocate', (e)=>{ userPos=[e.coords.longitude, e.coords.latitude]; userAcc=e.coords.accuracy;
-    gpsStatus(`GPS fix ✓ ±${Math.round(userAcc||0)} m`); });
+    gpsStatus(`GPS fix ✓ ±${Math.round(userAcc||0)} m`);
+    if(!cityAutoDetected) reverseGeocodeCity(e.coords.longitude, e.coords.latitude);
+  });
   geo.on('error', (e)=>{ gpsStatus(gpsErrorHint(e)); });
   geo.on('trackuserlocationstart', ()=>{ if(!userPos) gpsStatus('Waiting for GPS fix…'); });
   if(!('geolocation' in navigator)) gpsStatus('This browser has no geolocation — type a start point instead.');
   else if(!window.isSecureContext) gpsStatus('Heads up: GPS needs HTTPS or localhost (browser rule).');
-  // Auto-start Mapbox integrated GPS on load so routing/follow work immediately.
   map.on('load', ()=>{ try{ geo.trigger(); }catch(e){ gpsStatus(gpsErrorHint()); } });
-  // Visibility guard: if the native ⌖ control failed to render, inject a floating backup.
   map.on('load', ()=>{
     if(document.querySelector('#map .mapboxgl-ctrl-geolocate')) return;
     const b=document.createElement('button');
@@ -662,59 +985,231 @@ async function initMapbox(){
   });
   setMapMode('Mapbox');
 
-  let markers = []; // {id, marker}
-  let groupMarkers = [];
-  // NB: group refresh timing lives in shared groupState.refreshTimer.
-  const quakeSrcId='hz-quakes', fireSrcId='hz-fires';
-  const quakeAreaSrcId='hz-quake-area', fireAreaSrcId='hz-fire-area';
-
-  function ensureHazardLayers(){
-    if(!map.getSource(quakeSrcId)){
-      map.addSource(quakeSrcId, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
-      map.addLayer({id:'hz-quakes-layer', type:'circle', source:quakeSrcId,
-        paint:{'circle-radius':['max', 6, ['interpolate',['linear'],['get','mag'],3,6,9,20]],
-               'circle-color':'#9333ea','circle-opacity':0.75,'circle-stroke-color':'#fff','circle-stroke-width':1}});
-    }
-    if(!map.getSource(quakeAreaSrcId)){
-      map.addSource(quakeAreaSrcId, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
-      map.addLayer({id:'hz-quake-area-layer', type:'fill', source:quakeAreaSrcId,
-        layout:{visibility:'none'},
-        paint:{'fill-color':'#9333ea','fill-opacity':0.14,'fill-outline-color':'#6b21a8'}},
-        'hz-quakes-layer');
-    }
-    if(!map.getSource(fireSrcId)){
-      map.addSource(fireSrcId, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
-      map.addLayer({id:'hz-fires-layer', type:'circle', source:fireSrcId,
-        paint:{'circle-radius':5,'circle-color':'#dc2626','circle-opacity':0.8,'circle-stroke-color':'#fff','circle-stroke-width':1}});
-      map.addLayer({id:'hz-heat-layer', type:'heatmap', source:fireSrcId,
-        layout:{visibility:'none'},
-        paint:{'heatmap-weight':['interpolate',['linear'],['get','brightness'],300,0.3,450,1],
-               'heatmap-intensity':1,'heatmap-radius':28,'heatmap-opacity':0.6,
-               'heatmap-color':['interpolate',['linear'],['heatmap-density'],0,'rgba(254,249,195,0)',0.4,'#f97316',0.8,'#dc2626']}});
-    }
-    if(!map.getSource(fireAreaSrcId)){
-      map.addSource(fireAreaSrcId, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
-      map.addLayer({id:'hz-fire-area-layer', type:'fill', source:fireAreaSrcId,
-        layout:{visibility:'none'},
-        paint:{'fill-color':'#dc2626','fill-opacity':0.14,'fill-outline-color':'#991b1b'}},
-        'hz-fires-layer');
-    }
-  }
-  // Project NOAH fill layers (one source per hazard; surge source swaps SSA1-4).
-  const noahSrc={flood:'noah-flood', slide:'noah-slide', surge:'noah-surge'};
-  function ensureNoahLayers(){
-    Object.entries(noahSrc).forEach(([id, src])=>{
-      if(map.getSource(src)) return;
-      map.addSource(src, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
-      map.addLayer({id:src+'-layer', type:'fill', source:src,
-        layout:{visibility:'none'},
-        paint:{'fill-color':['match',['get','level'],'low','#facc15','moderate','#f97316','high','#dc2626','#f97316'],
-               'fill-opacity':0.35,'fill-outline-color':'#7c2d12'}});
+  // ---------------- GL-native evacuation-center source (clustered, no DOM markers) ----------------
+  const evacSrcId='evac-centers';
+  const layerIds={
+    clusters:'evac-clusters',
+    clusterCount:'evac-cluster-count',
+    points:'evac-points',
+    qa:'evac-qa-points',
+  };
+  let evacDataVersion=0, selectedFid=null, lastPointFilterKey='';
+  function ensureEvacLayers(){
+    if(map.getSource(evacSrcId)) return;
+    map.addSource(evacSrcId, {type:'geojson', data:{type:'FeatureCollection', features:[]}, cluster:true, clusterMaxZoom:14, clusterRadius:50, promoteId:'fid'});
+    map.addLayer({
+      id:layerIds.clusters, type:'circle', source:evacSrcId,
+      filter:['has','point_count'],
+      paint:{
+        'circle-color':['step',['get','point_count'],'#64748b',10,'#3b6ef5',50,'#7c3aed'],
+        'circle-radius':['step',['get','point_count'],16,10,22,50,30],
+        'circle-stroke-width':2,'circle-stroke-color':'#fff'
+      }
+    });
+    map.addLayer({
+      id:layerIds.clusterCount, type:'symbol', source:evacSrcId,
+      filter:['has','point_count'],
+      layout:{'text-field':['get','point_count_abbreviated'],'text-size':12,'text-allow-overlap':false},
+      paint:{'text-color':'#fff','text-halo-color':'#0f172a','text-halo-width':1}
+    });
+    map.addLayer({
+      id:layerIds.points, type:'circle', source:evacSrcId,
+      filter:['!',['has','point_count']],
+      paint:{
+        'circle-color':['case',
+          ['boolean',['feature-state','selected'],false],'#1d4ed8',
+          ['==',['get','needs_review'],true],'#f59e0b',
+          ['==',['get','verified'],false],'#94a3b8',
+          '#039855'],
+        'circle-radius':['case',
+          ['boolean',['feature-state','selected'],false],9,
+          ['interpolate',['linear'],['zoom'],8,6,14,9]],
+        'circle-stroke-width':['case',['boolean',['feature-state','selected'],false],3,1],
+        'circle-stroke-color':['case',['boolean',['feature-state','selected'],false],'#ffffff','#ffffff'],
+        'circle-opacity': citySelected()
+      }
+    });
+    map.addLayer({
+      id:layerIds.qa, type:'circle', source:evacSrcId,
+      filter:['all',['!',['has','point_count']],['any',['==',['get','needs_review'],true],['==',['get','verified'],false]]],
+      paint:{'circle-radius':12,'circle-color':'transparent','circle-stroke-width':3,'circle-stroke-color':'#f59e0b','circle-stroke-opacity':0.9,'circle-opacity':citySelected()},
+      layout:{visibility:'none'}
     });
   }
-  function routeStatus(msg){ setStatus('routeStatus', msg); try{ setDockSummary(msg); if(msg) showRouteDock(); }catch(e){} }
+  function citySelected(){ const c=document.getElementById('cityFilter').value;
+    return c?['match',['get','municipality_input'],c,1,0.3]:1; }
+  // Combined one-shot filter memoization: only rebuilt + applied when inputs change.
+  function buildFilterKey(){
+    return JSON.stringify({q:qVal(), city:cityVal(), type:typeVal(), status:facStatusVal(), qa:qaVal()});
+  }
+  function qVal(){ return (document.getElementById('q').value||'').trim().toLowerCase(); }
+  function cityVal(){ return document.getElementById('cityFilter').value; }
+  function typeVal(){ return document.getElementById('typeFilter').value; }
+  function facStatusVal(){ return document.getElementById('facStatusFilter').value; }
+  function qaVal(){ return document.getElementById('dataQa').checked; }
+  // Returns {geojson, pointFilter} for the current view. Scalar filters fold
+  // into ONE setFilter expression; free-text + live radius need a data subset
+  // because GL filter language has no substring/distance primitives (documented
+  // — both paths stay data-driven, memoized, and never touch the DOM).
+  const evacViewMemo={key:'', out:null};
+  function computeEvacView(){
+    const key=buildFilterKey();
+    if(evacViewMemo.key===key) return evacViewMemo.out;
+    const q=qVal(), type=typeVal(), status=facStatusVal(), qa=qaVal();
+    const parts=[];
+    if(type) parts.push(['match',['get','facility_type'], type, true, false]);
+    if(status) parts.push(['match',['get','facility_status'], status, true, false]);
+    if(q || type || status || qa){
+      const feats=(EVAC_FC.features||[]).filter(f=>{
+        const p=f.properties||{};
+        if(!f.geometry||f.geometry.type!=='Point') return false;
+        if(type && p.facility_type!==type) return false;
+        if(status && (p.facility_status||'').toUpperCase()!==status) return false;
+        if(qa && !(p.needs_review || !p.verified)) return false;
+        if(q){
+          const hay=((p.name||'')+' '+(p.barangay_resolved||p.barangay_input||'')+' '+(p.municipality_input||'')+' '+(p.facility_type||'')).toLowerCase();
+          if(hay.indexOf(q)===-1) return false;
+        }
+        return true;
+      });
+      const subFC={type:'FeatureCollection', features:feats};
+      const out={geojson:subFC, pointFilter:['all',['!',['has','point_count']],...parts], clusterFilter:['all',['has','point_count'],...parts]};
+      evacViewMemo.key=key; evacViewMemo.out=out;
+      return out;
+    }
+    const out={geojson:EVAC_FC, pointFilter:['!',['has','point_count']], clusterFilter:['has','point_count']};
+    evacViewMemo.key=key; evacViewMemo.out=out;
+    return out;
+  }
+  function refreshView(){
+    const filtered=getFiltered();
+    ensureEvacLayers();
+    const st=document.getElementById('cityFilter').value;
+    if(map.getSource(evacSrcId)){
+      const view=computeEvacView();
+      // Data swaps are cheap (≤868 features); the setFilter below is memoized.
+      map.getSource(evacSrcId).setData(view.geojson);
+      if(lastPointFilterKey!==JSON.stringify(view.pointFilter)){
+        lastPointFilterKey=JSON.stringify(view.pointFilter);
+        map.setFilter(layerIds.points, view.pointFilter);
+        map.setFilter(layerIds.clusters, view.clusterFilter);
+      }
+      // per-city highlight: dim non-selected via the shared expression
+      map.setPaintProperty(layerIds.points,'circle-opacity', citySelected());
+      try{ map.setPaintProperty(layerIds.qa,'circle-opacity', citySelected()); }catch(e){}
+      // data-quality (field-verification) overlay toggle
+      map.setLayoutProperty(layerIds.qa,'visibility', qaVal()?'visible':'none');
+    }
+    const onRoute=typeof routeToGL==='function' ? routeToGL : null;
+    renderList(filtered, {
+      onRoute,
+      onLocate:(c)=>{
+        map.flyTo({center:[c.lng,c.lat], zoom:14});
+        selectFid(c.fid);
+        showEvacPopupFor(c);
+      },
+      onReport:(c)=>{ showEvacPopupFor(c, true); }
+    });
+  }
+  function selectFid(fid){
+    try{
+      if(selectedFid!==null) map.setFeatureState({source:evacSrcId, id:selectedFid},{selected:false});
+      if(fid!==null) map.setFeatureState({source:evacSrcId, id:fid},{selected:true});
+    }catch(e){}
+    selectedFid=fid;
+  }
+  function centerByFid(fid){ return allCenters.find(c=>c.fid===fid); }
+  function hazardAtCenter(c){
+    if(!hazardIndex) return null;
+    const r=hazardIndex.query(c.lng,c.lat);
+    return r.maxSev>0?{maxSev:r.maxSev, name:(r.zones[0]||{}).name, zone:(r.zones[0]||{}).level}:null;
+  }
+  let activePopup=null;
+  function showEvacPopupFor(c, openReport){
+    if(activePopup){ try{ activePopup.remove(); }catch(e){} activePopup=null; }
+    const popup=new mapboxgl.Popup({offset:12, maxWidth:'320px'})
+      .setLngLat([c.lng,c.lat])
+      .setHTML(centerPopupHTML(c, `<button data-route="${c.lat},${c.lng}" data-name="${esc(c.name)}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">Route here</button>`, {hazard:hazardAtCenter(c)}))
+      .addTo(map);
+    activePopup=popup;
+    if(openReport) openReportForm(c);
+    return popup;
+  }
+  // Crowd-report inline form inside the popup (no fake numbers).
+  function openReportForm(c){
+    const key=evacKey(c);
+    const cur=getCrowd(key);
+    const mk=(v)=>
+      `<button data-setstatus="${esc(c.name)}::${esc(c.city)}::${v}" class="btn ${cur&&cur.status===v?'btn-primary':'btn-secondary'}" style="padding:4px 8px; font-size:11px;">${v}</button>`;
+    const html=`
+      <div style="margin-top:8px; border-top:1px solid var(--border); padding-top:8px;">
+        <div style="font-size:12px; font-weight:700; margin-bottom:4px;">Report ${esc(c.name)}</div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">${mk('Open')}${mk('Full')}${mk('No supplies')}${mk('Clear')}</div>
+        ${cur?`<div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">Current: ${esc(cur.status)} (${timeAgoRaw(cur.at)})</div>`:''}
+      </div>`;
+    if(activePopup){ try{ activePopup.setHTML(centerPopupHTML(c, `<button data-route="${c.lat},${c.lng}" data-name="${esc(c.name)}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">Route here</button>`, {hazard:hazardAtCenter(c)})+html).addTo(map); }catch(e){} }
+  }
+  // Cluster click → zoom in; point click → lazy popup.
+  map.on('click', layerIds.clusters, (e)=>{
+    if(!e.features||!e.features.length) return;
+    const f=e.features[0];
+    const bb=new mapboxgl.LngLatBounds();
+    const coor=(f.geometry||{type:'Point', coordinates:[0,0]}).coordinates;
+    // Clusters carry their own point in the cluster geometry; step in by zooming.
+    const nextZoom=map.getZoom()+2;
+    if(f.properties.cluster){
+      map.flyTo({center:coor, zoom:Math.min(nextZoom, 22)});
+    }else{
+      bb.extend(coor); map.fitBounds(bb,{padding:60});
+    }
+  });
+  map.on('click', layerIds.points, (e)=>{
+    if(!e.features||!e.features.length) return;
+    const f=e.features[0];
+    selectFid(f.id!==undefined?f.id:f.properties.fid);
+    const c=centerByFid(f.properties.fid);
+    if(c) showEvacPopupFor(c);
+  });
+  map.on('click', layerIds.qa, (e)=>{
+    if(!e.features||!e.features.length) return;
+    const f=e.features[0]; selectFid(f.id!==undefined?f.id:f.properties.fid);
+    const c=centerByFid(f.properties.fid); if(c) showEvacPopupFor(c);
+  });
+  map.on('mouseenter', layerIds.clusters, ()=>{ map.getCanvas().style.cursor='pointer'; });
+  map.on('mouseleave', layerIds.clusters, ()=>{ map.getCanvas().style.cursor=''; });
+  map.on('mouseenter', layerIds.points, (e)=>{
+    map.getCanvas().style.cursor='pointer';
+    if(e.features&&e.features.length){ const fid=e.features[0].properties.fid; try{ map.setFeatureState({source:evacSrcId, id:fid},{hover:true}); }catch(err){} }
+  });
+  map.on('mouseleave', layerIds.points, (e)=>{
+    map.getCanvas().style.cursor='';
+    if(e.features&&e.features.length){ const fid=e.features[0].properties.fid; try{ map.setFeatureState({source:evacSrcId, id:fid},{hover:false}); }catch(err){} }
+  });
+  // Report-status tagging via delegation (works from popups & list).
+  document.getElementById('map').addEventListener('click', (ev)=>{
+    const btn=ev.target.closest('[data-setstatus]');
+    if(!btn) return;
+    const [name, city, status]=btn.dataset.setstatus.split('::');
+    const c=allCenters.find(x=>x.name===name&&x.city===city);
+    if(!c) return;
+    setCrowd(evacKey(c), status, '');
+    if(activePopup){ try{ activePopup.remove(); }catch(e){} activePopup=null; }
+    showEvacPopupFor(c);
+    ev.preventDefault();
+  });
+  document.getElementById('map').addEventListener('click', (ev)=>{
+    const btn=ev.target.closest('[data-report]');
+    if(!btn) return;
+    const [name, city]=btn.dataset.report.split('::');
+    const c=allCenters.find(x=>x.name===name&&x.city===city);
+    if(!c) return;
+    openReportForm(c);
+    ev.preventDefault();
+  });
+  // ---------------- routing helpers (shared with shared-code clearRoute) ----------------
   let navProfile='driving', destPin=null, followMode=false, navSession=null, suggestAbort=null, suggestTimer=null;
-  const PH_BBOX='116.0,4.0,127.0,22.0'; // bias search to the Philippines
+  let lastRoute=null, safestMode=false, navActive=false;
+  const PH_BBOX='116.0,4.0,127.0,22.0';
   function newSession(){ try{ navSession=crypto.randomUUID(); }catch(e){ navSession='sess-'+Date.now(); } }
   clearRoute = function(){
     if(map.getLayer('route-line')) map.removeLayer('route-line');
@@ -722,11 +1217,12 @@ async function initMapbox(){
     if(destPin){ destPin.remove(); destPin=null; }
     const st=document.getElementById('navSteps'); if(st){ st.style.display='none'; st.innerHTML=''; }
     routeStatus('');
+    const hr=document.getElementById('routeHazardReadout'); if(hr){ hr.style.display='none'; }
+    lastRoute=null; navActive=false; stopRerouteWatch();
     try{ hideRouteDock(); setDockSummary(''); }catch(e){}
   };
   async function ensureUserPos(){
     if(userPos) return userPos;
-    // Drive the fix through the Mapbox control so the dot/accuracy circle stay in sync.
     try{ geo.trigger(); }catch(e){}
     const fix = await new Promise((res)=>{
       let done=false;
@@ -757,12 +1253,11 @@ async function initMapbox(){
     const data=await res.json();
     const f=(data.features||[])[0];
     if(!f) throw new Error('no result');
-    navSession=null; // end billing session once a suggestion is retrieved
+    navSession=null;
     return {lng:f.geometry.coordinates[0], lat:f.geometry.coordinates[1],
       name:(f.properties||{}).name || (f.properties||{}).place_formatted || 'Destination'};
   }
   async function geocodeFirst(q){
-    // Typed origin without picking a suggestion: take top result.
     const s=await geocodeSuggest(q);
     if(!s.length) throw new Error('place not found');
     return geocodeRetrieve(s[0].mapbox_id);
@@ -784,7 +1279,111 @@ async function initMapbox(){
     try{ setDockSteps(`<div style="font-weight:700; margin-bottom:2px;">Turn-by-turn (${steps.length} steps)</div>`+rows); }catch(e){}
   }
   function profileLabel(){ return navProfile==='walking'?'walk':navProfile==='cycling'?'bike':'drive'; }
-  // Generalized routing: any origin → any destination, any profile.
+  // ---- hazard-aware directions: alternatives + scoring + safest-mode pick ----
+  function routeStatus(msg){ setStatus('routeStatus', msg); try{ setDockSummary(msg); if(msg) showRouteDock(); }catch(e){} }
+  async function directionsRoutes(from, to){
+    const url=`https://api.mapbox.com/directions/v5/mapbox/${navProfile}/${from[0]},${from[1]};${to[0]},${to[1]}?geometries=geojson&overview=full&steps=true&alternatives=true&access_token=${encodeURIComponent(MAPBOX_TOKEN)}`;
+    const res=await fetch(url);
+    if(!res.ok) throw new Error('directions '+res.status);
+    const data=await res.json();
+    return data.routes||[];
+  }
+  function rankRoute(score, numRoutes){
+    const routeCountRank = numRoutes>1 ? (score&&score.hazardPct)||0 : 0;
+    if(!score) return 0;
+    return score.maxSev*100 + Math.min(100, score.hazardPct*1000) + routeCountRank;
+  }
+  function drawRoute(geometry, color){
+    if(!map.getSource('route-src')) map.addSource('route-src', {type:'geojson', data:{type:'Feature', properties:{}, geometry}});
+    else map.getSource('route-src').setData({type:'Feature', properties:{}, geometry});
+    if(!map.getLayer('route-line')) map.addLayer({id:'route-line', type:'line', source:'route-src',
+      layout:{'line-join':'round','line-cap':'round'}, paint:{'line-color':color||'#3b6ef5','line-width':['case',['boolean',['feature-state','active'],false],7,5],'line-opacity':0.9}});
+    lastRoute={geometry, color:color||'#3b6ef5'};
+  }
+  function setDestPin(lng, lat, name){
+    if(destPin) destPin.remove();
+    const el=document.createElement('div');
+    el.style.cssText='background:#7A271A;width:18px;height:18px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.5);cursor:pointer;';
+    destPin=new mapboxgl.Marker({element:el}).setLngLat([lng,lat])
+      .setPopup(new mapboxgl.Popup({offset:12}).setText(name||'Destination')).addTo(map);
+  }
+  function scoreAndShow(routes, from, toName){
+    const scored=routes.map(r=>({route:r, score:hazardIndex?scoreRouteGeometry(r.geometry):null}));
+    let picked=scored[0];
+    if(safestMode && scored.length>1){
+      scored.sort((a,b)=>rankRoute(a.score, scored.length)-rankRoute(b.score, scored.length) || (a.route.duration-b.route.duration));
+      picked=scored[0];
+    }
+    const r=picked.route;
+    drawRoute(r.geometry, safestMode?'#0e9f6e':'#3b6ef5');
+    const km=(r.distance/1000).toFixed(1), min=Math.round(r.duration/60);
+    const hz=picked.score;
+    const hr=document.getElementById('routeHazardReadout');
+    let hzLine='';
+    if(hz){ hzLine=`Hazard on route: ${hazardName(hz)} • ${(hz.hazardPct*100).toFixed(0)}% sampled in zones (${hz.hazardKm.toFixed(2)} km)`+(hz.zones.length?` • ${hz.zones.map(z=>z.name+': '+z.level).join(', ')}`:'');
+      if(hr){ hr.style.display='block'; hr.textContent=hzLine; }
+    }else if(hr){ hr.style.display='none'; }
+    let note='';
+    if(safestMode && scored.length>1){
+      const fastest=scored.slice().sort((a,b)=>a.route.duration-b.route.duration)[0];
+      note=` • Safest of ${scored.length} — fastest would be ~${Math.round(fastest.route.duration/60)} min (hazard ${hazardName(fastest.score)})`;
+    }else if(scored.length>1 && !safestMode){
+      const safe=scored.slice().sort((a,b)=>rankRoute(a.score, scored.length)-rankRoute(b.score, scored.length))[0];
+      note=` • ${scored.length} alternates — safest would be hazard ${hazardName(safe.score)} (−${Math.max(0, Math.round((safe.route.duration-r.duration)/60))} min)`;
+    }
+    routeStatus(`Route to ${toName||'destination'}: ${km} km, ~${min} min ${profileLabel()}.${note}`);
+    renderSteps(r);
+    const b=new mapboxgl.LngLatBounds(); r.geometry.coordinates.forEach(x=>b.extend(x)); map.fitBounds(b,{padding:60});
+    return r;
+  }
+  // Reroute watcher: watchPosition, throttled, alerts when the user enters a
+  // High-severity NOAH zone within the buffer and triggers an auto-reroute.
+  let rerouteWatchId=null, lastRerouteCheck={t:0,lng:0,lat:0};
+  function pointNearHighHazard(lng,lat){
+    if(!hazardIndex||!navActive||!lastRoute) return false;
+    if(hazardIndex.query(lng,lat).maxSev>=3) return true;
+    for(let a=0;a<8;a++){
+      const br=a*Math.PI/4;
+      const dl=Math.cos(br)*REROUTE_BUFFER_M/111320;
+      const dphi=Math.sin(br)*REROUTE_BUFFER_M/(111320*Math.cos(lat*Math.PI/180));
+      if(hazardIndex.query(lng+dphi,lat+dl).maxSev>=3) return true;
+    }
+    return false;
+  }
+  function onRerouteTick(e){
+    const lng=e.coords.longitude, lat=e.coords.latitude, now=Date.now();
+    if(now-lastRerouteCheck.t < REROUTE_THROTTLE_MS) return;
+    if(lastRerouteCheck.t && haversine(lastRerouteCheck.lat,lastRerouteCheck.lng,lat,lng)<REROUTE_MIN_MOVE_M) return;
+    lastRerouteCheck={t:now,lng,lat};
+    if(!navActive||!lastRoute) return;
+    if(pointNearHighHazard(lng,lat)){
+      showHazardToast('⚠️ Flood zone ahead — rerouting…');
+      const act=currentDest(); if(act){
+        const from=[lng,lat];
+        try{ routeFromTo(from, act.lng, act.lat, act.name, true); }catch(err){}
+      }
+    }
+  }
+  function startRerouteWatch(){
+    if(rerouteWatchId) return;
+    if(!navigator.geolocation) return;
+    try{ rerouteWatchId=navigator.geolocation.watchPosition(onRerouteTick, ()=>{}, {enableHighAccuracy:true, maximumAge:5000, timeout:20000}); }catch(e){}
+  }
+  function stopRerouteWatch(){
+    if(rerouteWatchId){ try{ navigator.geolocation.clearWatch(rerouteWatchId); }catch(e){} rerouteWatchId=null; }
+  }
+  let _currentDest=null;
+  function currentDest(){ return _currentDest; }
+  async function routeFromTo(from, toLng, toLat, name, reroute){
+    try{
+      if(!reroute) routeStatus('Finding route…');
+      const routes=await directionsRoutes(from, [toLng, toLat]);
+      if(!routes.length) throw new Error('no route');
+      _currentDest={lng:toLng, lat:toLat, name};
+      scoreAndShow(routes, from, name);
+      navActive=true; startRerouteWatch();
+    }catch(e){ routeStatus('Routing failed: '+(e.message||'location unavailable — enable GPS or type a start point.')); }
+  }
   async function routeToCoord(lng, lat, name, fromOverride){
     try{
       routeStatus('Getting start point…');
@@ -794,40 +1393,22 @@ async function initMapbox(){
         if(typed){ const g=await geocodeFirst(typed); from=[g.lng,g.lat]; }
         else { from=await ensureUserPos(); }
       }
-      routeStatus('Finding route…');
-      // Public pk.* token: same exposure as the map tiles themselves; URL-restricted in dashboard.
-      const url = `https://api.mapbox.com/directions/v5/mapbox/${navProfile}/${from[0]},${from[1]};${lng},${lat}?geometries=geojson&overview=full&steps=true&access_token=${encodeURIComponent(MAPBOX_TOKEN)}`;
-      const res = await fetch(url);
-      if(!res.ok) throw new Error('directions '+res.status);
-      const data = await res.json();
-      const route = (data.routes||[])[0];
-      if(!route) throw new Error('no route');
-      clearRoute();
-      map.addSource('route-src', {type:'geojson', data:{type:'Feature', properties:{}, geometry:route.geometry}});
-      map.addLayer({id:'route-line', type:'line', source:'route-src',
-        layout:{'line-join':'round','line-cap':'round'}, paint:{'line-color':'#3b6ef5','line-width':5,'line-opacity':0.9}});
-      const km=(route.distance/1000).toFixed(1), min=Math.round(route.duration/60);
-      routeStatus(`Route to ${name||'destination'}: ${km} km, ~${min} min ${profileLabel()}.`);
-      renderSteps(route);
-      const b=new mapboxgl.LngLatBounds(); route.geometry.coordinates.forEach(c=>b.extend(c)); map.fitBounds(b,{padding:60});
+      await routeFromTo(from, lng, lat, name, false);
     }catch(e){ routeStatus('Routing failed: '+(e.message||'location unavailable — enable GPS or type a start point.')); }
   }
-  // Called from popup "Route here" buttons (event delegation on map container).
   async function routeTo(lat, lng, name){
     setDestPin(lng, lat, name);
     await routeToCoord(lng, lat, name);
   }
-  function setDestPin(lng, lat, name){
-    if(destPin) destPin.remove();
-    const el=document.createElement('div');
-    el.style.cssText='background:#7A271A;width:18px;height:18px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.5);cursor:pointer;';
-    destPin=new mapboxgl.Marker({element:el}).setLngLat([lng,lat])
-      .setPopup(new mapboxgl.Popup({offset:12}).setText(name||'Destination')).addTo(map);
+  async function routeToGL(c){
+    setDestPin(c.lng, c.lat, c.name);
+    await routeToCoord(c.lng, c.lat, c.name);
   }
+  window.routeToGL=routeToGL;
   document.getElementById('map').addEventListener('click', (ev)=>{
-    const btn = ev.target.closest('[data-route]');
+    const btn=ev.target.closest('[data-route]');
     if(!btn) return;
-    const [lat, lng] = btn.dataset.route.split(',').map(Number);
+    const [lat, lng]=btn.dataset.route.split(',').map(Number);
     routeTo(lat, lng, btn.dataset.name);
   });
   // ---- destination autocomplete ----
@@ -863,10 +1444,31 @@ async function initMapbox(){
     });
     document.addEventListener('click', (e)=>{ if(!e.target.closest('#navDest') && !e.target.closest('#navSuggest')) hideSuggest(); });
   }
+  // ETA for a candidate route (used to re-rank the 5 nearest by ETA not distance).
+  async function directionsEta(from, to){
+    try{
+      const url=`https://api.mapbox.com/directions/v5/mapbox/${navProfile}/${from[0]},${from[1]};${to[0]},${to[1]}?overview=simplest&access_token=${encodeURIComponent(MAPBOX_TOKEN)}`;
+      const res=await fetch(url);
+      if(!res.ok) return null;
+      const data=await res.json();
+      const r=(data.routes||[])[0];
+      return r?{dur:r.duration, dist:r.distance}:null;
+    }catch(e){ return null; }
+  }
   function bindNavControls(){
     document.querySelectorAll('#navModes button').forEach(b=>b.addEventListener('click', ()=>{
       navProfile=b.dataset.profile;
       document.querySelectorAll('#navModes button').forEach(x=>{ x.className='btn '+(x===b?'btn-primary':'btn-secondary'); });
+    }));
+    // Safest / Fastest toggle
+    document.querySelectorAll('#routeHazardModes button').forEach(b=>b.addEventListener('click', ()=>{
+      safestMode = b.dataset.hz==='safe';
+      document.querySelectorAll('#routeHazardModes button').forEach(x=>{ x.className='btn '+(x===b?'btn-primary':'btn-secondary'); });
+      // re-score current route with the new preference
+      if(navActive && _currentDest && lastRoute){
+        const from=userPos || null;
+        if(from){ try{ routeFromTo(from, _currentDest.lng, _currentDest.lat, _currentDest.name, true); }catch(e){} }
+      }
     }));
     document.getElementById('navGo').addEventListener('click', async ()=>{
       const typed=(document.getElementById('navDest').value||'').trim();
@@ -888,7 +1490,6 @@ async function initMapbox(){
       if(followMode){ try{ geo.trigger(); }catch(e){} routeStatus('Follow on — camera tracks your GPS dot. Pan the map to pause.'); }
       else routeStatus('');
     });
-    // Panning pauses follow so the user stays in control (Waze-like passive state).
     map.on('dragstart', ()=>{
       if(!followMode) return;
       followMode=false;
@@ -899,30 +1500,83 @@ async function initMapbox(){
       map.easeTo({center:[e.coords.longitude, e.coords.latitude], duration:600});
     });
   }
-
-  function render(){
-    const filtered = getFiltered();
-    markers.forEach(m=>m.marker.remove()); markers=[];
-    filtered.forEach(c=>{
-      const el=document.createElement('div');
-      el.style.cssText=`background:${statusColor(c.occupancy_status)};width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4);cursor:pointer;`;
-      const popup=new mapboxgl.Popup({offset:12, maxWidth:'300px'})
-        .setHTML(centerPopupHTML(c, `<button data-route="${c.lat},${c.lng}" data-name="${esc(c.name)}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">Route here</button>`));
-      const marker=new mapboxgl.Marker({element:el}).setLngLat([c.lng,c.lat]).setPopup(popup).addTo(map);
-      markers.push({id:c.id, marker});
-    });
-    renderList(filtered, (c)=>{
-      map.flyTo({center:[c.lng,c.lat], zoom:14});
-      const m=markers.find(m=>m.id===c.id); if(m) m.marker.togglePopup();
-    });
-    // Fit once on first load only, capped at zoom 12: re-fitting on every
-    // keystroke yanked the camera into the tight cluster (white surroundings).
-    if(filtered.length && !render._fitted){
-      render._fitted = true;
-      const b=new mapboxgl.LngLatBounds();
-      filtered.forEach(c=>b.extend([c.lng,c.lat]));
-      try{ map.fitBounds(b,{padding:60, maxZoom:12}); }catch(e){}
+  // "Take me to nearest center": kNN top-5 → ETA re-rank → hazard-access dedup → best route.
+  async function takeMeToNearest(){
+    let from;
+    try{ from=await ensureUserPos(); }catch(e){ routeStatus(e.message||'Need GPS for nearest-center routing.'); return; }
+    routeStatus('Finding nearest centers…');
+    const near=knearest(from[0], from[1], 5);
+    if(!near.length){ routeStatus('No centers found.'); return; }
+    const scored=[];
+    for(const c of near){
+      const access=hazardIndex?hazardIndex.query(c.lng,c.lat).maxSev:0;
+      let eta=null;
+      try{ eta=await directionsEta(from, [c.lng,c.lat]); }catch(e){}
+      scored.push({c, access, eta});
     }
+    // Deprioritize centers whose location is inside/adjacent to High/Medium hazard
+    // (an access-road proxy — flag, don't hard-exclude: an admin may still prefer it).
+    scored.sort((a,b)=>{
+      const ap=accessPenalty(a), bp=accessPenalty(b);
+      const ad=(a.eta?a.eta.dur:Number.MAX_SAFE_INTEGER), bd=(b.eta?b.eta.dur:Number.MAX_SAFE_INTEGER);
+      return (ad+ap)-(bd+bp);
+    });
+    const best=scored[0];
+    const flagged=scored.filter(s=>s.access>=2);
+    if(best) await routeTo(best.c.lat, best.c.lng, best.c.name);
+    if(flagged.length){ setTimeout(()=>{ routeStatus(`${flagged.length} of ${scored.length} nearest center(s) flagged near ${flagged.every(s=>s.access>=3)?'high':'moderate'} hazard zones — chose the safer/nearest reachable route.`); }, 800); }
+  }
+  function accessPenalty(s){
+    if(!s.eta) return 0;
+    if(s.access>=3) return s.eta.dur;
+    if(s.access===2) return s.eta.dur*0.4;
+    return 0;
+  }
+  // ---- quake / fire / NOAH hazard layers (existing behavior + routing index hook) ----
+  const quakeSrcId='hz-quakes', fireSrcId='hz-fires';
+  const quakeAreaSrcId='hz-quake-area', fireAreaSrcId='hz-fire-area';
+  function ensureHazardLayers(){
+    if(!map.getSource(quakeSrcId)){
+      map.addSource(quakeSrcId, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
+      map.addLayer({id:'hz-quakes-layer', type:'circle', source:quakeSrcId,
+        paint:{'circle-radius':['max', 6, ['interpolate',['linear'],['get','mag'],3,6,9,20]],
+               'circle-color':'#9333ea','circle-opacity':0.75,'circle-stroke-color':'#fff','circle-stroke-width':1}});
+    }
+    if(!map.getSource(quakeAreaSrcId)){
+      map.addSource(quakeAreaSrcId, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
+      map.addLayer({id:'hz-quake-area-layer', type:'fill', source:quakeAreaSrcId,
+        layout:{visibility:'none'},
+        paint:{'fill-color':'#9333ea','fill-opacity':0.14,'fill-outline-color':'#6b21a8'}},
+        'hz-quakes-layer');
+    }
+    if(!map.getSource(fireSrcId)){
+      map.addSource(fireSrcId, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
+      map.addLayer({id:'hz-fires-layer', type:'circle', source:fireSrcId,
+        paint:{'circle-radius':5,'circle-color':'#dc2626','circle-opacity':0.8,'circle-stroke-color':'#fff','circle-stroke-width':1}});
+      map.addLayer({id:'hz-heat-layer', type:'heatmap', source:fireSrcId,
+        layout:{visibility:'none'},
+        paint:{'heatmap-weight':['interpolate',['linear'],['get','brightness'],300,0.3,450,1],
+               'heatmap-intensity':1,'heatmap-radius':28,'heatmap-opacity':0.6,
+               'heatmap-color':['interpolate',['linear'],['heatmap-density'],0,'rgba(254,249,195,0)',0.4,'#f97316',0.8,'#dc2626']}});
+    }
+    if(!map.getSource(fireAreaSrcId)){
+      map.addSource(fireAreaSrcId, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
+      map.addLayer({id:'hz-fire-area-layer', type:'fill', source:fireAreaSrcId,
+        layout:{visibility:'none'},
+        paint:{'fill-color':'#dc2626','fill-opacity':0.14,'fill-outline-color':'#991b1b'}},
+        'hz-fires-layer');
+    }
+  }
+  const noahSrc={flood:'noah-flood', slide:'noah-slide', surge:'noah-surge'};
+  function ensureNoahLayers(){
+    Object.entries(noahSrc).forEach(([id, src])=>{
+      if(map.getSource(src)) return;
+      map.addSource(src, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
+      map.addLayer({id:src+'-layer', type:'fill', source:src,
+        layout:{visibility:'none'},
+        paint:{'fill-color':['match',['get','level'],'low','#facc15','moderate','#f97316','high','#dc2626','#f97316'],
+               'fill-opacity':0.35,'fill-outline-color':'#7c2d12'}});
+    });
   }
   function hzCenter(){ const c=map.getCenter(); return {lat:+c.lat.toFixed(4), lon:+c.lng.toFixed(4)}; }
   function inViewCount(feats){
@@ -931,8 +1585,6 @@ async function initMapbox(){
       return feats.filter(f=>{ try{ return bb.contains(f.geometry.coordinates); }catch(e){ return false; } }).length;
     }catch(e){ return -1; }
   }
-  // Manual camera fit to loaded detections — distant events (often 100+
-  // km away) otherwise sit outside the viewport while counts look healthy.
   function zoomToHazards(){
     const sel=hazardSelection();
     const b=new mapboxgl.LngLatBounds();
@@ -947,15 +1599,17 @@ async function initMapbox(){
     ensureHazardLayers();
     const sel=hazardSelection();
     const showQ=sel.quake, showF=sel.fire, showH=sel.heat;
-    map.getSource(quakeSrcId).setData({type:'FeatureCollection', features:[]});
-    map.getSource(fireSrcId).setData({type:'FeatureCollection', features:[]});
-    map.getSource(quakeAreaSrcId).setData({type:'FeatureCollection', features:[]});
-    map.getSource(fireAreaSrcId).setData({type:'FeatureCollection', features:[]});
-    map.setLayoutProperty('hz-quakes-layer','visibility', showQ?'visible':'none');
-    map.setLayoutProperty('hz-fires-layer','visibility', showF?'visible':'none');
-    map.setLayoutProperty('hz-heat-layer','visibility', (showH)?'visible':'none');
-    map.setLayoutProperty('hz-quake-area-layer','visibility', showQ?'visible':'none');
-    map.setLayoutProperty('hz-fire-area-layer','visibility', showF?'visible':'none');
+    try{
+      map.getSource(quakeSrcId).setData({type:'FeatureCollection', features:[]});
+      map.getSource(fireSrcId).setData({type:'FeatureCollection', features:[]});
+      map.getSource(quakeAreaSrcId).setData({type:'FeatureCollection', features:[]});
+      map.getSource(fireAreaSrcId).setData({type:'FeatureCollection', features:[]});
+      map.setLayoutProperty('hz-quakes-layer','visibility', showQ?'visible':'none');
+      map.setLayoutProperty('hz-fires-layer','visibility', showF?'visible':'none');
+      map.setLayoutProperty('hz-heat-layer','visibility', (showH)?'visible':'none');
+      map.setLayoutProperty('hz-quake-area-layer','visibility', showQ?'visible':'none');
+      map.setLayoutProperty('hz-fire-area-layer','visibility', showF?'visible':'none');
+    }catch(e){}
     const {lat, lon}=hzCenter();
     const jobs=[];
     if(showQ){
@@ -984,24 +1638,22 @@ async function initMapbox(){
         hzStatus(_fin<0?fireStatusText(data, showH):`${fireStatusText(data, showH)} • ${_fin}/${feats.length} in view`);
       }).catch(e=>{ if(e.name!=='AbortError') hzStatus(e.code===503?'Fires unavailable — missing FIRMS key or provider down.':'Fires unavailable — retry shortly.'); }));
     }
-    // ---- Project NOAH static polygons (local files, keyless) ----
     ensureNoahLayers();
     const noahOn={flood:sel.flood, slide:sel.slide, surge:sel.surge};
-    if(!showQ && !showF && !showH && !noahOn.flood && !noahOn.slide && !noahOn.surge){ hzStatus(''); return; }
+    if(!showQ && !showF && !showH && !noahOn.flood && !noahOn.slide && !noahOn.surge){ if(hzStatus){} }
     Object.entries(noahOn).forEach(([id, on])=>{
-      map.setLayoutProperty(noahSrc[id]+'-layer','visibility', on?'visible':'none');
+      try{ map.setLayoutProperty(noahSrc[id]+'-layer','visibility', on?'visible':'none'); }catch(e){}
       if(!on){ return; }
       const wantFile=noahFileFor(id);
       hzStatus('Loading NOAH '+id+'…');
       jobs.push(fetchNoah(id).then(data=>{
-        // Skip stale SSA responses (user switched advisory mid-fetch).
         if(noahFileFor(id)!==wantFile) return;
         if(!document.getElementById(noahCheckboxId(id)).checked) return;
         map.getSource(noahSrc[id]).setData(data);
         hzStatus(noahStatusText(id, data));
       }).catch(()=>{ hzStatus(`NOAH ${id} failed to load — reload the page.`); }));
     });
-    await Promise.all(jobs);
+    try{ await Promise.all(jobs); }catch(e){}
   }
   // quake/fire popups on click
   function quakePopupHTML(p){
@@ -1026,26 +1678,24 @@ async function initMapbox(){
     if(!e.features || !e.features.length) return;
     new mapboxgl.Popup().setLngLat(e.lngLat).setHTML(firePopupHTML(e.features[0].properties)).addTo(map);
   });
-  // Project NOAH polygon popups (same handler for all three layers).
   ['noah-flood-layer','noah-slide-layer','noah-surge-layer'].forEach(lid=>{
     map.on('click',lid,(e)=>{
       if(!e.features || !e.features.length) return;
       new mapboxgl.Popup().setLngLat(e.lngLat).setHTML(noahLabel(e.features[0])).addTo(map);
     });
   });
-  // Maps-style POI tap: press any landmark/place label → popup with Route here.
+  // Maps-style POI tap
   map.on('click',(e)=>{
     try{
       const style=map.getStyle();
       if(!style || !style.layers) return;
-      // Hazard hits keep their dedicated popups.
-      const hz=map.queryRenderedFeatures(e.point, {layers:['hz-quakes-layer','hz-quake-area-layer','hz-fires-layer','hz-fire-area-layer','noah-flood-layer','noah-slide-layer','noah-surge-layer'].filter(id=>map.getLayer(id))});
+      const hz=map.queryRenderedFeatures(e.point, {layers:['hz-quakes-layer','hz-quake-area-layer','hz-fires-layer','hz-fire-area-layer','noah-flood-layer','noah-slide-layer','noah-surge-layer',layerIds.points,layerIds.qa,layerIds.clusters].filter(id=>map.getLayer(id))});
       if(hz.length) return;
       const poiLayers=style.layers.filter(l=>l.type==='symbol' && /poi|place/i.test(l.id||'')).map(l=>l.id);
       if(!poiLayers.length) return;
       const hits=map.queryRenderedFeatures(e.point, {layers:poiLayers});
       const f=(hits||[]).find(h=>h.geometry && h.geometry.type==='Point' && (h.properties||{}).name);
-      if(!f) return; // empty map / water / roads: stay silent
+      if(!f) return;
       const props=f.properties||{};
       const name=props.name_en || props.name;
       const [lng, lat]=f.geometry.coordinates;
@@ -1055,9 +1705,9 @@ async function initMapbox(){
         (sub?`<div style="font-size:12px;color:var(--text-secondary);">${sub}</div>`:'')+
         `<button data-route="${lat},${lng}" data-name="${esc(name)}" class="btn btn-primary" style="padding:6px 10px; font-size:12px; margin-top:8px;">Route here</button></div>`
       ).addTo(map);
-    }catch(err){ /* style not ready — ignore tap */ }
+    }catch(err){}
   });
-  // ---- group live locations (shared Group tab drives this; Routes box delegates) ----
+  // ---- group live locations ----
   function drawGroupMapbox(rows){
     groupMarkers.forEach(m=>m.remove()); groupMarkers=[];
     (rows||[]).forEach(r=>{
@@ -1071,38 +1721,66 @@ async function initMapbox(){
       m._grow=r; groupMarkers.push(m);
     });
   }
+  let groupMarkers=[];
   groupState.draw=drawGroupMapbox;
   groupState.locate=(r)=>{ try{ map.flyTo({center:[r.lon??r.lng, r.lat], zoom:14}); const m=groupMarkers.find(m=>m._grow===r); if(m) m.togglePopup(); }catch(e){} };
-  // ---- 2D / 3D ----
+  // ---- 2D / 3D / Satellite ----
   let terrainOn=false;
-  function set3D(on){
-    terrainOn=on;
-    if(on){
+  function ensureTerrain(demSourceId){
+    if(terrainOn){
       if(!map.getSource('mapbox-dem')){
         map.addSource('mapbox-dem', {type:'raster-dem', url:'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize:512, maxzoom:14});
       }
       map.setTerrain({'source':'mapbox-dem', 'exaggeration':1.5});
+      const labels=map.getStyle().layers.find(l=>l.type==='symbol' && l.layout && l.layout['text-field']);
       if(!map.getLayer('3d-buildings')){
-        const layers=map.getStyle().layers;
-        const labelLayer=layers.find(l=>l.type==='symbol' && l.layout && l.layout['text-field']);
         map.addLayer({id:'3d-buildings', source:'composite', 'source-layer':'building',
           filter:['==','extrude','true'], type:'fill-extrusion', minzoom:15,
           paint:{'fill-extrusion-color':'#aaa','fill-extrusion-height':['get','height'],'fill-extrusion-base':['get','min_height'],'fill-extrusion-opacity':0.6}},
-          labelLayer && labelLayer.id);
+          labels && labels.id);
       }
+    }
+  }
+  function set3D(on){
+    terrainOn=on;
+    if(on){
+      ensureTerrain('mapbox-dem');
       map.easeTo({pitch:60, bearing:-20, duration:800});
     }else{
       map.setTerrain(null);
+      try{ if(map.getLayer('3d-buildings')) map.removeLayer('3d-buildings'); }catch(e){}
       map.easeTo({pitch:0, bearing:0, duration:800});
     }
   }
+  const CURRENT_STYLE='mapbox://styles/mapbox/streets-v12';
+  document.getElementById('btnSat').addEventListener('click', ()=>{
+    const sat='mapbox://styles/mapbox/satellite-streets-v12';
+    const curStyle=map.getStyle();
+    const goingSat=!(curStyle&&curStyle.sprite&&String(curStyle.sprite).indexOf('satellite')!==-1);
+    map.setStyle(goingSat?sat:CURRENT_STYLE);
+    const b=document.getElementById('btnSat');
+    if(b) b.textContent=goingSat?'Streets':'Satellite';
+  });
+  // After any style switch, custom sources/layers are dropped — re-add them.
+  function rebuildCustomLayers(){
+    ensureEvacLayers();
+    ensureHazardLayers();
+    ensureNoahLayers();
+    try{ refreshView(); }catch(e){}
+    try{ refreshHazards(); }catch(e){}
+    if(terrainOn){ try{ ensureTerrain('mapbox-dem'); }catch(e){} }
+    if(lastRoute){ try{ drawRoute(lastRoute.geometry, lastRoute.color); }catch(e){} }
+  }
+  map.on('load', rebuildCustomLayers);
+  map.on('style.load', rebuildCustomLayers);
   // ---- wire up ----
   await loadCenters();
-  bindFilterInputs(render);
+  bindFilterInputs(refreshView);
   document.getElementById('locBtn').addEventListener('click', ()=>{
     gpsStatus('Waiting for GPS fix…');
     try{ geo.trigger(); }catch(e){ gpsStatus(gpsErrorHint()); }
   });
+  document.getElementById('nearestBtn').addEventListener('click', takeMeToNearest);
   debounceHazards(refreshHazards);
   document.getElementById('showHazardsBtn').addEventListener('click', zoomToHazards);
   map.on('moveend', ()=>{ clearTimeout(hzTimer); hzTimer=setTimeout(refreshHazards, 500); });
@@ -1112,9 +1790,14 @@ async function initMapbox(){
   if(_groupBtn) _groupBtn.addEventListener('click', ()=>{ setActiveGroup(document.getElementById('groupCode').value, {}); });
   bindNavSearch();
   bindNavControls();
-  map.on('load', ()=>{ render(); });
-  render();
-  initCentersLive(render);
+  map.on('load', ()=>{ refreshView(); });
+  await loadRoutingHazards().catch(()=>{});
+  // Offline resilience: register the Service Worker (map shell + data + tiles).
+  if('serviceWorker' in navigator){
+    try{ navigator.serviceWorker.register('/sw.js').catch(()=>{}); }catch(e){}
+  }
+  refreshView();
+  initCentersLive(refreshView);
 }
 
 // ================= LEAFLET/OSM FALLBACK (unchanged behavior) =================
@@ -1125,24 +1808,23 @@ function noahStyle(feat){
   return {color:'#7c2d12', weight:1, fillColor:NOAH_COLORS[lv]||'#f97316', fillOpacity:0.35};
 }
 function ensureLeaflet(){
-  // Runtime fallback when Mapbox CDN failed: load Leaflet dynamically.
   if(typeof L !== 'undefined') return Promise.resolve();
   const css=document.createElement('link');
   css.rel='stylesheet'; css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
   document.head.appendChild(css);
   const load=(src)=>new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
   return load('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js')
-    .then(()=>load('https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js'));
+    .then(()=>load('https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js'))
+    .then(()=>{ if(typeof L.markerClusterGroup!=='undefined') document.head.appendChild(Object.assign(document.createElement('link'),{rel:'stylesheet',href:'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css'})); });
 }
 function initFallback(){
-  // Mapbox unavailable (no token or CDN blocked) — use free OSM tiles.
   setMapMode('OSM fallback');
   const gpsBox=document.getElementById('gpsBox'); if(gpsBox) gpsBox.style.display='none';
   const vt=document.getElementById('viewToggle'); if(vt) vt.style.display='none';
+  const nearestBtn=document.getElementById('nearestBtn'); if(nearestBtn) nearestBtn.style.display='none';
   ensureLeaflet().then(()=>{
     _map = L.map('map', {zoomControl:false}).setView([14.6308,121.0968],11);
     L.control.zoom({position:'topright'}).addTo(_map);
-    // Visible ⌖ locate control (fallback has no GeolocateControl equivalent).
     const LocateCtl = L.Control.extend({options:{position:'topright'},
       onAdd: function(){
         const b=L.DomUtil.create('button','');
@@ -1175,13 +1857,13 @@ function initFallback(){
       }
     });
     _quakeLayer=L.layerGroup().addTo(_map); _fireLayer=L.layerGroup().addTo(_map);
+    _markers = (typeof L.markerClusterGroup!=='undefined') ? L.markerClusterGroup().addTo(_map) : [];
     loadCenters().then(renderFb).then(()=>initCentersLive(renderFb));
     bindFilterInputs(renderFb);
     document.getElementById('locBtn').addEventListener('click', useLocationFb);
     debounceHazards(refreshHazardsFb);
-  document.getElementById('showHazardsBtn').addEventListener('click', zoomToHazardsFb);
+    document.getElementById('showHazardsBtn').addEventListener('click', zoomToHazardsFb);
     _map.on('moveend', ()=>{ clearTimeout(hzTimer); hzTimer=setTimeout(refreshHazardsFb, 500); });
-    // ---- group live locations (same shared Group tab drives this engine too) ----
     _groupLayer=L.layerGroup().addTo(_map);
     groupState.draw=(rows)=>{
       _groupLayer.clearLayers();
@@ -1198,20 +1880,24 @@ function initFallback(){
 }
 function renderFb(){
   const filtered=getFiltered();
-  _markers.forEach(m=> _map.removeLayer(m)); _markers=[];
-  renderList(filtered, (c)=>{ _map.setView([c.lat,c.lng],14); const m=_markers.find(m=>m._cid===c.id); if(m) m.openPopup(); });
+  const hadCluster = _markers && typeof _markers.clearLayers==='function';
+  if(hadCluster) _markers.clearLayers();
+  else { _markers.forEach(m=> _map.removeLayer(m)); _markers=[]; }
+  renderList(filtered, {onLocate:(c)=>{ _map.setView([c.lat,c.lng],14); }});
   filtered.forEach(c=>{
-    const color=statusColor(c.occupancy_status);
-    const icon=L.divIcon({html:`<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`, className:'', iconSize:[16,16]});
-    const m=L.marker([c.lat,c.lng], {icon}).addTo(_map);
+    const color=statusColor(c.live&&c.live.occupancy_status);
+    const icon=L.divIcon({html:`<div style="background:${c.needs_review?'#f59e0b':(c.verified&&c.confidence===1?'#039855':'#3b6ef5')};width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`, className:'', iconSize:[16,16]});
+    const m=L.marker([c.lat,c.lng], {icon});
+    if(hadCluster){ _markers.addLayer(m); }
+    else { m.addTo(_map); _markers.push(m); }
     m._cid=c.id;
-    m.bindPopup(centerPopupHTML(c));
+    m.bindPopup(centerPopupHTML(c, null, {hazard:hazardIndex?{maxSev:hazardIndex.query(c.lng,c.lat).maxSev, name:(hazardIndex.query(c.lng,c.lat).zones[0]||{}).name, zone:(hazardIndex.query(c.lng,c.lat).zones[0]||{}).level}:null}));
     _markers.push(m);
   });
   _map.invalidateSize();
-  if(!renderFb._fitted && _markers.length){
+  if(!renderFb._fitted && _markers && _markers.length){
     renderFb._fitted = true;
-    try{ const group=L.featureGroup(_markers); _map.fitBounds(group.getBounds().pad(0.2)); }catch(e){}
+    try{ const group=hadCluster?_markers:L.featureGroup(_markers); _map.fitBounds(group.getBounds().pad(0.2)); }catch(e){}
   }
 }
 function hzCenterFb(){ const c=_map.getCenter(); return {lat:+c.lat.toFixed(4), lon:+c.lng.toFixed(4)}; }
@@ -1221,7 +1907,6 @@ function inViewCountFb(pts){
     return pts.filter(p=>{ try{ return bb.contains([p.lat??p[0], p.lon??p[1]]); }catch(e){ return false; } }).length;
   }catch(e){ return -1; }
 }
-// Manual camera fit to loaded detections — see Mapbox zoomToHazards.
 function zoomToHazardsFb(){
   const layers=[];
   _quakeLayer.eachLayer(l=>layers.push(l));
@@ -1275,15 +1960,14 @@ async function refreshHazardsFb(){
       hzStatus(_ffb<0?fireStatusText(data, showH):`${fireStatusText(data, showH)} • ${_ffb} in view`);
     }).catch(e=>{ if(e.name!=='AbortError') hzStatus(e.code===503?'Fires unavailable — missing FIRMS key or provider down.':'Fires unavailable — retry shortly.'); }));
   }
-  // ---- Project NOAH static polygons (local files, keyless) ----
+  // ---- Project NOAH static polygons ----
   const noahOnFb={flood:selFb.flood, slide:selFb.slide, surge:selFb.surge};
-  if(!showQ && !showF && !showH && !noahOnFb.flood && !noahOnFb.slide && !noahOnFb.surge){ hzStatus(''); return; }
   Object.entries(noahOnFb).forEach(([id, on])=>{
     if(!on) return;
     const wantFile=noahFileFor(id);
     hzStatus('Loading NOAH '+id+'…');
     jobs.push(fetchNoah(id).then(data=>{
-      if(noahFileFor(id)!==wantFile) return; // stale SSA response
+      if(noahFileFor(id)!==wantFile) return;
       if(!document.getElementById(noahCheckboxId(id)).checked) return;
       const lyr=L.geoJSON(data, {style:noahStyle,
         onEachFeature:(feat, layer)=>{ layer.bindPopup(noahLabel(feat)); }});
@@ -1294,7 +1978,7 @@ async function refreshHazardsFb(){
       hzStatus(noahStatusText(id, data));
     }).catch(()=>{ hzStatus(`NOAH ${id} failed to load — reload the page.`); }));
   });
-  await Promise.all(jobs);
+  try{ await Promise.all(jobs); }catch(e){}
 }
 function useLocationFb(){
   if(!navigator.geolocation){ alert('Geolocation not supported. Please select manually.'); return; }

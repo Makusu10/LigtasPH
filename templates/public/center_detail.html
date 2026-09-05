@@ -32,7 +32,7 @@
   </div>
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
     {% if c['contact_number'] %}<a href="tel:{{ c['contact_number'] }}" class="btn btn-secondary">Call {{ c['contact_number'] }}</a>{% endif %}
-    <a href="https://www.google.com/maps/dir/?api=1&destination={{ c['lat'] }},{{ c['lng'] }}" target="_blank" rel="noopener" class="btn btn-primary">Get Directions</a>
+    <a href="/map?center={{ c['id'] }}" class="btn btn-primary">Route here (built-in)</a>
   </div>
   {% if c['notes'] %}<div id="centerNotes" style="background:#f9ecc8; border:2px solid var(--amber); border-left:8px solid var(--amber); padding:10px 12px; border-radius:var(--radius); color:#6d4a05;">Notes: {{ c['notes'] }}</div>{% endif %}
   <div id="updatedLine" style="color:var(--text-secondary); font-size:12px;">Last updated: {{ c['updated_at'] }} • Created: {{ c['created_at'] }}</div>

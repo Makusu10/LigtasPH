@@ -33,6 +33,17 @@ def create_app(env=None):
     app.config["FIRMS_MAP_KEY"] = os.getenv("FIRMS_MAP_KEY", app.config.get("FIRMS_MAP_KEY", ""))
     app.config["MAPBOX_TOKEN"] = os.getenv("MAPBOX_TOKEN", app.config.get("MAPBOX_TOKEN", ""))
     app.config["STARTED_AT"] = STARTED_AT
+
+    # Cache-bust every static asset with the server boot timestamp. Browsers
+    # heuristic-cache static files aggressively (the no-cache headers only cover
+    # HTML/JSON), so a stale cached CSS/JS is the #1 cause of "still shows the
+    # old version". Because the suffix changes on every restart, an update to
+    # the repo is guaranteed to force fresh static files — no manual ?v= bumping.
+    @app.template_global()
+    def static_asset(filename):
+        from flask import url_for as _url_for
+        return _url_for("static", filename=filename) + "?v=" + STARTED_AT
+
     if cfg_name == "testing":
         # A developer .env key must not leak into the suite: tests such as
         # test_api_weather_no_cache_503 expect a 503 when providers fail.

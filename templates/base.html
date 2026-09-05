@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}LigtasPH: Calamity Response & Evacuation Mapping{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v=3">
+  <link rel="stylesheet" href="{{ static_asset('css/main.css') }}">
   <script>
   // Theme pre-paint: apply stored/OS theme before CSS renders (no white flash).
   (function(){try{var t=localStorage.getItem('ligtasph_theme')||'system';var d=t==='dark'||(t!=='light'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.setAttribute('data-theme',d?'dark':'light');}catch(e){}})();
@@ -97,8 +97,8 @@
   </footer>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script>try{lucide.createIcons();}catch(e){}</script>
-  <script src="{{ url_for('static', filename='js/prefs.js') }}" defer></script>
-  <script src="{{ url_for('static', filename='js/announcements.js') }}" defer></script>
+  <script src="{{ static_asset('js/prefs.js') }}" defer></script>
+  <script src="{{ static_asset('js/announcements.js') }}" defer></script>
   <script>
     // mobile nav toggle
     document.addEventListener('DOMContentLoaded', function(){

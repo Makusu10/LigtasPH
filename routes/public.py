@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, current_app
+from flask import Blueprint, render_template, current_app, send_from_directory
 from utils.db import get_db
 
 bp = Blueprint("public", __name__)
@@ -29,6 +29,12 @@ def home():
 @bp.route("/map")
 def map_page():
     return render_template("public/map.html", mapbox_token=current_app.config.get("MAPBOX_TOKEN", ""))
+
+@bp.route("/sw.js")
+def service_worker():
+    """Offline-resilience Service Worker (map page). Served from static so the
+    SW can be updated by simply replacing static/js/sw.js."""
+    return send_from_directory(current_app.static_folder, "js/sw.js", mimetype="application/javascript")
 
 @bp.route("/centers")
 def centers_page():
