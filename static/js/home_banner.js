@@ -34,8 +34,18 @@
     return s <= nowMs() && nowMs() <= e;
   }
   function fmtRange(a) {
-    function short(s) { return String(s || '').replace('T', ' ').slice(0, 16); }
-    return short(a.starts_at) + ' → ' + short(a.ends_at) + ' UTC';
+    // "2026-09-05 15:31:00" (UTC) -> "Sep 5, 3:31PM PHT"
+    function pht(s) {
+      var t = parseTime(s);
+      if (isNaN(t)) return String(s || '').slice(0, 16);
+      var d = new Date(t + 8 * 3600 * 1000);
+      var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      var h = d.getUTCHours(), ap = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      var m = ('0' + d.getUTCMinutes()).slice(-2);
+      return months[d.getUTCMonth()] + ' ' + d.getUTCDate() + ', ' + h + ':' + m + ap + ' PHT';
+    }
+    return pht(a.starts_at) + ' → ' + pht(a.ends_at);
   }
   function scopeLabel(a) {
     if (a.scope === 'city') return 'For ' + (a.city || '');
@@ -94,16 +104,25 @@
     bar.hidden = false;
     bar.className = 'card sev-' + (next.severity || 'info');
     bar.id = 'home-ann-banner';
+    var critical = next.severity === 'critical';
+    bar.setAttribute('role', critical ? 'alert' : 'status');
+    var dot = document.getElementById('home-ann-dot');
+    dot.style.background = sevColor(next);
+    dot.setAttribute('aria-label', 'Severity: ' + (next.severity || 'info'));
     document.getElementById('home-ann-title').textContent = next.title || 'Announcement';
+    var sevChip = document.getElementById('home-ann-sev');
+    sevChip.textContent = critical ? 'Critical alert' : next.severity === 'warning' ? 'Warning' : 'Notice';
+    sevChip.className = 'badge ' + (critical ? 'badge-full' : next.severity === 'warning' ? 'badge-nearly' : 'badge-unknown');
+    sevChip.style.fontSize = '10px';
     var m = document.getElementById('home-ann-msg');
     m.textContent = next.message || '';
-    // Clamp to one line; show the expander only if text really overflows
-    // (measured in-DOM, so it adapts to width/font — no char guessing).
-    m.classList.add('clamped');
+    // Critical alerts are never truncated; others clamp to one line with
+    // the expander shown only on real overflow (measured, not guessed).
+    m.classList.toggle('clamped', !critical);
     var exp = document.getElementById('home-ann-expand');
     exp.hidden = true;
     requestAnimationFrame(function () {
-      var over = m.scrollHeight > m.clientHeight + 1;
+      var over = !critical && m.scrollHeight > m.clientHeight + 1;
       exp.hidden = !over;
       if (!over) m.classList.remove('clamped');
     });
@@ -144,11 +163,13 @@
       var dot = document.createElement('span');
       dot.className = 'ann-hist-dot';
       dot.style.background = sevColor(a);
+      dot.setAttribute('aria-label', 'Severity: ' + (a.severity || 'info'));
+      dot.setAttribute('role', 'img');
       var body = document.createElement('div');
       body.style.cssText = 'flex:1; min-width:0;';
       var head = document.createElement('div');
       head.style.cssText = 'font-weight:700; font-size:13px;';
-      head.textContent = a.title || 'Announcement';
+      head.textContent = (a.title || 'Announcement') + ' — ' + (a.severity === 'critical' ? 'Critical' : a.severity === 'warning' ? 'Warning' : 'Notice');
       var txt = document.createElement('div');
       txt.style.cssText = 'font-size:13px; margin-top:2px;';
       txt.textContent = a.message || '';
@@ -195,9 +216,21 @@
       var open = panel.hidden;
       panel.hidden = !open;
       bell.setAttribute('aria-expanded', open ? 'true' : 'false');
-      if (open) loadHistory();
+      if (open) {
+        loadHistory();
+        var first = panel.querySelector('button');
+        if (first) first.focus();
+      }
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !panel.hidden) {
+        panel.hidden = true;
+        bell.setAttribute('aria-expanded', 'false');
+        bell.focus();
+      }
     });
     document.getElementById('ann-dismiss-all').addEventListener('click', function () {
+      if (!confirm('Dismiss all announcements, including critical ones?')) return;
       loadLive().then(function (list) {
         list.forEach(function (a) { if (a && a.id != null) setAcked(a.id); });
         renderBanner([]);

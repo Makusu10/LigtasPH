@@ -478,7 +478,11 @@ async function loadCenters(){
   if(sel){
     sel.innerHTML='<option value="">All cities</option>';
     cities.forEach(ci=>{ const o=document.createElement('option'); o.textContent=ci; o.value=ci; sel.appendChild(o); });
-    if(cur && cities.includes(cur)) sel.value=cur;
+    // Deep link from home hero (?city=).
+    let want='';
+    try{ want=new URLSearchParams(location.search).get('city') || localStorage.getItem('ligtasph_ann_city_v1') || ''; }catch(e){}
+    if(want && cities.includes(want)) sel.value=want;
+    else if(cur && cities.includes(cur)) sel.value=cur;
   }
 }
 // Live center updates: version check every 15s, full re-fetch only on

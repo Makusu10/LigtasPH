@@ -278,11 +278,8 @@ input:focus, select:focus, textarea:focus { border-color:var(--primary); backgro
 [data-theme="dark"] .hourly-strip::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); }
 /* Announcement modal is JS-injected; vars keep it themed (see announcements.js) */
 /* Home announcement banner + bell history (see home_banner.js) */
-#home-ann-banner{ display:flex; gap:12px; align-items:flex-start; border-left-width:5px; margin-bottom:16px; }
+#home-ann-banner{ display:flex; gap:12px; align-items:flex-start; margin-bottom:16px; }
 #home-ann-banner[hidden]{ display:none; }
-#home-ann-banner.sev-critical{ border-left-color:var(--red); }
-#home-ann-banner.sev-warning{ border-left-color:var(--orange); }
-#home-ann-banner.sev-info{ border-left-color:var(--primary); }
 #home-ann-body{ flex:1; min-width:0; }
 #home-ann-msg{ font-size:14px; line-height:1.5; margin:2px 0 0; }
 #home-ann-msg.clamped{ display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; }

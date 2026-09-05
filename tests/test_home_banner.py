@@ -44,6 +44,30 @@ def test_home_has_banner_and_bell(client):
     assert 'id="ann-bell"' in html
     assert 'id="ann-history"' in html
     assert "js/home_banner.js" in html
+    assert 'id="heroCity"' in html
+    assert 'id="heroFind"' in html
+    assert 'id="home-ann-sev"' in html
+    assert 'tel:911' in html
+
+
+def test_home_unknown_stat_for_null_capacity(client, app):
+    with app.app_context():
+        from utils.db import get_db
+        db = get_db()
+        db.execute("DELETE FROM evacuation_centers WHERE name='Nullcap Test'")
+        db.execute(
+            """INSERT INTO evacuation_centers (name, address, city, lat, lng, capacity, current_occupancy)
+               VALUES ('Nullcap Test', 'Addr', 'Marikina', 14.6, 121.1, NULL, NULL)""")
+        db.commit()
+    try:
+        html = client.get("/").get_data(as_text=True)
+        assert "Status Unknown" in html
+    finally:
+        with app.app_context():
+            from utils.db import get_db
+            db = get_db()
+            db.execute("DELETE FROM evacuation_centers WHERE name='Nullcap Test'")
+            db.commit()
 
 
 def test_api_history_includes_expired_newest_first(client):
