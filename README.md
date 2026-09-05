@@ -10,6 +10,8 @@
 
 **LigtasPH** is an integrated disaster-information and evacuation-mapping platform for residents, Local Government Units (LGUs), and Disaster Risk Reduction and Management Offices (DRRMOs) across the Philippines.
 
+🌐 **Live demo:** [https://ligtasph.onrender.com/](https://ligtasph.onrender.com/) (Render free tier — sleeps after 15 min idle, first load takes ~30s).
+
 The platform combines verified evacuation centers, occupancy and relief-supply monitoring, multi-source weather forecasts, PAGASA heat-index classifications, DENR PM2.5 classifications, DOST Project NOAH hazard overlays, earthquake and active-fire feeds, temporary family location sharing, and geo-targeted emergency announcements.
 
 > **Sprint 2 highlight:** LigtasPH includes 836 live evacuation centers across all 17 Metro Manila LGUs, parsed from `data/ncr_evacuation_centers.geojson`. Another 32 ungeocodable records are quarantined for review. Unreported capacity remains `NULL` and displays as `Status Unavailable` rather than a fabricated zero or misleading availability status.
