@@ -79,20 +79,27 @@ def _parse_announcement_form(form):
                 errors.append("Radius must be 1–2000 km.")
         except (TypeError, ValueError):
             errors.append("Center lat/lng and radius are required for radius scope.")
-    # datetime-local "YYYY-MM-DDTHH:MM" -> "YYYY-MM-DD HH:MM:00" (UTC-naive, compared via datetime())
+    # Times are typed in Philippine time (UTC+8, where the admins sit) but the
+    # API compares against datetime('now') = UTC. Convert Manila -> UTC on
+    # input so "show from right now" is live on the next refresh, not 8h late.
+    # datetime-local "YYYY-MM-DDTHH:MM" -> UTC "YYYY-MM-DD HH:MM:SS".
+    _MANILA = _dt.timezone(_dt.timedelta(hours=8))
     def _norm(v):
         v = (v or "").strip().replace("T", " ")[:16]
         if len(v) == 16:
             v += ":00"
         return v
-    starts_at, ends_at = _norm(starts_raw), _norm(ends_raw)
+    starts_raw, ends_raw = _norm(starts_raw), _norm(ends_raw)
     try:
-        s = _dt.datetime.strptime(starts_at, "%Y-%m-%d %H:%M:%S")
-        e = _dt.datetime.strptime(ends_at, "%Y-%m-%d %H:%M:%S")
+        s = _dt.datetime.strptime(starts_raw, "%Y-%m-%d %H:%M:%S").replace(tzinfo=_MANILA)
+        e = _dt.datetime.strptime(ends_raw, "%Y-%m-%d %H:%M:%S").replace(tzinfo=_MANILA)
         if not s < e:
             errors.append("End time must be after start time.")
+        starts_at = s.astimezone(_dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        ends_at = e.astimezone(_dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     except ValueError:
         errors.append("Start and end times are required (valid date/time).")
+        starts_at = ends_at = ""
     return {
         "title": title, "message": message, "scope": scope,
         "city": city if scope == "city" else "",
@@ -127,10 +134,27 @@ def announcements():
             flash("Announcement published.", "success")
             return redirect(url_for("admin.announcements"))
     rows = db.execute("SELECT * FROM announcements ORDER BY starts_at DESC").fetchall()
+    import datetime as _dt2
+    from utils.announcements import dedup_message
+    _MANILA2 = _dt2.timezone(_dt2.timedelta(hours=8))
+    shown = []
+    for r in rows:
+        d = dict(r)
+        d["message"] = dedup_message(d.get("title"), d.get("message"))
+        for k in ("starts_at", "ends_at"):
+            try:
+                d[k + "_manila"] = (
+                    _dt2.datetime.strptime(d[k], "%Y-%m-%d %H:%M:%S")
+                    .replace(tzinfo=_dt2.timezone.utc).astimezone(_MANILA2)
+                    .strftime("%Y-%m-%d %H:%M")
+                )
+            except (ValueError, TypeError):
+                d[k + "_manila"] = d[k]
+        shown.append(d)
     cities = db.execute(
         "SELECT DISTINCT city FROM evacuation_centers WHERE archived=0 ORDER BY city"
     ).fetchall()
-    return render_template("admin/announcements.html", announcements=rows, cities=cities)
+    return render_template("admin/announcements.html", announcements=shown, cities=cities)
 
 
 @bp.route("/admin/announcements/<int:aid>/toggle", methods=["POST"])
@@ -283,3 +307,53 @@ def archive_hotline(hid):
         return redirect(url_for("admin.hotlines")), 404
     flash("Hotline archived." if archived else "Hotline restored.", "info")
     return redirect(url_for("admin.hotlines"))
+
+
+@bp.route("/admin/keys", methods=["GET", "POST"])
+@login_required
+def api_keys():
+    from flask import current_app
+    from utils import envkeys
+    if request.method == "POST":
+        changed = envkeys.save({k: request.form.get(k, "") for k in envkeys.MANAGED_KEYS})
+        # Apply live immediately so providers work without a restart.
+        for k in changed:
+            current_app.config[k] = (request.form.get(k, "") or "").strip()
+        if changed:
+            flash("Saved: " + ", ".join(changed) + ". Applied live; restart only if clients look stale.", "success")
+        else:
+            flash("Nothing changed — empty fields keep their current values.", "info")
+        return redirect(url_for("admin.api_keys"))
+    live = {k: current_app.config.get(k, "") for k in envkeys.MANAGED_KEYS}
+    return render_template("admin/keys.html", entries=envkeys.entries(live), env_path=str(envkeys.ENV_PATH))
+
+
+@bp.route("/admin/restart", methods=["POST"])
+@login_required
+def restart_app():
+    """Restart the app process so updates reflect server-side; clients pick
+    up the new build_id via /api/status and refresh cached feeds.
+
+    Refused under production servers (gunicorn/waitress) where re-exec would
+    escape process management — redeploy there instead.
+    """
+    import os
+    import sys
+    import threading
+    import time
+    prog = (sys.argv[0] if sys.argv else "").lower()
+    if (os.environ.get("SERVER_SOFTWARE", "").lower().startswith(("gunicorn", "waitress"))
+            or "gunicorn" in prog or "waitress" in prog):
+        flash("Restart is disabled under this server — redeploy to apply changes.", "warning")
+        return redirect(url_for("admin.api_keys"))
+
+    def _do():
+        time.sleep(1.0)
+        try:
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+        except Exception:
+            os._exit(3)  # noqa: SLF001 — last resort so a supervisor restarts us
+
+    threading.Thread(target=_do, daemon=True).start()
+    flash("Restarting… the app will be back in a few seconds. Clients refresh cached data automatically.", "info")
+    return redirect(url_for("admin.api_keys"))

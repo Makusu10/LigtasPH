@@ -1,186 +1,461 @@
-# LigtasPH: Integrated Calamity Response and Evacuation Mapping System
+# 🇵🇭 LigtasPH: Integrated Calamity Response & Evacuation Mapping System
 
-**LigtasPH** is a centralized disaster-information platform for residents of the Philippines. It locates official evacuation centers, tracks occupancy and supply status, shows current weather, and provides emergency hotlines per city/municipality. Admin portal for LGU/DRRMO to maintain centers, occupancy, supplies, and hotlines.
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![Flask 3.x](https://img.shields.io/badge/framework-Flask%203.x-black.svg)](https://flask.palletsprojects.com/)
+[![Database](https://img.shields.io/badge/database-SQLite%20(WAL)-lightgrey.svg)](https://www.sqlite.org/)
+[![Leaflet](https://img.shields.io/badge/maps-Leaflet%201.9%20%7C%20Mapbox-green.svg)](https://leafletjs.com/)
+[![Tests](https://img.shields.io/badge/tests-137%20passed-brightgreen.svg)](tests/)
+[![License: MIT](https://img.shields.io/badge/License-MIT%20%2F%20Academic-yellow.svg)](#license)
+[![Status](https://img.shields.io/badge/status-Sprint%202%20Active-orange.svg)](#)
 
-> Sprint 2: real NCR evacuation-center dataset (`data/ncr_evacuation_centers.geojson`, 868 features → 836 live + 32 quarantined) loaded via `flask --app app import-geojson`. Imported rows carry `source/verified/needs_review` provenance; capacity stays NULL ("Status Unavailable") until an admin sets real numbers. Sprint 1 MVP (Flask + SQLite + Vanilla JS + Leaflet/OSM) remains the foundation.
+**LigtasPH** is an integrated disaster-information and evacuation-mapping platform for residents, Local Government Units (LGUs), and Disaster Risk Reduction and Management Offices (DRRMOs) across the Philippines.
 
----
+The platform combines verified evacuation centers, occupancy and relief-supply monitoring, multi-source weather forecasts, PAGASA heat-index classifications, DENR PM2.5 classifications, DOST Project NOAH hazard overlays, earthquake and active-fire feeds, temporary family location sharing, and geo-targeted emergency announcements.
 
-## 🚀 Quick Start (Local)
+> **Sprint 2 highlight:** LigtasPH includes 836 live evacuation centers across all 17 Metro Manila LGUs, parsed from `data/ncr_evacuation_centers.geojson`. Another 32 ungeocodable records are quarantined for review. Unreported capacity remains `NULL` and displays as `Status Unavailable` rather than a fabricated zero or misleading availability status.
+
+## Table of contents
+
+1. [Features](#features)
+2. [Architecture and system design](#architecture-and-system-design)
+3. [Quick start](#quick-start)
+4. [CLI commands](#cli-commands)
+5. [REST API](#rest-api)
+6. [Database](#database)
+7. [Environmental indicators](#environmental-indicators)
+8. [Configuration](#configuration)
+9. [Project layout](#project-layout)
+10. [Deployment](#deployment)
+11. [Security and resilience](#security-and-resilience)
+12. [Testing](#testing)
+13. [License](#license)
+
+## Features
+
+### Evacuation-center mapping
+
+- 836 live evacuation centers across all 17 Metro Manila LGUs.
+- Provenance and review fields: `source`, `verified`, `needs_review`, and `review_reason`.
+- Idempotent imports that preserve administrator-updated occupancy and supply counts.
+- Honest handling of missing capacity through `NULL` and `Status Unavailable`.
+- Client polling through `/api/centers/version` for map, directory, and detail refreshes.
+- Leaflet maps with Mapbox terrain rendering and an OpenStreetMap fallback.
+- Filters for city, operating condition, occupancy, and critical supplies.
+
+### Hazard overlays and live feeds
+
+- DOST Project NOAH flood, landslide, and storm-surge GeoJSON overlays.
+- USGS earthquake telemetry within a configurable 10 to 2,000 km radius.
+- NASA FIRMS thermal-anomaly data restricted to the Philippine bounding box.
+
+### Weather and environmental conditions
+
+- OpenWeather forecasts with automatic Open-Meteo fallback.
+- Server-side heat-index calculation using the Rothfusz regression equation.
+- PAGASA heat-index alert classification.
+- PM2.5 classification under DENR DAO 2020-14, kept distinct from US EPA AQI.
+- Fresh cache under 10 minutes, stale cache under one hour, or an honest HTTP `503` response when providers fail.
+
+### Family location sharing and announcements
+
+- Temporary emergency groups with secure six-character invite codes.
+- GPS pings with accuracy data and a two-hour expiration period.
+- A live radar map for group members and nearby evacuation centers.
+- Emergency announcements scoped nationwide, by city, or by Haversine radius.
+
+### Administration
+
+- DRRMO administrator portal with center, hotline, and announcement management.
+- Occupancy, supply, stale-record, and city-capacity monitoring.
+- Audit records for center updates, including previous and new occupancy values.
+- Searchable emergency directory with national and local LGU hotlines.
+
+## Architecture and system design
+
+The main diagram separates runtime requests from storage and third-party data providers. Initialization and GeoJSON ingestion are shown separately because those operations run through Flask CLI commands rather than the normal request path.
+
+### Runtime architecture
+
+```mermaid
+flowchart LR
+    subgraph Client["Client tier"]
+        direction TB
+        WebUI["Responsive web interface"]
+        MapUI["Leaflet map"]
+        Poller["Center update poller"]
+        LocationUI["Family location sharing"]
+    end
+
+    subgraph Application["Flask application"]
+        direction TB
+
+        AppFactory["Application factory<br/>create_app()"]
+
+        subgraph Middleware["Security middleware"]
+            direction LR
+            CSRF["CSRF protection"]
+            RateLimit["Rate limiting"]
+            Auth["Authentication<br/>and account lockout"]
+            Validation["Input validation"]
+        end
+
+        subgraph Blueprints["Route blueprints"]
+            direction LR
+            PublicRoutes["Public routes"]
+            AuthRoutes["Authentication routes"]
+            AdminRoutes["Administration routes"]
+            APIRoutes["REST API routes"]
+        end
+
+        subgraph ServiceLayer["Service layer"]
+            direction LR
+            Weather["Weather service"]
+            AirQuality["Air-quality service"]
+            Hazards["Hazard service"]
+            Environment["Environmental<br/>classification"]
+        end
+
+        DataAccess["Database access layer"]
+    end
+
+    subgraph Storage["Local storage"]
+        direction TB
+        Database[("SQLite database<br/>WAL mode")]
+        NOAH[("Project NOAH<br/>GeoJSON layers")]
+    end
+
+    subgraph External["External providers"]
+        direction TB
+        WeatherAPIs["OpenWeather<br/>Open-Meteo"]
+        HazardAPIs["USGS<br/>NASA FIRMS"]
+        MapTiles["Mapbox<br/>OpenStreetMap"]
+    end
+
+    WebUI --> PublicRoutes
+    MapUI --> APIRoutes
+    Poller --> APIRoutes
+    LocationUI --> APIRoutes
+
+    AppFactory -. "Registers" .-> Middleware
+    AppFactory -. "Registers" .-> Blueprints
+    Middleware --> Blueprints
+
+    PublicRoutes --> ServiceLayer
+    PublicRoutes --> DataAccess
+    AdminRoutes --> DataAccess
+    APIRoutes --> ServiceLayer
+    APIRoutes --> DataAccess
+
+    Weather --> Environment
+    AirQuality --> Environment
+    ServiceLayer --> DataAccess
+    DataAccess --> Database
+
+    NOAH -. "Loaded by client" .-> MapUI
+    MapUI -. "Tile requests" .-> MapTiles
+
+    Weather -. "Primary and fallback" .-> WeatherAPIs
+    AirQuality -. "Primary and fallback" .-> WeatherAPIs
+    Hazards -. "Live telemetry" .-> HazardAPIs
+
+    classDef client fill:#e3f2fd,stroke:#1976d2,color:#102a43;
+    classDef route fill:#ede7f6,stroke:#673ab7,color:#261447;
+    classDef security fill:#fff3e0,stroke:#ef6c00,color:#4e2600;
+    classDef service fill:#e8eaf6,stroke:#3f51b5,color:#17204f;
+    classDef storage fill:#e8f5e9,stroke:#388e3c,color:#173b1a;
+    classDef external fill:#fce4ec,stroke:#c2185b,color:#4a1027;
+
+    class WebUI,MapUI,Poller,LocationUI client;
+    class AppFactory,PublicRoutes,AuthRoutes,AdminRoutes,APIRoutes route;
+    class CSRF,RateLimit,Auth,Validation security;
+    class Weather,AirQuality,Hazards,Environment,DataAccess service;
+    class Database,NOAH storage;
+    class WeatherAPIs,HazardAPIs,MapTiles external;
+```
+
+### Database initialization and data ingestion
+
+```mermaid
+flowchart LR
+    CLI["Flask CLI"]
+
+    Init["init-db"]
+    Seed["seed"]
+    Import["import-geojson"]
+
+    Source[("NCR evacuation-center<br/>GeoJSON dataset")]
+    Normalize["Normalize and<br/>deduplicate records"]
+    Review{"Coordinates<br/>valid?"}
+
+    Live[("evacuation_centers<br/>836 live records")]
+    Staging[("staging_centers<br/>32 quarantined records")]
+    Supporting[("Administrators,<br/>hotlines, and defaults")]
+
+    CLI --> Init
+    CLI --> Seed
+    CLI --> Import
+
+    Init --> Live
+    Init --> Staging
+    Init --> Supporting
+
+    Seed --> Supporting
+
+    Source --> Import
+    Import --> Normalize
+    Normalize --> Review
+
+    Review -- "Yes" --> Live
+    Review -- "No" --> Staging
+
+    classDef command fill:#ede7f6,stroke:#673ab7,color:#261447;
+    classDef process fill:#e3f2fd,stroke:#1976d2,color:#102a43;
+    classDef decision fill:#fff3e0,stroke:#ef6c00,color:#4e2600;
+    classDef data fill:#e8f5e9,stroke:#388e3c,color:#173b1a;
+
+    class CLI,Init,Seed,Import command;
+    class Normalize process;
+    class Review decision;
+    class Source,Live,Staging,Supporting data;
+```
+
+## Quick start
 
 ### Prerequisites
-- **Python 3.11+** (tested 3.11.9, also works 3.14)
-- **pip** + **venv**
-- **Git**
 
-### 1. Clone & venv
+- Python 3.11 or later
+- `pip` and `venv`
+- Git
+
+### Clone and create a virtual environment
+
 ```bash
-git clone https://github.com/<your-username>/LigtasPH.git
+git clone https://github.com/Makusu10/LigtasPH.git
 cd LigtasPH
-python3 -m venv venv
-# Windows: venv\Scripts\activate
-source venv/bin/activate
+python3 -m venv .venv
 ```
 
-### 2. Install dependencies
-```bash
-pip install -r requirements.txt
-```
+Activate it:
 
-### 3. Configure env
 ```bash
-cp .env.example .env
-# edit .env: set SECRET_KEY (long random), OPENWEATHER_API_KEY (free 1000/day), ADMIN_USERNAME/PASSWORD
-# GEMINI_API_KEY optional, Open-Meteo (weather+air) needs no key; OpenWeather Air Pollution reuses same key
-```
-
-### 4. Init DB, seed & import real centers
-```bash
-flask --app app init-db
-flask --app app seed
-# admin default from .env: admin / admin123 (hashed, not plaintext)
-# Sprint 2 real dataset (836 NCR centers + 32 quarantined for review):
-flask --app app import-geojson
-# idempotent: re-runs UPDATE geocoded fields, never clobber admin-set numbers
-```
-
-### 5. Run / Activate the Website
-
-**Option A — One-click GUI (recommended for demo/lab):**
-```bash
-python run_gui.py
-# Auto-creates venv if missing, installs deps, init-db + seed if needed,
-# then opens http://127.0.0.1:5000 in your default browser.
-# Works from ANY Python: run_gui.py auto-detects .venv → venv → /tmp/ligtas_venv → env
-# and re-executes with that venv's python. Or double-click run_gui.py in Explorer/Finder.
-# Ctrl+C in terminal to stop.
-```
-
-**Option B — Manual Flask dev server:**
-```bash
-# Linux / macOS — activate venv first
-source venv/bin/activate          # or source .venv/bin/activate
+# Linux or macOS
+source .venv/bin/activate
 
 # Windows CMD
-venv\Scripts\activate
+.venv\Scripts\activate
 
 # Windows PowerShell
-venv\Scripts\Activate.ps1
-
-# Then run
-flask --app app run --debug       # http://127.0.0.1:5000 with auto-reload
-# or
-python wsgi.py                    # same, uses wsgi.py:1
+.venv\Scripts\Activate.ps1
 ```
 
-**Option C — Production (local prod check):**
+### Install, configure, and initialize
+
 ```bash
-gunicorn wsgi:app                 # http://127.0.0.1:8000 (Render uses this; Procfile: web: gunicorn wsgi:app)
+pip install -r requirements.txt
+cp .env.example .env
+
+python -m flask --app app init-db
+python -m flask --app app seed
+python -m flask --app app import-geojson
 ```
 
-**How to know it worked:**
-- Browser shows `LIGTASPH` nav: `Home | Evacuation Map | Evacuation Centers | Weather | Emergency Hotlines | Admin Login`
-- Home shows stats `total 856` (836 imported + 20 seeded live, 1 archived hidden) + map preview + recently updated. Imported centers without admin-set capacity show `Status Unavailable` (never counted as Available).
-- Login to admin: `http://127.0.0.1:5000/admin/login` → `admin` / `admin123` → redirects to `/admin/dashboard` (protected route returns 302 when anon).
+### Run the application
 
-**Deactivate venv when done:**
 ```bash
-deactivate
+# Local GUI launcher
+python run_gui.py
+
+# Flask development server
+python -m flask --app app run --debug
+
+# Production WSGI server
+python -m gunicorn wsgi:app --bind 127.0.0.1:8000
 ```
 
-**Troubleshooting:**
-- `externally-managed-environment` → use `python3 -m venv venv` then `source venv/bin/activate` first.
-- `ModuleNotFoundError: No module named 'flask'` → `pip install -r requirements.txt` inside venv.
-- `port 5000 busy` → `flask --app app run --port 5001` or change `PORT` in `run_gui.py:16`.
-- `instance/ligtas.sqlite` locked → stop Flask (`Ctrl+C`) then `flask --app app init-db && flask --app app seed`.
-- Browser didn't open (headless/WSL) → manually visit `http://127.0.0.1:5000`.
+The development application opens at `http://127.0.0.1:5000`.
 
----
+### Default local credentials
 
-## 🛠️ Available Commands
-| Command | Description |
-| :--- | :--- |
-| `flask --app app run` | Flask dev server (auto reload) |
-| `flask --app app init-db` | Create 10 tables (FK ON, CHECKs, indexes) |
-| `flask --app app seed` | Seed 21 demo centers (Available/Nearly/Full/archived), ~29 hotlines, 1 admin (hashed), weather_cache demo (incl. heat/AQI demo) |
-| `flask --app app import-geojson [path]` | Sprint 2: import 836 NCR centers + quarantine 32 (idempotent, default `data/ncr_evacuation_centers.geojson`) |
-| `gunicorn wsgi:app` | Production server (Render/PythonAnywhere) |
-| `pytest -q` | Run 137 tests (auth, API, weather, env heat/AQI 503, 404, sharing, hazards, admin CRUD, geojson import) |
-| `pip install -r requirements.txt` | Install Flask, Flask-WTF, Flask-Limiter, gunicorn, whitenoise, pytest |
+- Username: `admin`
+- Password: `admin123`
+- Login: `http://127.0.0.1:5000/admin/login`
 
----
+> [!CAUTION]
+> Change the default username, password, and `SECRET_KEY` before production deployment. Login requests are limited to 10 per minute, and five consecutive failures lock the account for 15 minutes.
 
-## 📦 Production Deployment
+## CLI commands
 
-### Render (free)
-- Build: `pip install -r requirements.txt`
-- Start: `gunicorn wsgi:app`
-- Env vars in Dashboard: `SECRET_KEY`, `OPENWEATHER_API_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `FLASK_ENV=production`
-- Disk: mount `instance/` for SQLite persistence or re-seed on boot
-
-### PythonAnywhere (free)
-- Upload, `mkvirtualenv --python=python3.11 ligtas && pip install -r requirements.txt`
-- WSGI file: `from app import create_app; application = create_app()`
-- Workdir `/home/<user>/LigtasPH`, run `flask --app app init-db && flask --app app seed` in console, set env in Web tab, Reload
-
----
-
-## 🏗️ Tech Stack & Architecture
-- **Frontend**: HTML5, CSS3 (Material 3 liquid-glass matte, Inter/Roboto, tokens --primary/#3b6ef5), Vanilla JS, Leaflet 1.9 + OSM, Lucide + Material Symbols, Visual weather Now + hourly + environmental (Heat/AQI) cards
-- **Backend**: Flask 3.x, Flask-WTF (CSRF), Flask-Limiter (5/15min lockout), Werkzeug hash, python-dotenv, whitenoise
-- **DB**: SQLite (`instance/ligtas.sqlite`, `PRAGMA foreign_keys=ON`), 10 tables: `administrators`, `evacuation_centers` (nullable capacity + `source/verified/needs_review/review_reason` provenance), `staging_centers` (quarantined imports), `center_status_updates`, `emergency_hotlines`, `weather_cache` (also caches `air-quality` 10m/1h), `emergency_groups`, `live_locations`, `hazards_cache`, `announcements`
-- **Weather**: `services/weather_service.py` → `cache<10min → OpenWeather (key, PH is_day) → Open-Meteo (no key, Asia/Manila + is_day + daily High/Low) → stale 1h →503`, never fabricates; Heat Index via Rothfusz (`utils/environment.py`)
-- **Air Quality**: `services/air_quality_service.py` → `cache10m → OpenWeather Air Pollution (if key) → Open-Meteo Air Quality (no key, PM2.5/US AQI) → stale 1h →503`; DENR DAO 2020-14 PM2.5 + US EPA AQI labeled separately
-- **Structure**: `app.py` (factory) + `wsgi.py`, `config.py`, `routes/{public,auth,admin,api}.py`, `models/`, `services/{weather_service,air_quality_service}`, `utils/{db,seed,validators,security,environment}`, `templates/{public,admin,errors,partials}`, `static/{css,js,images}`, `tests/`
-
----
-
-## 🗺️ Key Features (Sprint 2 — real data)
-
-1. **Real NCR dataset**: 868 GeoJSON features → 836 live centers across all 17 LGUs (717 verified, 11 flagged `needs_review`) + 32 quarantined rows in `staging_centers` (no usable coordinates). Import via `flask --app app import-geojson`; re-runs update geocoded fields only, never clobber admin-set capacity/occupancy/contacts.
-2. **Provenance tracking**: every imported center carries `source` (e.g. `geojson:osm`), `verified`, `needs_review` + `review_reason`; city names normalized (`City of Manila` → `Manila`), addresses synthesized deterministically (`plan_addresses()`), GeoJSON `[lon, lat]` order asserted.
-3. **Honest unknown capacity**: imported capacity/occupancy is NULL until an admin sets real numbers — API, map, directory, detail, home, and admin dashboard all render `Status Unavailable` / "capacity unreported" instead of fake zeros. Admin edit form requires capacity before occupancy can be tracked.
-4. *(Sprint 1 features 5–12 below unchanged: weather, environmental safety, hotlines, admin, map, directory, detail, home.)*
-1. **Home** stats (total/available/nearly/full) + map preview + recently updated + last_updated + emergency notice
-2. **Evacuation Map** markers colored green/orange/red/gray + text label, search/filter city/status/supply, `fitBounds`, Use My Location, list view, popup with occupancy/supply/directions
-3. **Directory** searchable cards with progress bar + badges + sort (name/available/occupancy/recent) + empty state
-4. **Center Detail** computed `available_slots`, `occupancy_pct`, `occupancy_status` (Available<80/Nearly 80-99/Full), 5 supplies, notes, `tel:` + directions
-5. **Weather** proxy hides key, OpenWeather → Open-Meteo (Asia/Manila, is_day, High/Low) fallback, handles 400/503 + retry; visuals: Now dark/light (PH time), gauges, hourly strip, Heat Index (PAGASA)
-6. **Environmental Safety** side-by-side Heat Index + AQI cards with overall status (max severity), PM2.5 µg/m³ (DENR) & US AQI labeled, tinted backgrounds, accessible badges/bars, skeletons
-7. **Hotlines** filter city/category/q, `tel:` + Copy, empty per locality
-8. **Admin** hashed login, session, protected `/admin/*`, dashboard (total capacity/occupancy/low-supply/stale>7d), centers/hotlines tables
-
----
-
-## 🔒 Security
-- Werkzeug `generate_password_hash`/`check_password_hash`, Flask session `HttpOnly/SameSite`, CSRF, parameterized queries, escaped templates, `SECRET_KEY` via env, 5-attempt lockout, no secrets committed.
-
-## ♿ Accessibility & Responsive
-- Inter 16px, semantic HTML, ARIA, keyboard, focus ring, contrast, color+label+icon, 44px taps, media `768px` collapse, 320/375/768/1024/1440 tested.
-
-## 🧪 Testing
 ```bash
-pytest -q  # 137 passed: pages + protected redirect, api centers/hotlines/weather+env (200+400/503), detail 200/404 incl. closed-status, login 401/302+dashboard + lockout 403, environment boundaries, sharing (groups/locations/expiry), hazards (quakes/fires cache + 503), admin CRUD (occupancy audit, hotline create/archive, logout POST), geojson import (normalization, idempotency, quarantine, NULL-capacity status)
+python -m flask --app app run --debug
+python -m flask --app app init-db
+python -m flask --app app seed
+python -m flask --app app import-geojson
+python -m pytest -q
+python run_gui.py
+python scripts/convert_noah.py
+python -m gunicorn wsgi:app
 ```
 
-## Known MVP Limitations
-- Offline: requires network for tiles/weather live; cached demo works offline after first seed
-- Unofficial sites & nationwide hotline coverage not in MVP
-- NOAA `api.weather.gov` US-centric → PH returns empty (handled gracefully)
-- No file uploads; archived flag instead of hard delete
+## REST API
 
-## Environment Variables
-See `.env.example`: `SECRET_KEY`, `FLASK_ENV`, `DATABASE_URL`, `ADMIN_USERNAME/PASSWORD`, `OPENWEATHER_API_KEY`, `GEMINI_API_KEY` (optional), Open-Meteo weather & air-quality need no key (air fallback reuses `OPENWEATHER_API_KEY` for `/air_pollution`).
+All API routes use the `/api` prefix.
 
-## Environmental Indicators
+- `GET /api/centers`: query centers by text, city, status, supply, or sorting rule.
+- `GET /api/centers/version`: obtain the latest update timestamp and center count.
+- `GET /api/centers/<id>`: retrieve one evacuation center.
+- `GET /api/ncr-lgus`: retrieve all 17 NCR LGUs and centroids.
+- `GET /api/weather`: retrieve weather and heat-index data by coordinates or city.
+- `GET /api/air-quality`: retrieve PM2.5 and AQI data.
+- `GET /api/environment`: retrieve combined weather and air-quality severity.
+- `GET /api/earthquakes`: retrieve earthquakes within a requested radius.
+- `GET /api/fires`: retrieve active thermal anomalies for one or two days.
+- `GET /api/announcements`: retrieve announcements filtered by city or location.
+- `POST /api/groups`: create a temporary location-sharing group.
+- `POST /api/locations`: submit one member's temporary location.
+- `GET /api/groups/<code>/locations`: retrieve unexpired group locations.
+- `GET /api/hotlines`: search hotlines by city, category, or text.
 
-**Heat Index** `utils/environment.py:29` — NWS Rothfusz regression `F` → `C` from `temp`+`humidity` (provider never supplies explicit heat index; OpenWeather `feels_like` is not labeled as Heat Index). PAGASA categories `<27 Not Hazardous | 27-32 Caution | 33-41 Extreme Caution | 42-51 Danger | ≥52 Extreme Danger` with green/yellow/orange/red-orange/dark-red badges + tinted card + bar (gradual, WCAG contrast, not whole-page red).
+## Database
 
-**Air Quality** `services/air_quality_service.py:12` — Primary `https://air-quality-api.open-meteo.com/v1/air-quality` (no key, PH) `pm2_5, us_aqi` + fallback `https://api.openweathermap.org/data/2.5/air_pollution` (reuses key). DENR DAO 2020-14 PM2.5 `0-25 Good |25.1-35 Fair |35.1-45 Sensitive |45.1-55 Very Unhealthy |55.1-90 Acutely | >91 Emergency` (µg/m³) plus US EPA AQI numeric labeled `US EPA` — never confused. Overall = max severity of heat vs air.
+SQLite runs with foreign-key enforcement and write-ahead logging. The schema contains 10 main tables:
 
-**Cache** `weather_cache` 10m live /1h stale `utils/db.py:80` shared `source` `air-quality`; never fabricates — shows Unavailable + retry. PH timezone `Asia/Manila`, `is_day` for Now card day/night.
+- `administrators`
+- `evacuation_centers`
+- `staging_centers`
+- `center_status_updates`
+- `emergency_hotlines`
+- `weather_cache`
+- `emergency_groups`
+- `live_locations`
+- `hazards_cache`
+- `announcements`
 
-Limitations: heat index needs `temp`+`humidity` (unavailable → Unavailable badge); AQI offline/rate-limit → Unavailable (not 0); some rural coords have sparse AQI; feels_like ≠ heat index.
+## Environmental indicators
+
+### PAGASA heat index
+
+The application calculates heat index through the NOAA/NWS Rothfusz regression and maps the result to the following tiers:
+
+- Below 27°C: Not Hazardous
+- 27°C to 32°C: Caution
+- 33°C to 41°C: Extreme Caution
+- 42°C to 51°C: Danger
+- 52°C or above: Extreme Danger
+
+### DENR DAO 2020-14 PM2.5 classification
+
+- 0.0 to 25.0 µg/m³: Good
+- 25.1 to 35.0 µg/m³: Fair
+- 35.1 to 45.0 µg/m³: Unhealthy for Sensitive Groups
+- 45.1 to 55.0 µg/m³: Very Unhealthy
+- 55.1 to 90.0 µg/m³: Acutely Unhealthy
+- Above 91.0 µg/m³: Emergency
+
+Provider failures never produce dummy zeroes. The application returns fresh cache, stale cache within one hour, or HTTP `503 Service Unavailable` with `retry: true`.
+
+## Configuration
+
+Copy `.env.example` to `.env`, then configure these variables as needed:
+
+- `SECRET_KEY`: required in production.
+- `FLASK_ENV`: `development`, `production`, or `testing`.
+- `DATABASE_URL`: defaults to `instance/ligtas.sqlite`.
+- `ADMIN_USERNAME` and `ADMIN_PASSWORD`: required custom values in production.
+- `OPENWEATHER_API_KEY`: optional; Open-Meteo is the keyless fallback.
+- `MAPBOX_TOKEN`: optional; OpenStreetMap is the fallback.
+- `FIRMS_MAP_KEY`: optional NASA FIRMS key.
+- `GEMINI_API_KEY`: reserved for future AI assistance.
+- `APP_URL`: optional deployed base URL.
+
+## Project layout
+
+```text
+LigtasPH/
+├── app.py
+├── config.py
+├── wsgi.py
+├── run_gui.py
+├── requirements.txt
+├── data/
+├── routes/
+│   ├── public.py
+│   ├── auth.py
+│   ├── admin.py
+│   └── api.py
+├── services/
+│   ├── weather_service.py
+│   ├── air_quality_service.py
+│   └── hazards_service.py
+├── utils/
+├── scripts/
+├── templates/
+├── static/
+│   ├── css/
+│   ├── js/
+│   ├── noah/
+│   └── images/
+└── tests/
+```
+
+## Deployment
+
+### Render
+
+Use these commands in the Render web service:
+
+```bash
+# Build
+pip install -r requirements.txt && flask --app app init-db && flask --app app seed && flask --app app import-geojson
+
+# Start
+gunicorn wsgi:app
+```
+
+Set `FLASK_ENV=production`, define secure administrator credentials and a strong `SECRET_KEY`, then mount persistent storage at `instance/`.
+
+### Docker
+
+```dockerfile
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+RUN python -m flask --app app init-db && \
+    python -m flask --app app seed && \
+    python -m flask --app app import-geojson
+EXPOSE 8000
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "wsgi:app"]
+```
+
+## Security and resilience
+
+- Werkzeug password hashing.
+- Login rate limiting and temporary account lockout.
+- `HttpOnly`, `SameSite=Lax`, and production-only `Secure` cookies.
+- CSRF protection for state-changing administrative forms.
+- Parameterized SQLite queries.
+- Cryptographically secure group-code generation.
+- Two-hour expiration for live family locations.
+- Cached fallbacks and honest `503` responses during provider failures.
+
+## Testing
+
+Run all 137 tests:
+
+```bash
+python -m pytest -q
+```
+
+Run a module or individual test:
+
+```bash
+python -m pytest -q tests/test_sprint2_geojson.py
+python -m pytest -q tests/test_announcements.py::test_announcements_radius_filter
+```
+
+The suite covers spatial calculations, API fallbacks, data normalization, quarantined imports, administrative changes, audit records, environmental classifications, hazard feeds, map behavior, family-sharing expiration, and splash-screen sessions.
 
 ## License
-Demo for academic use. Sample data flagged "Development — not verified live."
+
+Developed for academic and civic disaster-resilience use. Sample and demonstration records are marked for development and educational validation. Released under the [MIT License](LICENSE).

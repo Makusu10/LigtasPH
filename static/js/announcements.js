@@ -93,14 +93,14 @@
     var s = document.createElement('style');
     s.id = 'ann-style';
     s.textContent = [
-      '#ann-modal-overlay{position:fixed;inset:0;background:rgba(13,27,34,0.72);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;}',
-      '#ann-modal{background:#f1f4ef;border:3px solid #23343c;border-radius:2px;max-width:480px;width:100%;box-shadow:6px 6px 0 rgba(13,27,34,0.4);overflow:hidden;}',
-      '#ann-modal-head{height:8px;}',
+      '#ann-modal-overlay{position:fixed;inset:0;background:rgba(16,24,40,0.45);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;}',
+      '#ann-modal{background:var(--surface,#fff);color:var(--text,#1b2330);border-radius:16px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.25);overflow:hidden;border:1px solid var(--glass-border,transparent);}',
+      '#ann-modal-head{height:6px;}',
       '#ann-modal-body{padding:20px;}',
       '#ann-modal h2{margin:0 0 8px;font-size:20px;font-family:Oswald,"Archivo Narrow",sans-serif;text-transform:uppercase;letter-spacing:.03em;}',
       '#ann-modal p{margin:0 0 6px;font-size:14px;line-height:1.5;}',
-      '#ann-modal-meta{font-family:"IBM Plex Mono",monospace;font-size:12px;color:#3d4a52;margin-top:8px;}',
-      '#ann-topbar{position:sticky;top:64px;z-index:1060;margin-bottom:12px;border-radius:2px;padding:10px 14px;font-size:13px;display:flex;gap:10px;align-items:center;justify-content:space-between;border:2px solid;}'
+      '#ann-modal-meta{font-size:12px;color:var(--text-secondary,#5f6b7a);margin-top:8px;}',
+      '#ann-topbar{position:sticky;top:64px;z-index:1060;margin-bottom:12px;border-radius:12px;padding:10px 14px;font-size:13px;display:flex;gap:10px;align-items:center;justify-content:space-between;border:1px solid;}'
     ].join('\n');
     document.head.appendChild(s);
   }
@@ -185,9 +185,21 @@
     showNext();
   }
 
+  // Master kill-switch from Settings (LigtasPrefs may load after us —
+  // both scripts are deferred in order, but read live to be safe).
+  function popupsEnabled() {
+    try {
+      if (window.LigtasPrefs) return window.LigtasPrefs.announcementsEnabled();
+      return localStorage.getItem('ligtasph_ann_enabled') !== '0';
+    } catch (e) { return true; }
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     // Skip on admin pages so editors aren't interrupted while publishing.
     if (window.location.pathname.indexOf('/admin') === 0) return;
+    // Skip on home: the banner + bell replace the modal there.
+    if (document.getElementById('home-ann-banner')) return;
+    if (!popupsEnabled()) return;
     refreshPos();
     fetchLive().then(run, function () { run(loadCache()); });
   });

@@ -117,4 +117,19 @@ def seed_db():
         aq_demo = {"source":"open-meteo-air","scale":"DENR PM2.5 + US EPA AQI (separate)","city":"Metro Manila","lat":14.6308,"lon":121.0968,"aqi":50,"aqi_scale":"US EPA","pm25":7.1,"pm10":14.2,"dominant_pollutant":"PM2.5","category":"Good","color":"green","recommendation":"Air quality is satisfactory. Enjoy outdoor activities.","severity":0,"colors":{"badge":"#ECFDF3","border":"#A6F4C5","text":"#054F31","bar":"#10b981","tint":"rgba(236,253,243,0.45)"},"details":{"carbon_monoxide": 220, "nitrogen_dioxide": 10, "ozone": 42, "sulphur_dioxide": 4},"fetched_at": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()), "_demo": True}
         db.execute("INSERT INTO weather_cache (city, lat, lng, source, payload) VALUES (?,?,?,?,?)",
                    ("Metro Manila",14.6308,121.0968,"air-quality", json.dumps(aq_demo)))
+    # Announcements — demo/sample rows authored in-app (times stored UTC).
+    # Insert-missing by title so existing DBs pick them up on re-seed.
+    announcements = [
+        ("This is a test can every one see this", "test", "all", "", None, None, None, "info", "2026-09-05 07:22:00", "2026-09-05 10:22:00", 1),
+        ("System update this weekend", "LigtasPH will be briefly unavailable on Sunday between 1:00 AM and 3:00 AM for scheduled maintenance. Saved data on your device is unaffected. Please plan around this window and contact your local DRRMO for urgent needs during the downtime.", "all", "", None, None, None, "warning", "2000-01-01 00:00:00", "2100-01-01 00:00:00", 1),
+        ("Last month drill", "City-wide earthquake drill completed.", "all", "", None, None, None, "info", "2000-01-01 00:00:00", "2000-01-02 00:00:00", 1),
+        ("Genshin Impact Version 7.0 \"Everwinter Without Mercy\"", "Genshin Impact Version 7.0 \"Everwinter Without Mercy\" officially launched on August 12, 2026, introducing the massive, highly anticipated Snezhnaya region. This vast northern expansion features key locations like Morpazok, the grand Snezhnaya Palace, and the Kolvesi Theater, while introducing interactive cold survival and unique shooting mechanics alongside an inland railway exploration system. The update is currently in its Phase II banner cycle, featuring drop-rate boosts for the new 5-star character Ineffa and 4-star Flins, following the initial Phase I releases of Odette and Aliasha. Looking ahead, the game will transition to Version 7.1 on September 23, 2026, which will host the Genshin Impact Anniversary celebration offering a free standard 5-star character selector and major login rewards, while introducing new characters like Vestna, Vodinista, Skirk, and Escafi to the roster.", "all", "", None, None, None, "critical", "2026-09-05 07:31:00", "2026-09-05 19:31:00", 1),
+        ("UPDATE: UI and Announcement", "Darkmode tsaka may annoncement banner na pag open na pag ni dismiss mapupunta sa new notification drop down", "all", "", None, None, None, "info", "2026-09-05 07:41:00", "2026-09-05 12:41:00", 1),
+    ]
+    for a in announcements:
+        dup = db.execute("SELECT 1 FROM announcements WHERE title=?", (a[0],)).fetchone()
+        if not dup:
+            db.execute("""INSERT INTO announcements
+            (title,message,scope,city,center_lat,center_lng,radius_km,severity,starts_at,ends_at,is_active)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)""", a)
     db.commit()

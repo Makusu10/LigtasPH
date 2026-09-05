@@ -11,6 +11,10 @@ def app():
     with app.app_context():
         init_db()
         seed_db()
+        # These tests assume a clean announcements table; seed rows and
+        # other files' rows share this in-memory DB, so reset it here.
+        get_db().execute("DELETE FROM announcements")
+        get_db().commit()
     return app
 
 

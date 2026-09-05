@@ -1,25 +1,58 @@
 {% extends 'base.html' %}
 {% block title %}Home — LigtasPH{% endblock %}
 {% block content %}
+<div id="home-ann-banner" class="card sev-info" hidden role="status">
+  <span id="home-ann-dot" aria-hidden="true" style="width:12px; height:12px; border-radius:50%; flex:0 0 auto; margin-top:5px; background:var(--primary);"></span>
+  <div id="home-ann-body">
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <span id="home-ann-title" style="font-weight:800; font-size:15px;"></span>
+      <span id="home-ann-sev" class="badge badge-unknown" style="font-size:10px;"></span>
+    </div>
+    <p id="home-ann-msg" class="clamped"></p>
+    <div id="home-ann-meta"></div>
+  </div>
+  <div id="home-ann-actions">
+    <button id="home-ann-expand" class="btn btn-secondary" style="padding:10px 14px; font-size:13px; min-height:44px;" hidden>Show more</button>
+    <button id="home-ann-dismiss" class="btn btn-primary" style="padding:10px 14px; font-size:13px; min-height:44px;">Dismiss</button>
+  </div>
+</div>
+<button id="ann-bell" aria-label="Announcement history" aria-expanded="false" title="Announcements">
+  <span class="material-symbols-rounded" style="font-size:22px;">notifications</span>
+  <span id="ann-bell-count" hidden>0</span>
+</button>
+<div id="ann-history" class="card" hidden role="dialog" aria-label="Announcement history">
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;">
+    <h2 style="margin:0; font-size:15px;">Announcements</h2>
+    <button id="ann-dismiss-all" class="btn btn-secondary" style="padding:4px 10px; font-size:11px;">Dismiss all</button>
+  </div>
+  <div style="font-size:12px; color:var(--text-secondary); margin-bottom:6px;">Newest first, including expired.</div>
+  <div id="ann-history-items"></div>
+</div>
 <section class="card" style="padding:24px; display:grid; gap:14px;">
   <div style="display:flex; gap:12px; align-items:center;">
     <span class="nav-brand-mark" style="width:36px;height:36px; font-size:14px;">LP</span>
     <h1 style="margin:0; font-size:28px; line-height:1.1;">Find your evacuation center now</h1>
   </div>
-  <p style="color:var(--text-secondary); margin:0; max-width:65ch;">Locate official evacuation centers, check occupancy and supplies, and get weather and hotlines for your city or municipality.</p>
-  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
-    <a href="{{ url_for('public.map_page') }}" class="btn btn-primary btn-lg">Find Nearest Evacuation Center</a>
-    <a href="{{ url_for('public.hotlines_page') }}" class="btn btn-secondary">Emergency Hotlines</a>
+  <p style="color:var(--text-secondary); margin:0; max-width:65ch;">LigtasPH is a centralized platform for locating official evacuation centers, checking occupancy and supply status, viewing current weather, and finding emergency hotlines for your city or municipality.</p>
+  <form id="heroFind" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px; align-items:stretch;">
+    <select id="heroCity" aria-label="Your city" style="flex:1; min-width:180px;"><option value="">Loading cities…</option></select>
+    <button type="button" id="heroLocate" class="btn btn-secondary">Use my location</button>
+    <button type="submit" id="heroGo" class="btn btn-primary" disabled>Find an Evacuation Center</button>
+  </form>
+  <div id="heroMsg" style="font-size:13px; color:var(--text-secondary);" role="status"></div>
+  <div style="display:flex; gap:10px; flex-wrap:wrap;">
+    <a href="{{ url_for('public.hotlines_page') }}" class="btn btn-secondary">View Emergency Hotlines</a>
   </div>
-  <div style="background:#f8e6e3; border:2px solid var(--red); border-left:8px solid var(--red); padding:10px 12px; border-radius:var(--radius); color:#5e0a0e; font-weight:600; font-family:var(--font-display); font-size:14px; letter-spacing:0.02em;">If you are in immediate danger, contact 911 or your local DRRMO. This site is for information only.</div>
+  <div style="background:rgba(217,45,32,0.10); border:1px solid rgba(217,45,32,0.35); padding:10px 12px; border-radius:8px; color:var(--red); font-size:13px; font-weight:600;">If you are in immediate danger, contact <a href="tel:911" style="color:inherit;">911</a> or your local DRRMO. This site is for information only.</div>
 </section>
 
 <section style="margin-top:16px;">
   <div class="grid-4">
-    <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Listed Centers</div><div class="stat-num" style="font-size:28px; font-weight:800;">{{ total }}</div></div>
-    <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Available</div><div style="font-size:28px; font-weight:800; color:var(--green);">{{ available }}</div><span class="badge badge-available">Available < 80%</span></div>
-    <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Nearly Full</div><div style="font-size:28px; font-weight:800; color:var(--orange);">{{ nearly }}</div><span class="badge badge-nearly">80–99%</span></div>
-    <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Full</div><div style="font-size:28px; font-weight:800; color:var(--red);">{{ full }}</div><span class="badge badge-full">100%</span></div>
+    <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Listed Centers</div><div style="font-size:28px; font-weight:800; color:var(--navy);">{{ total }}</div></div>
+    <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Available</div><div style="font-size:28px; font-weight:800; color:var(--green);">{{ available }}</div><a href="{{ url_for('public.centers_page') }}?status=Available" class="badge badge-available" style="text-decoration:none;">Available &lt; 80%</a></div>
+    <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Nearly Full</div><div style="font-size:28px; font-weight:800; color:var(--orange);">{{ nearly }}</div><a href="{{ url_for('public.centers_page') }}?status=Nearly+Full" class="badge badge-nearly" style="text-decoration:none;">80–99%</a></div>
+    <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Full</div><div style="font-size:28px; font-weight:800; color:var(--red);">{{ full }}</div><a href="{{ url_for('public.centers_page') }}?status=Full" class="badge badge-full" style="text-decoration:none;">100%</a></div>
+    <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">Status Unknown</div><div style="font-size:28px; font-weight:800;">{{ unknown }}</div><a href="{{ url_for('public.centers_page') }}?status=Status+Unavailable" class="badge badge-unknown" style="text-decoration:none;">Awaiting capacity data</a></div>
   </div>
   {% if last_updated %}
     <p style="color:var(--text-secondary); font-size:12px; margin-top:8px;">Last updated: {{ last_updated }}{% if unknown %} • {{ unknown }} center{{ 's' if unknown != 1 }} awaiting capacity data{% endif %}</p>
@@ -29,8 +62,8 @@
 <section style="margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:16px;" class="map-layout">
   <div class="card">
     <h2 style="margin:0 0 8px; font-size:16px;">Map Preview</h2>
-    <div id="previewMap" style="height:280px; border-radius:var(--radius); border:2px solid var(--line);"></div>
-    <p style="color:var(--text-secondary); font-size:12px; margin:8px 0 0;"><span class="badge badge-available">Available</span> <span class="badge badge-nearly">Nearly Full</span> <span class="badge badge-full">Full</span></p>
+    <div id="previewMap" style="height:280px; border-radius:8px; border:1px solid var(--border);"></div>
+    <p style="color:var(--text-secondary); font-size:12px; margin:8px 0 0;"><span class="badge badge-available">Available</span> <span class="badge badge-nearly">Nearly Full</span> <span class="badge badge-full">Full</span> <span class="badge badge-unknown">Unknown</span> <span id="previewCount"></span></p>
   </div>
   <div class="card">
     <h2 style="margin:0 0 8px; font-size:16px;">Recently Updated Centers</h2>
@@ -45,7 +78,7 @@
               <div style="font-weight:700;">{{ c['name'] }}</div>
               <div style="color:var(--text-secondary); font-size:13px;">{{ c['city'] }} • {{ avail }} slots • {{ "%.1f"|format(pct) }}%</div>
             </div>
-            <a href="{{ url_for('public.center_detail', center_id=c['id']) }}" class="btn btn-secondary" style="padding:6px 10px; font-size:12px;">View</a>
+            <a href="{{ url_for('public.center_detail', center_id=c['id']) }}" class="btn btn-secondary" style="padding:10px 14px; font-size:13px; min-height:44px;">View</a>
           </div>
           {% else %}
           <div style="border:2px solid var(--line); border-radius:var(--radius); padding:10px 12px; display:flex; justify-content:space-between; gap:12px; align-items:center;">
@@ -53,7 +86,7 @@
               <div style="font-weight:700;">{{ c['name'] }}</div>
               <div style="color:var(--text-secondary); font-size:13px;">{{ c['city'] }} • capacity unreported</div>
             </div>
-            <a href="{{ url_for('public.center_detail', center_id=c['id']) }}" class="btn btn-secondary" style="padding:6px 10px; font-size:12px;">View</a>
+            <a href="{{ url_for('public.center_detail', center_id=c['id']) }}" class="btn btn-secondary" style="padding:10px 14px; font-size:13px; min-height:44px;">View</a>
           </div>
           {% endif %}
         {% endfor %}
@@ -73,11 +106,50 @@
 {% endif %}
 {% endblock %}
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/home_banner.js') }}" defer></script>
 {% if mapbox_token %}
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.29.0/mapbox-gl.js"></script>
 {% else %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 {% endif %}
+<script>
+  // Hero operate path: pick a city or geolocate, then jump to the map
+  // with the choice carried along (map + directory hydrate ?city=).
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const sel = document.getElementById('heroCity');
+    const msg = document.getElementById('heroMsg');
+    const go = document.getElementById('heroGo');
+    if(!sel) return;
+    try{
+      const saved = localStorage.getItem('ligtasph_ann_city_v1') || '';
+      fetch('/api/centers?sort=name').then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }).then(centers=>{
+        const cities=[...new Set(centers.map(c=>c.city))].sort();
+        sel.innerHTML='<option value="">Choose your city…</option>';
+        cities.forEach(ci=>{ const o=document.createElement('option'); o.value=ci; o.textContent=ci; if(ci===saved) o.selected=true; sel.appendChild(o); });
+        go.disabled=false;
+      }).catch(()=>{ sel.innerHTML='<option value="">Cities unavailable offline</option>'; msg.textContent='City list needs a connection — use your location or open the map directly.'; });
+    }catch(e){ go.disabled=false; }
+    sel.addEventListener('change', ()=>{ try{ localStorage.setItem('ligtasph_ann_city_v1', sel.value || ''); }catch(_){} });
+    document.getElementById('heroLocate').addEventListener('click', ()=>{
+      msg.textContent='';
+      if(!('geolocation' in navigator)){ msg.textContent='Geolocation not supported — pick your city instead.'; return; }
+      msg.textContent='Locating…';
+      navigator.geolocation.getCurrentPosition(pos=>{
+        try{ localStorage.setItem('ligtasph_ann_pos_v1', JSON.stringify({lat:pos.coords.latitude, lon:pos.coords.longitude, at:new Date().toISOString()})); }catch(e){}
+        window.location.href="{{ url_for('public.map_page') }}";
+      }, err=>{
+        msg.textContent = err && err.code===1 ? 'Blocked — allow location in the browser site settings, or pick your city.' : 'No fix — pick your city instead.';
+      }, {maximumAge:60000, timeout:10000});
+    });
+    document.getElementById('heroFind').addEventListener('submit', e=>{
+      e.preventDefault();
+      const city = sel.value;
+      if(!city && sel.options.length<=1){ msg.textContent='City list is still loading — wait a moment or use your location.'; return; }
+      if(!city){ msg.textContent='Please choose your city, or use your location.'; sel.focus(); return; }
+      window.location.href = "{{ url_for('public.map_page') }}" + '?city='+encodeURIComponent(city);
+    });
+  });
+</script>
 <script>
   // Minimal preview map - load centers via API (Mapbox when configured, else OSM)
   document.addEventListener('DOMContentLoaded', async ()=>{
@@ -102,7 +174,10 @@
     try{
       const res = await fetch('/api/centers');
       const centers = await res.json();
-      centers.slice(0,6).forEach(c=>{
+      const shown = centers.slice(0,6);
+      const pc = document.getElementById('previewCount');
+      if(pc) pc.innerHTML = `Showing ${shown.length} of ${centers.length} — <a href="{{ url_for('public.map_page') }}" style="color:var(--primary);">open full map</a>`;
+      shown.forEach(c=>{
         const known=c.occupancy_pct!==null&&c.occupancy_pct!==undefined;
         let color = '#67757c';
         if(known){ color='#25743a'; if(c.occupancy_pct>=100) color='#c1121f'; else if(c.occupancy_pct>=80) color='#d9991a'; }
@@ -124,17 +199,30 @@
         try{ map.invalidateSize(); }catch(e){}
       }
     }catch(e){ console.warn(e); }
-    // weather summary fetch
+    // weather summary fetch (saved position > saved city > Marikina default;
+    // the label always names what the numbers actually describe)
     try{
-      const w = await fetch('/api/weather?lat=14.6308&lon=121.0968');
-      if(w.ok){
+      let url='/api/weather?lat=14.6308&lon=121.0968', wlabel='Marikina (default)';
+      try{
+        const p=JSON.parse(localStorage.getItem('ligtasph_ann_pos_v1')||'null');
+        if(p && p.lat!=null && p.lon!=null){ url=`/api/weather?lat=${p.lat}&lon=${p.lon}`; wlabel='near you'; }
+        else { const c=localStorage.getItem('ligtasph_ann_city_v1'); if(c){ url='/api/weather?city='+encodeURIComponent(c); wlabel=c; } }
+      }catch(e){}
+      const wrap=document.getElementById('weatherSummary');
+      wrap.innerHTML='<div class="card" style="color:var(--text-secondary); font-size:13px;">Loading weather…</div>';
+      const w = await fetch(url);
+      if(!w.ok) throw new Error('HTTP '+w.status);
+      {
         const d=await w.json();
         const sec=document.createElement('div');
         sec.className='card';
-        sec.innerHTML=`<div style="font-weight:700; font-size:13px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.06em;">Weather — ${d.name||''}</div><div style="font-size:14px;">${d.weather?.[0]?.description||''} • ${d.main?.temp??''}°C • Humidity ${d.main?.humidity??''}% • Wind ${d.wind?.speed??''} m/s</div><div style="font-size:12px; color:var(--text-secondary);">${d.source||''} • ${d.fetched_at||''}</div>`;
-        document.getElementById('weatherSummary').appendChild(sec);
+        sec.innerHTML=`<div style="font-weight:700; font-size:13px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.06em;">Weather — ${wlabel}</div><div style="font-size:14px;">${d.weather?.[0]?.description||''} • ${d.main?.temp??''}°C • Humidity ${d.main?.humidity??''}% • Wind ${d.wind?.speed??''} m/s</div><div style="font-size:12px; color:var(--text-secondary);">${d.source||''} • ${d.fetched_at||''}</div>`;
+        wrap.innerHTML=''; wrap.appendChild(sec);
       }
-    }catch(e){}
+    }catch(e){
+      const wrap=document.getElementById('weatherSummary');
+      if(wrap) wrap.innerHTML='<div class="card" style="font-size:13px; color:var(--text-secondary);">Weather unavailable. <a href="{{ url_for('public.weather_page') }}" style="color:var(--primary);">Open the Weather page</a> to retry.</div>';
+    }
   });
 </script>
 {% endblock %}

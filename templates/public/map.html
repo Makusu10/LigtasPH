@@ -174,25 +174,11 @@
   /* map controls clear the floating nav */
   #map .mapboxgl-ctrl-top-right{ top:70px; }
   #map .leaflet-top.leaflet-right{ margin-top:70px; }
-  /* top nav becomes a hoverable overlay (map page only) — glass, not opaque */
+  /* top nav floats over the map but stays solid + readable (both themes) */
   body:has(.map-shell) .nav{ position:absolute; top:0; left:0; right:0; z-index:1100;
-    background:rgba(18,40,63,0.80); border-bottom:1px solid rgba(255,255,255,0.12); box-shadow:none; }
-  body:has(.map-shell) .nav:hover,
-  body:has(.map-shell) .nav:focus-within,
-  body:has(.map-shell) .nav:has(.mobile-menu.open){ background:rgba(18,40,63,0.95);
-    border-bottom:1px solid rgba(255,255,255,0.12); box-shadow:var(--hard-shadow); }
-  /* Turn-by-turn dock floats over the map: the second glass surface (light glass). */
-  #routeDock{
-    background:rgba(244,246,248,0.90);
-    -webkit-backdrop-filter:blur(10px) saturate(1.05);
-    backdrop-filter:blur(10px) saturate(1.05);
-    border:1px solid rgba(20,40,63,0.16);
-  }
-  @supports not (backdrop-filter: blur(1px)){ #routeDock{ background:rgba(244,246,248,0.98); } }
-  @media (prefers-color-scheme: dark){
-    #routeDock{ background:rgba(18,40,63,0.88); border-color:rgba(255,255,255,0.14); }
-    #tileFallback{ background:rgba(18,40,63,0.90); border-color:var(--line-soft); }
-  }
+    background:var(--glass-strong); backdrop-filter:blur(20px) saturate(1.3);
+    -webkit-backdrop-filter:blur(20px) saturate(1.3);
+    border-bottom:1px solid var(--glass-border); box-shadow:0 4px 20px rgba(16,42,67,0.08); }
   /* demo banner becomes a small floating pill; footer hidden for full height */
   body:has(.map-shell) .demo-banner{ position:absolute; top:74px; left:50%; transform:translateX(-50%);
     z-index:1050; width:max-content; max-width:min(620px, 92vw); margin:0; padding:8px 14px;
@@ -232,10 +218,10 @@ function centerFig(c){
 function centerPopupHTML(c, routeBtn){
   return `<div style="min-width:220px">
     <div style="font-weight:800;">${esc(c.name)}</div>
-    <div style="color:#67757c; font-size:13px;">${esc(c.address)}, ${esc(c.city)}</div>
+    <div style="color:var(--text-secondary); font-size:13px;">${esc(c.address)}, ${esc(c.city)}</div>
     <div style="margin:8px 0; font-size:13px;">${centerFig(c)}<br><span class="badge badge-${badgeClass(c.occupancy_status)}">${esc(c.occupancy_status)}</span></div>
     <div style="font-size:12px;">Food ${esc(c.food_status)} • Water ${esc(c.water_status)} • Basic ${esc(c.basic_needs_status)}</div>
-    <div style="font-size:12px; color:#67757c;">Updated ${esc(c.updated_at)}</div>
+    <div style="font-size:12px; color:var(--text-secondary);">Updated ${esc(c.updated_at)}</div>
     <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;"><a href="/centers/${c.id}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">View Details</a>${routeBtn||''}<a href="https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}" target="_blank" rel="noopener" class="btn btn-primary" style="padding:6px 8px; font-size:12px;">Get Directions</a></div>
   </div>`;
 }
@@ -481,7 +467,7 @@ function noahLabel(feat){
   const hz=p.hazard||'hazard';
   const lv=p.level||'?';
   const adv=p.advisory?` (${p.advisory})`:'';
-  return `<div style="min-width:180px"><div style="font-weight:800; text-transform:capitalize;">${esc(hz)} — ${esc(lv)}${esc(adv)}</div><div style="font-size:12px;color:#67757c;">Source: Project NOAH (DOST)</div></div>`;
+  return `<div style="min-width:180px"><div style="font-weight:800; text-transform:capitalize;">${esc(hz)} — ${esc(lv)}${esc(adv)}</div><div style="font-size:12px;color:var(--text-secondary);">Source: Project NOAH (DOST)</div></div>`;
 }
 async function loadCenters(){
   const res = await fetch('/api/centers');
@@ -492,7 +478,11 @@ async function loadCenters(){
   if(sel){
     sel.innerHTML='<option value="">All cities</option>';
     cities.forEach(ci=>{ const o=document.createElement('option'); o.textContent=ci; o.value=ci; sel.appendChild(o); });
-    if(cur && cities.includes(cur)) sel.value=cur;
+    // Deep link from home hero (?city=).
+    let want='';
+    try{ want=new URLSearchParams(location.search).get('city') || localStorage.getItem('ligtasph_ann_city_v1') || ''; }catch(e){}
+    if(want && cities.includes(want)) sel.value=want;
+    else if(cur && cities.includes(cur)) sel.value=cur;
   }
 }
 // Live center updates: version check every 15s, full re-fetch only on
@@ -555,8 +545,8 @@ function circlePolygon(lon, lat, radiusKm, steps){
   }
   return coords;
 }
-const QUAKE_RING_NOTE='<div style="font-size:11px;color:#67757c;">Purple ring ≈ estimated felt area (illustrative, not official).</div>';
-const FIRE_RING_NOTE='<div style="font-size:11px;color:#67757c;">Red ring ≈ 1 km watch perimeter (illustrative).</div>';
+const QUAKE_RING_NOTE='<div style="font-size:11px;color:var(--text-secondary);">Purple ring ≈ estimated felt area (illustrative, not official).</div>';
+const FIRE_RING_NOTE='<div style="font-size:11px;color:var(--text-secondary);">Red ring ≈ 1 km watch perimeter (illustrative).</div>';
 function debounceHazards(refresh){
   const wrapped=()=>{ updateHazardsBadge(); refresh(); };
   ['hzQuake','hzFire','hzHeat','hzFlood','hzSlide','hzSurge'].forEach(id=>{
@@ -1015,7 +1005,7 @@ async function initMapbox(){
   }
   // quake/fire popups on click
   function quakePopupHTML(p){
-    return `<div style="min-width:200px"><div style="font-weight:800;">M${esc(p.mag)} — ${esc(p.place)}</div><div style="font-size:12px;color:#67757c;">Depth ${esc(p.depth??'?')} km • Est. felt radius ${esc(p.radius??quakeRadiusKm(p.mag))} km • <a href="${esc(p.url||'#')}" target="_blank" rel="noopener">USGS</a></div>${QUAKE_RING_NOTE}</div>`;
+    return `<div style="min-width:200px"><div style="font-weight:800;">M${esc(p.mag)} — ${esc(p.place)}</div><div style="font-size:12px;color:var(--text-secondary);">Depth ${esc(p.depth??'?')} km • Est. felt radius ${esc(p.radius??quakeRadiusKm(p.mag))} km • <a href="${esc(p.url||'#')}" target="_blank" rel="noopener">USGS</a></div>${QUAKE_RING_NOTE}</div>`;
   }
   function firePopupHTML(p){
     return `<div style="font-size:12px;"><b>Active fire</b> (${esc(p.confidence)})<br>Brightness ${esc(p.brightness)} • ${esc(p.date)} ${esc(p.time)}</div>${FIRE_RING_NOTE}`;
@@ -1062,7 +1052,7 @@ async function initMapbox(){
       const sub=esc(props.address || props.category || '');
       new mapboxgl.Popup({offset:12, maxWidth:'280px'}).setLngLat(e.lngLat).setHTML(
         `<div style="min-width:180px"><div style="font-weight:800;">${esc(name)}</div>`+
-        (sub?`<div style="font-size:12px;color:#67757c;">${sub}</div>`:'')+
+        (sub?`<div style="font-size:12px;color:var(--text-secondary);">${sub}</div>`:'')+
         `<button data-route="${lat},${lng}" data-name="${esc(name)}" class="btn btn-primary" style="padding:6px 10px; font-size:12px; margin-top:8px;">Route here</button></div>`
       ).addTo(map);
     }catch(err){ /* style not ready — ignore tap */ }
@@ -1076,7 +1066,7 @@ async function initMapbox(){
       el.title=r.display_name;
       el.style.cssText=`background:${mine?'#25743a':'#1f5fbf'};width:${mine?'18px':'16px'};height:${mine?'18px':'16px'};border-radius:50%;border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.5);cursor:pointer;`;
       const m=new mapboxgl.Marker({element:el}).setLngLat([r.lon??r.lng, r.lat])
-        .setPopup(new mapboxgl.Popup({offset:10}).setHTML(`<b>${esc(r.display_name)}${mine?' (you)':''}</b><br><span style="font-size:12px;color:#67757c;">${esc(timeAgo(r.shared_at))} • shared ${esc(r.shared_at||'')}</span>`))
+        .setPopup(new mapboxgl.Popup({offset:10}).setHTML(`<b>${esc(r.display_name)}${mine?' (you)':''}</b><br><span style="font-size:12px;color:var(--text-secondary);">${esc(timeAgo(r.shared_at))} • shared ${esc(r.shared_at||'')}</span>`))
         .addTo(map);
       m._grow=r; groupMarkers.push(m);
     });
@@ -1199,7 +1189,7 @@ function initFallback(){
         const mine=groupState.myName && r.display_name && r.display_name.toLowerCase()===groupState.myName.toLowerCase();
         const m=L.marker([r.lat, r.lon??r.lng], {icon:L.divIcon({html:`<div style="background:${mine?'#25743a':'#1f5fbf'};width:${mine?'18px':'16px'};height:${mine?'18px':'16px'};border-radius:50%;border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.5);"></div>`, className:'', iconSize:[18,18]}), title:r.display_name});
         m._grow=r;
-        m.bindPopup(`<b>${esc(r.display_name)}${mine?' (you)':''}</b><br><span style="font-size:12px;color:#67757c;">${esc(timeAgo(r.shared_at))} • shared ${esc(r.shared_at||'')}</span>`);
+        m.bindPopup(`<b>${esc(r.display_name)}${mine?' (you)':''}</b><br><span style="font-size:12px;color:var(--text-secondary);">${esc(timeAgo(r.shared_at))} • shared ${esc(r.shared_at||'')}</span>`);
         m.addTo(_groupLayer);
       });
     };
@@ -1257,10 +1247,10 @@ async function refreshHazardsFb(){
     jobs.push(fetchQuakes(lat, lon, hzAbort.quake.signal).then(data=>{
       (data.quakes||[]).slice(0,200).forEach(q=>{
         L.circle([q.lat,q.lon], {radius:quakeRadiusKm(q.mag)*1000, color:'#9333ea', weight:1, opacity:0.6, fillOpacity:0.12}).addTo(_quakeLayer)
-          .bindPopup(`<div style="min-width:200px"><div style="font-weight:800;">M${q.mag??'?'} — ${esc(q.place||'Earthquake')}</div><div style="font-size:12px;color:#67757c;">Depth ${q.depth_km??'?'} km • Est. felt radius ${quakeRadiusKm(q.mag)} km • <a href="${q.url||'#'}" target="_blank" rel="noopener">USGS</a></div>${QUAKE_RING_NOTE}</div>`);
+          .bindPopup(`<div style="min-width:200px"><div style="font-weight:800;">M${q.mag??'?'} — ${esc(q.place||'Earthquake')}</div><div style="font-size:12px;color:var(--text-secondary);">Depth ${q.depth_km??'?'} km • Est. felt radius ${quakeRadiusKm(q.mag)} km • <a href="${q.url||'#'}" target="_blank" rel="noopener">USGS</a></div>${QUAKE_RING_NOTE}</div>`);
         const size=10+Math.min(14,(q.mag||0)*2);
         const m=L.marker([q.lat,q.lon], {icon:L.divIcon({html:`<div class="quake-pulse" style="width:${size}px;height:${size}px;"></div>`, className:'', iconSize:[size,size]}), title:`M${q.mag} ${q.place||''}`}).addTo(_quakeLayer);
-        m.bindPopup(`<div style="min-width:200px"><div style="font-weight:800;">M${q.mag??'?'} — ${esc(q.place||'Earthquake')}</div><div style="font-size:12px;color:#67757c;">Depth ${q.depth_km??'?'} km • <a href="${q.url||'#'}" target="_blank" rel="noopener">USGS</a></div></div>`);
+        m.bindPopup(`<div style="min-width:200px"><div style="font-weight:800;">M${q.mag??'?'} — ${esc(q.place||'Earthquake')}</div><div style="font-size:12px;color:var(--text-secondary);">Depth ${q.depth_km??'?'} km • <a href="${q.url||'#'}" target="_blank" rel="noopener">USGS</a></div></div>`);
       });
       const _qfb=inViewCountFb((data.quakes||[]).slice(0,200));
       hzStatus(_qfb<0?quakeStatusText(data):`${quakeStatusText(data)} • ${_qfb} in view`);

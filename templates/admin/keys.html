@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block title %}API Keys & Restart — LigtasPH{% endblock %}
+{% block content %}
+{% include 'partials/nav_admin.html' %}
+<h1 style="margin:12px 0 4px;">API Keys</h1>
+<p style="color:var(--text-secondary); margin:0 0 4px; font-size:13px;">Provider keys are stored in <code>{{ env_path }}</code> (never in git). Values are masked here — full secrets never reach the browser.</p>
+<p style="color:var(--text-secondary); margin:0 0 12px; font-size:13px;">Leave a field empty to keep its current value. Saved keys apply to the server immediately. Admin login and <code>SECRET_KEY</code> stay file-only.</p>
+
+<div class="card" style="margin-bottom:16px;">
+  <form method="post" action="{{ url_for('admin.api_keys') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% for e in entries %}
+      <div style="margin-bottom:12px;">
+        <label for="key-{{ e['key'] }}">{{ e['label'] }}
+          {% if e['configured'] %}<span class="badge badge-available">configured{{ ' • ' + e['masked'] if e['masked'] }}</span>
+          {% else %}<span class="badge badge-unknown">not set</span>{% endif %}
+        </label>
+        <input id="key-{{ e['key'] }}" name="{{ e['key'] }}" type="password" autocomplete="off" placeholder="Paste new value, or leave empty to keep">
+        <div style="color:var(--text-secondary); font-size:12px; margin-top:4px;">{{ e['help'] }}</div>
+      </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-primary">Save keys</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3 style="margin:0 0 6px;">Restart app</h3>
+  <p style="color:var(--text-secondary); margin:0 0 10px; font-size:13px;">Re-executes the server process (run_gui / flask dev). Clients detect the new build on next load and refresh cached feeds automatically. Disabled under gunicorn/waitress — redeploy there instead.</p>
+  <form method="post" action="{{ url_for('admin.restart_app') }}" onsubmit="return confirm('Restart the app now? Users will see a few seconds of downtime.');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn btn-secondary">Restart now</button>
+  </form>
+</div>
+{% endblock %}

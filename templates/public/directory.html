@@ -12,7 +12,7 @@
 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; align-items:center;">
   <input id="q" placeholder="Search name, city, address" style="flex:1; min-width:220px;">
   <select id="city"><option value="">All cities</option></select>
-  <select id="status"><option value="">All statuses</option><option>Available</option><option>Nearly Full</option><option>Full</option></select>
+  <select id="status"><option value="">All statuses</option><option>Available</option><option>Nearly Full</option><option>Full</option><option>Status Unavailable</option></select>
   <select id="sort"><option value="updated">Recently updated</option><option value="name">Name</option><option value="available">Available slots</option><option value="occupancy">Occupancy %</option></select>
 </div>
 <div id="liveStamp" role="status" style="font-size:12px; color:var(--text-secondary); margin-bottom:10px;">Live updates on • checking every 15s…</div>
@@ -61,6 +61,12 @@ document.addEventListener('DOMContentLoaded', async()=>{
   document.getElementById('city').addEventListener('change', (e)=>{ try{ localStorage.setItem('ligtasph_ann_city_v1', e.target.value || ''); }catch(_){} });
   document.getElementById('status').addEventListener('change', render);
   document.getElementById('sort').addEventListener('change', load);
+  // Deep links from home stat cards (?status=, ?city= already handled in load()).
+  try{
+    const wantStatus=new URLSearchParams(location.search).get('status') || '';
+    if(wantStatus) document.getElementById('status').value=wantStatus;
+    render();
+  }catch(e){}
 });
 async function load(){
   const sort=document.getElementById('sort')?.value || 'updated';
@@ -71,7 +77,12 @@ async function load(){
   const cur=sel.value;
   sel.innerHTML='<option value="">All cities</option>';
   cities.forEach(ci=>{ const o=document.createElement('option'); o.value=ci; o.textContent=ci; sel.appendChild(o); });
-  sel.value=cur;
+  // Deep link from home hero (?city=).
+  try{
+    const want=new URLSearchParams(location.search).get('city') || '';
+    if(want && cities.includes(want)){ sel.value=want; localStorage.setItem('ligtasph_ann_city_v1', want); }
+    else sel.value=cur;
+  }catch(e){ sel.value=cur; }
   render();
 }
 function render(){

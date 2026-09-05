@@ -19,6 +19,12 @@ __pycache__/
 .coverage
 htmlcov/
 
+# Agent/UI-design tooling (local only — not application code)
+.opencode/
+.agent/
+.claude/
+.gemini/
+
 .DS_Store
 *.log
 .vscode/

@@ -56,18 +56,31 @@
 }
 
 * { box-sizing: border-box; }
-html, body {
-  margin:0; padding:0;
-  font-family: var(--font-body);
-  font-size:16px; line-height:1.5;
-  color: var(--text);
-  min-height:100vh;
-  background-color: var(--paper);
-  background-image:
-    linear-gradient(rgba(27,44,63,0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(27,44,63,0.045) 1px, transparent 1px);
-  background-size: 24px 24px;
-  background-attachment: fixed;
+html, body { margin:0; padding:0; font-family: 'Inter', 'Roboto', system-ui, sans-serif; font-size:16px; color:var(--text); background: var(--bg); background-image: var(--bg-gradient); background-attachment: fixed; min-height:100vh; }
+@media (prefers-reduced-motion: no-preference){
+  html { scroll-behavior: smooth; }
+}
+/* Browser surfaces carry the design too: selection, scrollbars, link offset */
+::selection { background: rgba(59,110,245,0.28); }
+[data-theme="dark"] ::selection { background: rgba(122,162,255,0.35); }
+* { scrollbar-width: thin; scrollbar-color: rgba(120,134,155,0.55) transparent; }
+*::-webkit-scrollbar { width:10px; height:10px; }
+*::-webkit-scrollbar-thumb { background: rgba(120,134,155,0.55); border-radius:999px; border:2px solid transparent; background-clip:content-box; }
+*::-webkit-scrollbar-track { background: transparent; }
+a { text-underline-offset: 3px; }
+input, select, textarea { font-variant-numeric: tabular-nums; }
+
+/* Utilities — Liquid Glass */
+.container { max-width:1200px; margin:0 auto; padding:0 16px; }
+.card {
+  background: var(--glass);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.2);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.2);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  padding:16px;
+  box-shadow: var(--glass-shadow);
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
 h1,h2,h3,h4 { font-family: var(--font-display); font-weight:600; letter-spacing:0.01em; color: var(--ink); }
 h1 { font-size:26px; }
@@ -75,91 +88,30 @@ h2 { font-size:18px; }
 code { font-family: var(--font-mono); font-size:0.9em; background: var(--panel-2); padding:1px 5px; border:1px solid var(--line-soft); border-radius:4px; }
 a { color: var(--blue); }
 
-.container { max-width:1200px; margin:0 auto; padding:0 16px; }
-
-/* Cards — slate panel + hairline border + soft dashboard shadow */
-.card {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 16px;
-  box-shadow: var(--hard-shadow);
-  transition: box-shadow .12s ease;
-}
-.card:hover { box-shadow: var(--hard-shadow-lg); }
-.map-shell .card, .map-shell #routeDock { box-shadow: var(--glass-shadow); }
-
-/* Badges — small mono tags */
-.badge {
-  display:inline-flex; align-items:center; gap:6px;
-  font-family: var(--font-mono); font-size:11px; font-weight:600;
-  letter-spacing:0.05em; text-transform:uppercase;
-  padding:3px 8px; border-radius:6px;
-  border:1px solid transparent; white-space:nowrap;
-}
-.badge-available { background:#e4efe6; color:var(--green); border-color:var(--green); }
-.badge-nearly { background:#f7efd9; color:var(--amber-dark); border-color:var(--amber); }
-.badge-full { background:#f8e3e0; color:var(--red-dark); border-color:var(--red); }
-.badge-unknown { background:var(--panel-2); color:var(--text-secondary); border-color:var(--line-soft); }
-
-/* Buttons — flat, hairline-bordered, tactile press; primary uses the amber accent.
-   Snappy feedback: ~120ms state change, 80ms press, no springs. */
-.btn {
-  display:inline-flex; align-items:center; justify-content:center; gap:8px;
-  padding:9px 16px; border-radius:var(--radius);
-  font-family: var(--font-display); font-weight:600; font-size:14px;
-  letter-spacing:0.02em;
-  border:1px solid var(--line); cursor:pointer; text-decoration:none;
-  box-shadow: 0 2px 0 var(--line); background: var(--panel);
-  color: var(--text);
-  transition: background-color .12s ease, color .12s ease, filter .12s ease, box-shadow .12s ease, transform .08s ease;
-}
-.btn:hover { filter:brightness(0.98); }
-.btn:active { transform:translate(1px,1px); box-shadow:0 1px 0 var(--line); }
-.btn-primary { background: var(--amber); border-color: var(--amber-dark); color:#201905; box-shadow:0 2px 0 var(--amber-dark); }
-.btn-primary:hover { background: var(--amber-dark); border-color:#5f3a01; color:#fff; }
-.btn-secondary { background: var(--panel); color: var(--text); border-color: var(--line); }
-.btn-secondary:hover { background:#e2e7ec; }
-/* Dominant emergency action — the one shout on the screen */
-.btn-lg { padding:16px 24px; font-size:17px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; }
-.btn-lg .btn-icon { font-family:var(--font-mono); font-size:20px; line-height:1; }
-
-/* Emergency action band — amber/red alert strip that dominates before lists/filters */
-.emergency-strip {
-  display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
-  background: var(--night); border:1px solid rgba(255,255,255,0.16); border-left:8px solid var(--red);
-  color:#fff; padding:12px 14px; margin:0 0 14px; border-radius:var(--radius);
-  box-shadow: var(--hard-shadow);
-}
-.emergency-strip .strip-tag { font-family:var(--font-mono); font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--amber-bright); display:block; }
-.emergency-strip .strip-copy { font-family:var(--font-display); font-weight:600; font-size:19px; letter-spacing:0.01em; line-height:1.2; }
-.emergency-strip .btn { flex:0 0 auto; }
-
-/* Nav — dark navy bar, amber top edge (no red). Glass: sole elevated surface
-   that floats above page content, so it gets subtle blur + translucency. */
-.nav {
-  background: rgba(18,40,63,0.86);
-  border-bottom: 1px solid rgba(255,255,255,0.12);
-  border-top: 3px solid var(--amber);
-  position: sticky; top:0; z-index:20;
-  box-shadow: var(--hard-shadow);
-  -webkit-backdrop-filter: blur(10px) saturate(1.1);
-  backdrop-filter: blur(10px) saturate(1.1);
-}
-@supports not (backdrop-filter: blur(1px)){
-  .nav{ background: rgba(18,40,63,0.97); }
-}
-.nav-inner { display:flex; align-items:center; justify-content:space-between; height:62px; gap:16px; }
-.nav-brand { display:flex; align-items:center; gap:10px; font-family: var(--font-display); font-weight:600; letter-spacing:0.03em; font-size:19px; color:#fff; text-decoration:none; text-transform:uppercase; }
-.nav-brand-mark { width:30px; height:30px; background: var(--amber); border:1px solid #fff; border-radius:var(--radius); display:grid; place-items:center; color:var(--ink); font-weight:700; font-size:13px; box-shadow:0 1px 2px rgba(0,0,0,0.25); }
-.nav-links { display:flex; gap:2px; align-items:center; }
-.nav-links a { color:#c6d2d6; text-decoration:none; font-family:var(--font-display); font-weight:500; font-size:14px; letter-spacing:0.01em; padding:9px 12px; border-bottom:3px solid transparent; }
-.nav-links a:hover { color:#fff; background:rgba(255,255,255,0.08); }
-.nav-links a[aria-current="page"] { color:#fff; border-bottom-color:var(--amber-bright); }
-.nav-toggle { display:none; background: transparent; border:1px solid rgba(255,255,255,0.3); border-radius:var(--radius); padding:8px 10px; color:#fff; }
-.mobile-menu { display:none; flex-direction:column; gap:2px; padding:12px 0 16px; border-top:1px solid rgba(255,255,255,0.12); }
-.mobile-menu a { padding:10px 14px; color:#fff; text-decoration:none; font-family:var(--font-display); font-weight:500; letter-spacing:0.01em; border-left:3px solid transparent; }
-.mobile-menu a:hover { background:rgba(255,255,255,0.08); border-left-color:var(--amber-bright); }
+/* Nav — liquid glass sticky */
+.nav { background: rgba(255,255,255,0.72); backdrop-filter: blur(20px) saturate(1.3); -webkit-backdrop-filter: blur(20px) saturate(1.3); border-bottom:1px solid var(--glass-border); position:sticky; top:0; z-index:20; box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 4px 20px rgba(16,42,67,0.04); }
+.nav-inner { display:flex; align-items:center; justify-content:space-between; height:64px; gap:16px; }
+.nav-brand { display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:-0.02em; color:var(--navy); text-decoration:none; }
+.nav-brand-mark { width:32px; height:32px; background: linear-gradient(135deg, var(--primary) 0%, #5b8cff 100%); border-radius:10px; display:grid; place-items:center; color:white; font-weight:800; font-size:13px; box-shadow: 0 4px 12px rgba(59,110,245,0.3); }
+.nav-links { display:flex; gap:8px; align-items:center; position:relative; }
+.nav-links a { position:relative; z-index:1; color:var(--text-secondary); text-decoration:none; font-weight:500; font-size:14px; padding:8px 14px; border-radius:var(--radius-pill); transition: all 0.2s ease; }
+.nav-links a:hover { background: rgba(59,110,245,0.08); color:var(--primary); }
+.nav-links a[aria-current="page"] { background: var(--primary-container); color:var(--navy); font-weight:600; }
+/* Active-tab highlight (positioned by JS; static pill above is the no-JS fallback).
+   GPU-only: the pill sits on the active tab and only ever animates transform
+   + a fading glow — no layout properties, no blur on the pill itself. */
+#navPill { position:absolute; top:0; left:0; height:100%; width:0; border-radius:var(--radius-pill);
+  background:rgba(59,110,245,0.14); border:1px solid rgba(59,110,245,0.28); z-index:0;
+  pointer-events:none; opacity:0;
+  transition:transform .38s cubic-bezier(.22,1,.36,1), box-shadow .5s ease-out, opacity .25s ease; }
+#navPill.glow { box-shadow:0 0 16px 1px rgba(59,110,245,0.45); }
+.nav-links.pill-live a[aria-current="page"] { background:transparent; }
+[data-theme="dark"] #navPill { background:rgba(122,162,255,0.16); border-color:rgba(122,162,255,0.32); }
+[data-theme="dark"] #navPill.glow { box-shadow:0 0 16px 1px rgba(122,162,255,0.5); }
+.nav-toggle { display:none; background: var(--glass); border:1px solid var(--glass-border); border-radius:12px; padding:8px 10px; backdrop-filter: blur(12px); }
+.mobile-menu { display:none; flex-direction:column; gap:4px; padding:12px 0 16px; border-top:1px solid var(--border); }
+.mobile-menu a { padding:10px 14px; color:var(--text); text-decoration:none; font-weight:500; border-radius:12px; }
+.mobile-menu a:hover { background: var(--glass); }
 
 @media (max-width: 768px) {
   .nav-links { display:none; }
@@ -316,39 +268,115 @@ input:focus, select:focus, textarea:focus { outline:none; border-color:var(--blu
   #splash.splash-hide{ transition-duration:.15s; }
 }
 
-/* --------------------------------------------------------------------------
-   DARK MODE — default for `prefers-color-scheme: dark`, no toggle, no JS.
-   Navy-slate night shift: surfaces deepen, accents keep their amber role,
-   red stays brighter for true alerts. Tags/flashes keep light backgrounds
-   so their fixed dark text stays AA.
-   -------------------------------------------------------------------------- */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper:#0e1c2e; --panel:#15283d; --panel-2:#1c3148;
-    --line:#2f465e; --line-soft:#41586f;
-    --red:#e0525a; --red-dark:#a41d25;
-    --blue:#6ba0d6; --green:#58a76e;
-    --text:#dde6ec; --text-secondary:#9fb0bf; --text-muted:#74879a;
-    --hard-shadow:0 1px 3px rgba(0,0,0,0.4), 0 1px 0 rgba(0,0,0,0.3);
-    --hard-shadow-lg:0 2px 8px rgba(0,0,0,0.5);
-  }
-  h1,h2,h3,h4 { color:#e9eef3; }
-  input,select,textarea { color:#1b2c3f; }
-  a { color:#8ab6e8; }
-  .btn-secondary:hover { background:#253c54; }
-  .weather-now.day { background:#15283d; color:#cfe0ea; }
-  .weather-now.day .now-label, .weather-now.day .weather-now-feels, .weather-now.day .weather-now-hilo { color:#9fb0bf; }
-  .weather-now.day .weather-now-temp, .weather-now.day .weather-now-desc { color:#eef3f6; }
-  .hourly-card { background:#122338; color:#eef3f6; }
-  .hourly-card .h-temp { color:#eef3f6; }
-  .env-tint-green { background:#1c2f23; }
-  .env-tint-yellow { background:#2f2a1c; }
-  .env-tint-orange { background:#342a1e; }
-  .env-tint-red { background:#351c1c; }
-  .env-tint-purple { background:#261f30; }
-  .stat-num { color:#e9eef3; }
-  .badge-available { background:#e7f2ea; color:#2e7d52; }
-  .badge-nearly { background:#faf3df; color:#8a5c06; }
-  .badge-full { background:#f8e6e3; color:#8c1a20; }
-  .badge-unknown { background:#eef2f5; color:#4a5b6a; }
+/* Dark mode — enabled via <html data-theme="dark"> (see prefs.js).
+ * Light theme above is untouched; every rule here is scoped under the
+ * attribute so the default rendering is byte-identical. Map tiles stay
+ * light by design (see Settings). */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --primary: #7aa2ff;
+  --primary-soft: #1c2a4d;
+  --primary-container: #23365e;
+  --navy: #e8edf7;
+  --red: #f97066;
+  --orange: #fdb022;
+  --green: #32d583;
+  --bg: #0b1220;
+  --bg-gradient: radial-gradient(1200px 600px at 10% -10%, #16233f 0%, transparent 60%),
+                 radial-gradient(1000px 500px at 90% 0%, #0e2a28 0%, transparent 55%),
+                 linear-gradient(180deg, #0d1526 0%, #0a101d 100%);
+  --surface: #141d31;
+  --glass: rgba(20,29,49,0.72);
+  --glass-strong: rgba(26,36,59,0.88);
+  --glass-border: rgba(255,255,255,0.10);
+  --glass-shadow: 0 8px 32px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.4);
+  --glass-shadow-strong: 0 12px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4);
+  --text: #e8edf7;
+  --text-secondary: #a8b3c7;
+  --text-muted: #75829a;
+  --border: rgba(255,255,255,0.09);
+  --border-strong: rgba(255,255,255,0.16);
 }
+[data-theme="dark"] .nav { background: rgba(13,21,38,0.78); box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 4px 20px rgba(0,0,0,0.35); }
+[data-theme="dark"] .nav-links a:hover { background: rgba(122,162,255,0.14); color: var(--primary); }
+[data-theme="dark"] .nav-links a[aria-current="page"] { background: var(--primary-container); color: #fff; }
+[data-theme="dark"] th { background: rgba(255,255,255,0.04); }
+[data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea { background: rgba(255,255,255,0.06); color: var(--text); }
+[data-theme="dark"] input:focus, [data-theme="dark"] select:focus, [data-theme="dark"] textarea:focus { background: rgba(255,255,255,0.09); border-color: var(--primary); box-shadow: 0 0 0 3px rgba(122,162,255,0.18); }
+[data-theme="dark"] select option { background: #141d31; color: #e8edf7; }
+[data-theme="dark"] .btn-secondary:hover { background: rgba(255,255,255,0.10); border-color: rgba(122,162,255,0.3); }
+[data-theme="dark"] .card:hover { border-color: rgba(255,255,255,0.16); }
+/* Pastel alert surfaces stay readable: darken text-side, keep hue */
+[data-theme="dark"] .flash-danger { background: rgba(122,39,26,0.45); color:#fda29b; border-color: rgba(253,162,155,0.35); }
+[data-theme="dark"] .flash-warning { background: rgba(122,77,7,0.45); color:#fedf89; border-color: rgba(254,223,137,0.35); }
+[data-theme="dark"] .flash-info { background: rgba(24,73,169,0.45); color:#b2ddff; border-color: rgba(178,221,255,0.35); }
+[data-theme="dark"] .flash-success { background: rgba(5,79,49,0.5); color:#a6f4c5; border-color: rgba(166,244,197,0.35); }
+[data-theme="dark"] .demo-banner { background: rgba(122,77,7,0.35); border-color: rgba(254,223,137,0.35); color:#fedf89; }
+[data-theme="dark"] .badge-available { background:rgba(5,79,49,0.5); color:#a6f4c5; border-color:rgba(166,244,197,0.35); }
+[data-theme="dark"] .badge-nearly { background:rgba(122,77,7,0.4); color:#fedf89; border-color:rgba(254,223,137,0.35); }
+[data-theme="dark"] .badge-full { background:rgba(122,39,26,0.45); color:#fda29b; border-color:rgba(253,162,155,0.35); }
+[data-theme="dark"] .badge-unknown { background:rgba(255,255,255,0.07); color:var(--text-secondary); }
+/* Weather day card would glare in dark mode — give it a dusk treatment */
+[data-theme="dark"] .weather-now.day { background: linear-gradient(135deg, rgba(26,36,59,0.9) 0%, rgba(35,54,94,0.85) 55%, rgba(30,58,138,0.75) 100%); color:#e8edf7; }
+[data-theme="dark"] .weather-now.day .weather-now-temp, [data-theme="dark"] .weather-now.day .weather-now-desc { color:#fff; }
+[data-theme="dark"] .weather-now.day .now-label, [data-theme="dark"] .weather-now.day .weather-now-feels, [data-theme="dark"] .weather-now.day .weather-now-hilo { color:#a8b3c7; }
+[data-theme="dark"] .weather-icon-wrap { background: rgba(122,162,255,0.12); border-color: rgba(122,162,255,0.3); }
+[data-theme="dark"] .weather-bar, [data-theme="dark"] .env-bar { background: rgba(255,255,255,0.12); }
+[data-theme="dark"] .skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.06) 75%); background-size:200% 100%; }
+[data-theme="dark"] .env-card-icon { background: rgba(255,255,255,0.07); }
+/* Env tint washes need a darker base to stay legible */
+[data-theme="dark"] .env-tint-green { background: linear-gradient(135deg, rgba(5,79,49,0.4) 0%, rgba(5,79,49,0.15) 100%); }
+[data-theme="dark"] .env-tint-yellow { background: linear-gradient(135deg, rgba(122,77,7,0.4) 0%, rgba(122,77,7,0.15) 100%); }
+[data-theme="dark"] .env-tint-orange { background: linear-gradient(135deg, rgba(154,52,18,0.45) 0%, rgba(154,52,18,0.18) 100%); }
+[data-theme="dark"] .env-tint-red { background: linear-gradient(135deg, rgba(127,29,29,0.5) 0%, rgba(127,29,29,0.2) 100%); }
+[data-theme="dark"] .env-tint-purple { background: linear-gradient(135deg, rgba(88,28,135,0.45) 0%, rgba(88,28,135,0.18) 100%); }
+/* Footer + hourly scrollbars use hardcoded light values inline */
+[data-theme="dark"] body > footer { background: rgba(13,21,38,0.78) !important; }
+[data-theme="dark"] .hourly-strip::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); }
+/* Announcement modal is JS-injected; vars keep it themed (see announcements.js) */
+/* Home announcement banner + bell history (see home_banner.js) */
+#home-ann-banner{ display:flex; gap:12px; align-items:flex-start; margin-bottom:16px; }
+#home-ann-banner[hidden]{ display:none; }
+#home-ann-body{ flex:1; min-width:0; }
+#home-ann-msg{ font-size:14px; line-height:1.5; margin:2px 0 0; }
+#home-ann-msg.clamped{ display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; }
+#home-ann-meta{ font-size:12px; color:var(--text-secondary); margin-top:6px; }
+#home-ann-actions{ display:flex; gap:8px; flex:0 0 auto; flex-wrap:wrap; }
+#ann-bell{ position:fixed; right:16px; top:76px; z-index:600; width:44px; height:44px; border-radius:50%;
+  display:grid; place-items:center; cursor:pointer; background:var(--glass-strong);
+  border:1px solid var(--glass-border); box-shadow:var(--glass-shadow); color:var(--text); }
+#ann-bell:hover{ box-shadow:var(--glass-shadow-strong); }
+#ann-bell-count{ position:absolute; top:-4px; right:-4px; min-width:20px; height:20px; padding:0 5px;
+  border-radius:999px; background:var(--red); color:#fff; font-size:11px; font-weight:800;
+  display:grid; place-items:center; }
+#ann-bell-count[hidden]{ display:none; }
+#ann-history{ position:fixed; right:16px; top:128px; width:min(370px, calc(100vw - 32px)); max-height:min(62vh, 520px);
+  overflow-y:auto; z-index:600; }
+#ann-history[hidden]{ display:none; }
+.ann-hist-item{ border-bottom:1px solid var(--border); padding:10px 0; display:flex; gap:10px; }
+.ann-hist-item:last-child{ border-bottom:none; }
+.ann-hist-dot{ width:10px; height:10px; border-radius:50%; flex:0 0 auto; margin-top:5px; }
+.ann-hist-item.is-dismissed{ opacity:0.6; }
+#ann-undo{ position:fixed; left:50%; transform:translateX(-50%); bottom:16px; z-index:700;
+  display:flex; gap:10px; align-items:center; padding:10px 14px; font-size:13px; }
+#ann-undo[hidden]{ display:none; }
+@media (max-width:768px){ #ann-bell{ top:auto; bottom:16px; } #ann-history{ top:auto; bottom:68px; } #ann-undo{ bottom:68px; } }
+/* Weather page: backend severity tints are light pastels — in dark mode the
+   card wash is dropped (severity cue survives via border + badge). */
+[data-theme="dark"] .env-card.env-tinted { background: var(--glass) !important; }
+[data-theme="dark"] .cond-badge { background: rgba(24,73,169,0.5) !important; border-color: rgba(178,221,255,0.4) !important; color: #b2ddff !important; }
+/* Map popups (Leaflet + Mapbox) ship white chrome — theme it in dark mode.
+   Popup *bodies* already use var(--text-secondary); this covers the frame. */
+[data-theme="dark"] .leaflet-popup-content-wrapper,
+[data-theme="dark"] .mapboxgl-popup-content { background: var(--surface); color: var(--text); border:1px solid var(--border-strong); }
+[data-theme="dark"] .leaflet-popup-tip { background: var(--surface); border:1px solid var(--border-strong); }
+[data-theme="dark"] .leaflet-popup-close-button,
+[data-theme="dark"] .mapboxgl-popup-close-button { color: var(--text-secondary) !important; }
+[data-theme="dark"] .mapboxgl-popup-anchor-top .mapboxgl-popup-tip,
+[data-theme="dark"] .mapboxgl-popup-anchor-top-left .mapboxgl-popup-tip,
+[data-theme="dark"] .mapboxgl-popup-anchor-top-right .mapboxgl-popup-tip { border-bottom-color: var(--surface); }
+[data-theme="dark"] .mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip,
+[data-theme="dark"] .mapboxgl-popup-anchor-bottom-left .mapboxgl-popup-tip,
+[data-theme="dark"] .mapboxgl-popup-anchor-bottom-right .mapboxgl-popup-tip { border-top-color: var(--surface); }
+[data-theme="dark"] .mapboxgl-popup-anchor-left .mapboxgl-popup-tip { border-right-color: var(--surface); }
+[data-theme="dark"] .mapboxgl-popup-anchor-right .mapboxgl-popup-tip { border-left-color: var(--surface); }

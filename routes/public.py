@@ -56,3 +56,7 @@ def weather_page():
 @bp.route("/hotlines")
 def hotlines_page():
     return render_template("public/hotlines.html")
+
+@bp.route("/settings")
+def settings_page():
+    return render_template("public/settings.html")

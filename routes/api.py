@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from utils.db import get_db
 
 bp = Blueprint("api", __name__)
@@ -13,6 +13,29 @@ _INVITE_ALPHABET = string.ascii_uppercase + string.digits
 
 def _new_invite_code(n=6):
     return "".join(secrets.choice(_INVITE_ALPHABET) for _ in range(n))
+
+@bp.route("/api/status")
+def api_status():
+    """Client-safe server status: build id + provider availability.
+
+    Never exposes secret values — only booleans. The Settings page uses
+    build_id to invalidate stale offline caches after a server restart.
+    """
+    def _has(key, prefix=None):
+        v = (current_app.config.get(key, "") or "").strip()
+        if not v or v.startswith("YOUR_"):
+            return False
+        return v.startswith(prefix) if prefix else True
+    return jsonify({
+        "build_id": current_app.config.get("STARTED_AT", ""),
+        "is_demo": bool(current_app.config.get("IS_DEMO", True)),
+        "providers": {
+            "openweather": _has("OPENWEATHER_API_KEY"),
+            "open_meteo": True,  # keyless fallback, always available online
+            "mapbox": _has("MAPBOX_TOKEN", "pk."),
+            "firms": _has("FIRMS_MAP_KEY"),
+        },
+    })
 
 def _occupancy_status(row):
     """Return (pct, available_slots, status), tolerating unknown capacity.
@@ -386,21 +409,25 @@ def _haversine_km(lat1, lon1, lat2, lon2):
 
 @bp.route("/api/announcements")
 def api_announcements():
-    """Public feed of live announcements.
+    """Public feed of announcements.
 
     Query params (all optional):
       city — exact city match for scope='city' rows
       lat / lon — user coords for scope='radius' rows (haversine <= radius_km)
+      history=1 — include expired/upcoming rows too (bell history), newest
+        first, each flagged with `expired`; otherwise only live rows.
 
     Always returns scope='all' rows. City/radius rows only match when the
     corresponding param is supplied, so targeted messages don't leak to
-    everyone. Only rows with is_active=1 and now in [starts_at, ends_at].
+    everyone. Live mode: only rows with is_active=1 and now in
+    [starts_at, ends_at].
     """
     try:
         db = get_db()
         city = (request.args.get("city", "") or "").strip()
         lat = request.args.get("lat")
         lon = request.args.get("lon", request.args.get("lng"))
+        history = (request.args.get("history", "") or "").strip() == "1"
         try:
             lat_f = float(lat) if lat not in (None, "") else None
             lon_f = float(lon) if lon not in (None, "") else None
@@ -411,20 +438,32 @@ def api_announcements():
                     return jsonify({"error": "Invalid coordinates"}), 400
         except (TypeError, ValueError):
             return jsonify({"error": "Invalid coordinates"}), 400
-        rows = db.execute(
-            """SELECT id, title, message, scope, city, center_lat, center_lng,
-                      radius_km, severity, starts_at, ends_at, created_at
+        if history:
+            rows = db.execute(
+                """SELECT id, title, message, scope, city, center_lat, center_lng,
+                          radius_km, severity, starts_at, ends_at, created_at,
+                          CASE WHEN datetime('now') < datetime(starts_at)
+                                 OR datetime('now') > datetime(ends_at)
+                               THEN 1 ELSE 0 END AS expired
+                   FROM announcements
+                   WHERE is_active=1
+                   ORDER BY starts_at DESC"""
+            ).fetchall()
+        else:
+            rows = db.execute(
+                """SELECT id, title, message, scope, city, center_lat, center_lng,
+                          radius_km, severity, starts_at, ends_at, created_at
                FROM announcements
                WHERE is_active=1
                  AND datetime('now') >= datetime(starts_at)
                  AND datetime('now') <= datetime(ends_at)
-               ORDER BY
-                 CASE severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END,
-                 starts_at DESC"""
-        ).fetchall()
+               ORDER BY starts_at DESC, id DESC"""
+            ).fetchall()
         out = []
+        from utils.announcements import dedup_message
         for r in rows:
             d = dict(r)
+            d["message"] = dedup_message(d.get("title"), d.get("message"))
             scope = d.get("scope", "all")
             if scope == "city":
                 if not city or (d.get("city") or "").strip().lower() != city.lower():

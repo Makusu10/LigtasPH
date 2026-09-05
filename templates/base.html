@@ -4,7 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}LigtasPH: Calamity Response & Evacuation Mapping{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v=3">
+  <script>
+  // Theme pre-paint: apply stored/OS theme before CSS renders (no white flash).
+  (function(){try{var t=localStorage.getItem('ligtasph_theme')||'system';var d=t==='dark'||(t!=='light'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.setAttribute('data-theme',d?'dark':'light');}catch(e){}})();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -24,26 +28,47 @@
       <div class="splash-word">LIGTAS<span>PH</span></div>
       <div class="splash-tag">Calamity Response &amp; Evacuation Mapping</div>
       <div class="splash-bar" aria-hidden="true"><span></span></div>
+      <button id="splashSkip" class="btn btn-secondary" style="padding:6px 14px; font-size:12px; margin-top:4px;">Skip</button>
     </div>
   </div>
   <script>
   (function(){
-    // Logo cover: once per tab session, auto-advances, tap/key skips.
+    // Logo cover: once per tab session. Stays until the whole page (maps,
+    // fonts, scripts) finishes loading — but never traps anyone: Skip /
+    // tap / key exits instantly, and a hard cap ends it on slow networks.
     var KEY='ligtasph_splash_seen';
     var el=document.getElementById('splash');
     if(!el) return;
     try{ if(sessionStorage.getItem(KEY)){ el.remove(); return; } }catch(e){}
     var done=false;
+    var t0=(window.performance && performance.now) ? performance.now() : Date.now();
+    var now=function(){ return (window.performance && performance.now) ? performance.now() : Date.now(); };
+    var reduce=false;
+    try{ reduce=window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
+    var MIN_SHOW = reduce ? 0 : 800;   // brand moment, avoids a flicker
+    var MAX_WAIT = reduce ? 400 : 6000; // hard cap for stalled networks
     function hide(){
       if(done) return; done=true;
       try{ sessionStorage.setItem(KEY,'1'); }catch(e){}
       el.classList.add('splash-hide');
       setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, 450);
     }
-    var reduce=false;
-    try{ reduce=window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
-    setTimeout(hide, reduce ? 400 : 1800);
+    function maybeHide(){
+      if(done) return;
+      if(document.readyState==='complete' && now()-t0>=MIN_SHOW) hide();
+    }
+    var poll=setInterval(function(){
+      maybeHide();
+      if(done) clearInterval(poll);
+    }, 100);
+    var cap=setTimeout(function(){ clearInterval(poll); hide(); }, MAX_WAIT);
+    window.addEventListener('load', function(){
+      // load fired: exit as soon as the minimum show time has elapsed
+      var wait=Math.max(0, MIN_SHOW-(now()-t0));
+      setTimeout(function(){ clearInterval(poll); hide(); }, wait);
+    });
     el.addEventListener('click', hide);
+    document.getElementById('splashSkip').addEventListener('click', function(e){ e.stopPropagation(); hide(); });
     document.addEventListener('keydown', function onKey(e){
       if(e.key==='Enter'||e.key==='Escape'||e.key===' '){ hide(); document.removeEventListener('keydown', onKey); }
     });
@@ -64,14 +89,15 @@
     {% endwith %}
     {% block content %}{% endblock %}
   </div>
-  <footer style="border-top:2px solid var(--line); background:var(--night); padding:20px 0; margin-top:32px;">
-    <div class="container" style="color:#b7c4c9; font-size:13px; display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; font-family:var(--font-mono); text-transform:uppercase; letter-spacing:0.04em;">
-      <span>© 2026 LigtasPH — Integrated Calamity Response &amp; Evacuation Mapping</span>
-      <span style="color:var(--amber-bright);">Emergency: 911 • NDRRMC • PAGASA • Red Cross 143</span>
+  <footer style="border-top:1px solid var(--glass-border); background: rgba(255,255,255,0.55); backdrop-filter: blur(16px); padding:20px 0; margin-top:32px;">
+    <div class="container" style="color:var(--text-secondary); font-size:13px; display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+      <span>© 2026 LigtasPH — Integrated Calamity Response & Evacuation Mapping</span>
+      <span>Emergency: <a href="tel:911">911</a> • <a href="tel:143">Red Cross 143</a> • NDRRMC • PAGASA</span>
     </div>
   </footer>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script>try{lucide.createIcons();}catch(e){}</script>
+  <script src="{{ url_for('static', filename='js/prefs.js') }}" defer></script>
   <script src="{{ url_for('static', filename='js/announcements.js') }}" defer></script>
   <script>
     // mobile nav toggle
@@ -80,6 +106,49 @@
       const menu = document.getElementById('mobileMenu');
       if(btn && menu){ btn.addEventListener('click', ()=> menu.classList.toggle('open')); }
     });
+    // Active-tab highlight: a matte overlay parked on the selected tab.
+    // On load it glides in from the previously tapped tab — both measured
+    // in THIS page's layout (no stale cross-page coordinates), GPU-only
+    // transform, with a one-second glow to mark the selection.
+    (function(){
+      const KEY='ligtasph_nav_from';
+      function init(){
+        const bar=document.querySelector('.nav-links');
+        const active=bar && bar.querySelector('a[aria-current="page"]');
+        if(!bar || !active) return;
+        if(getComputedStyle(bar).display==='none') return; // mobile menu owns small screens
+        const reduce=window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        let pill=document.getElementById('navPill');
+        if(!pill){ pill=document.createElement('span'); pill.id='navPill'; pill.setAttribute('aria-hidden','true'); bar.appendChild(pill); }
+        const box=bar.getBoundingClientRect(), r=active.getBoundingClientRect();
+        const place=(p)=>{ pill.style.left=p.left+'px'; pill.style.top=(p.top||0)+'px'; pill.style.width=p.width+'px'; pill.style.height=r.height+'px'; };
+        place({left:r.left-box.left, top:r.top-box.top, width:r.width, height:r.height});
+        bar.classList.add('pill-live');
+        pill.style.opacity='1';
+        let prevPath=null;
+        try{ prevPath=sessionStorage.getItem(KEY); }catch(e){}
+        const prevLink=prevPath && prevPath!==location.pathname
+          ? bar.querySelector('a[href="'+prevPath+'"]') : null;
+        if(prevLink && !reduce){
+          const q=prevLink.getBoundingClientRect();
+          const dx=(q.left-box.left)-(r.left-box.left), sx=q.width/r.width;
+          pill.style.transition='none';
+          pill.style.transform='translateX('+dx+'px) scaleX('+sx+')';
+          pill.classList.add('glow');
+          void pill.offsetWidth; // commit start, then release
+          pill.style.transition='';
+          pill.style.transform='';
+          setTimeout(()=>pill.classList.remove('glow'), 1000);
+        }
+        bar.addEventListener('click', (e)=>{
+          const a=e.target.closest && e.target.closest('a'); if(!a) return;
+          try{ sessionStorage.setItem(KEY, a.getAttribute('href')); }catch(err){}
+        });
+      }
+      if(document.fonts && document.fonts.ready){ Promise.race([document.fonts.ready, new Promise(r=>setTimeout(r,800))]).then(init); }
+      else if(document.readyState!=='loading') init();
+      else document.addEventListener('DOMContentLoaded', init);
+    })();
   </script>
   {% block scripts %}{% endblock %}
 </body>
