@@ -308,3 +308,18 @@ input:focus, select:focus, textarea:focus { border-color:var(--primary); backgro
    card wash is dropped (severity cue survives via border + badge). */
 [data-theme="dark"] .env-card.env-tinted { background: var(--glass) !important; }
 [data-theme="dark"] .cond-badge { background: rgba(24,73,169,0.5) !important; border-color: rgba(178,221,255,0.4) !important; color: #b2ddff !important; }
+/* Map popups (Leaflet + Mapbox) ship white chrome — theme it in dark mode.
+   Popup *bodies* already use var(--text-secondary); this covers the frame. */
+[data-theme="dark"] .leaflet-popup-content-wrapper,
+[data-theme="dark"] .mapboxgl-popup-content { background: var(--surface); color: var(--text); border:1px solid var(--border-strong); }
+[data-theme="dark"] .leaflet-popup-tip { background: var(--surface); border:1px solid var(--border-strong); }
+[data-theme="dark"] .leaflet-popup-close-button,
+[data-theme="dark"] .mapboxgl-popup-close-button { color: var(--text-secondary) !important; }
+[data-theme="dark"] .mapboxgl-popup-anchor-top .mapboxgl-popup-tip,
+[data-theme="dark"] .mapboxgl-popup-anchor-top-left .mapboxgl-popup-tip,
+[data-theme="dark"] .mapboxgl-popup-anchor-top-right .mapboxgl-popup-tip { border-bottom-color: var(--surface); }
+[data-theme="dark"] .mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip,
+[data-theme="dark"] .mapboxgl-popup-anchor-bottom-left .mapboxgl-popup-tip,
+[data-theme="dark"] .mapboxgl-popup-anchor-bottom-right .mapboxgl-popup-tip { border-top-color: var(--surface); }
+[data-theme="dark"] .mapboxgl-popup-anchor-left .mapboxgl-popup-tip { border-right-color: var(--surface); }
+[data-theme="dark"] .mapboxgl-popup-anchor-right .mapboxgl-popup-tip { border-left-color: var(--surface); }
