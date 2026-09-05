@@ -1,13 +1,18 @@
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, Response
 from utils.db import get_db
 
 bp = Blueprint("api", __name__)
 
+import json
 import math
 import re
 import secrets
 import sqlite3
 import string
+from pathlib import Path
+
+_BASEDIR = Path(__file__).resolve().parent.parent
+_EVAC_GEOJSON = _BASEDIR / "data" / "ncr_evacuation_centers.geojson"
 
 _SITE_RE = re.compile(r"([A-Z][A-Z /&.\-]+?)\s*[•·|]\s*(TEMPORARY|PERMANENT)\b")
 
@@ -148,6 +153,44 @@ def api_center_detail(cid):
     try: d["location_verified"]=bool(c["verified"])
     except (KeyError, IndexError, TypeError): d["location_verified"]=False
     return jsonify(d)
+
+@bp.route("/api/evac-centers.geojson")
+def api_evac_centers_geojson():
+    """Stream the full Sprint-2 evacuation-center dataset for GL-native
+    clustered map sources. This is the raw import (name, barangay,
+    municipality, facility_type/status, confidence, verified,
+    uncertainty_radius_m, needs_review...) — richer than /api/centers,
+    which adds live occupancy but drops import provenance.
+    """
+    if not _EVAC_GEOJSON.exists():
+        return jsonify({"error": "evac dataset missing"}), 404
+    # Cacheable in the browser (immutable per deploy); clients re-fetch on
+    # restart via cache-busting. Honors the offline SW precache list.
+    return Response(
+        _EVAC_GEOJSON.read_text(encoding="utf-8"),
+        mimetype="application/geo+json",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+@bp.route("/api/centers/<int:cid>/status")
+def api_center_status(cid):
+    """Structured live-supply status for a center. The current dataset has no
+    food/water/capacity telemetry, so this returns an explicit 'not available'
+    state — map popups must NOT fabricate numbers. Forward-compatible
+    integration point for future live reporting.
+    """
+    db = get_db()
+    c = db.execute("SELECT id FROM evacuation_centers WHERE id=? AND archived=0", (cid,)).fetchone()
+    if not c:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify({
+        "center_id": cid,
+        "available": False,
+        "status": "not_available",
+        "message": "Live supply data not yet available — see crowd reports on the map.",
+        "source": "none",
+        "updated_at": None,
+    })
 
 @bp.route("/api/hotlines")
 def api_hotlines():

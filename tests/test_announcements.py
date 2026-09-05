@@ -24,7 +24,7 @@ def client(app):
 
 
 def _login(client):
-    client.post("/admin/login", data={"username": "admin", "password": "admin123"})
+    client.post("/hanapanngbaddieguardsimarkus", data={"username": "admin", "password": "admin123"})
 
 
 def test_api_announcements_empty(client):
@@ -136,7 +136,7 @@ def test_admin_announcements_crud(client, app):
     # Unauthenticated access redirects
     r = client.get("/admin/announcements")
     assert r.status_code == 302
-    assert "/admin/login" in r.headers["Location"]
+    assert "/hanapanngbaddieguardsimarkus" in r.headers["Location"]
 
     _login(client)
 
@@ -221,3 +221,4 @@ def test_admin_announcement_form_validation(client):
         "starts_at": "2026-09-05T08:00", "ends_at": "2026-09-05T12:00",
     }, follow_redirects=True)
     assert b"Center lat/lng and radius are required for radius scope." in r.data
+

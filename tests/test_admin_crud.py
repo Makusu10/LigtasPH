@@ -19,7 +19,7 @@ def client(app):
 
 
 def _login(client):
-    client.post("/admin/login", data={"username": "admin", "password": "admin123"})
+    client.post("/hanapanngbaddieguardsimarkus", data={"username": "admin", "password": "admin123"})
 
 
 def test_admin_update_requires_login(client):
@@ -79,3 +79,4 @@ def test_admin_logout_requires_post(client):
     _login(client)
     assert client.get("/admin/logout").status_code == 405
     assert client.post("/admin/logout").status_code == 302
+

@@ -19,7 +19,7 @@ def client(app):
 
 
 def _login(client):
-    client.post("/admin/login", data={"username": "admin", "password": "admin123"})
+    client.post("/hanapanngbaddieguardsimarkus", data={"username": "admin", "password": "admin123"})
 
 
 def test_settings_page_ok(client):
@@ -93,3 +93,4 @@ def test_admin_restart_refused_under_gunicorn(client, monkeypatch):
 
 def test_admin_restart_requires_login(client):
     assert client.post("/admin/restart").status_code == 302
+

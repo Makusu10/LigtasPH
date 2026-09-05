@@ -152,5 +152,25 @@
 
     loadCities();
     loadStatus();
+
+    // Staff entry: tap the about line 5 times within 3s to reveal sign-in.
+    // (Admin Login was removed from the public nav on purpose.)
+    (function () {
+      var taps = 0, timer = null;
+      var line = document.getElementById('aboutTap');
+      var btn = document.getElementById('staffBtn');
+      if (!line || !btn) return;
+      line.addEventListener('click', function () {
+        taps++;
+        if (timer) clearTimeout(timer);
+        if (taps >= 5) {
+          taps = 0;
+          btn.hidden = false;
+          btn.style.display = '';
+          return;
+        }
+        timer = setTimeout(function () { taps = 0; }, 3000);
+      });
+    })();
   });
 })();

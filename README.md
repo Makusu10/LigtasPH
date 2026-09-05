@@ -278,7 +278,7 @@ The development application opens at `http://127.0.0.1:5000`.
 
 - Username: `admin`
 - Password: `admin123`
-- Login: `http://127.0.0.1:5000/admin/login`
+- Login: hidden staff URL — tap the version line in Settings 5×, or ask the team (deliberately unpublished).
 
 > [!CAUTION]
 > Change the default username, password, and `SECRET_KEY` before production deployment. Login requests are limited to 10 per minute, and five consecutive failures lock the account for 15 minutes.

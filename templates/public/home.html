@@ -107,7 +107,7 @@
 {% endif %}
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/home_banner.js') }}" defer></script>
+<script src="{{ static_asset('js/home_banner.js') }}" defer></script>
 {% if mapbox_token %}
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.29.0/mapbox-gl.js"></script>
 {% else %}

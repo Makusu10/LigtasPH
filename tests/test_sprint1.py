@@ -31,7 +31,7 @@ def test_hotlines_page_ok(client):
     assert client.get("/hotlines").status_code == 200
 
 def test_admin_login_page_ok(client):
-    assert client.get("/admin/login").status_code == 200
+    assert client.get("/hanapanngbaddieguardsimarkus").status_code == 200
 
 def test_admin_protected_redirect(client):
     assert client.get("/admin/dashboard").status_code == 302
@@ -84,23 +84,23 @@ def test_center_detail_404(client):
     assert client.get("/centers/999").status_code == 404
 
 def test_login_invalid(client):
-    r = client.post("/admin/login", data={"username": "admin", "password": "wrong"})
+    r = client.post("/hanapanngbaddieguardsimarkus", data={"username": "admin", "password": "wrong"})
     assert r.status_code == 401
 
 def test_login_valid_and_dashboard(client):
-    r = client.post("/admin/login", data={"username": "admin", "password": "admin123"}, follow_redirects=False)
+    r = client.post("/hanapanngbaddieguardsimarkus", data={"username": "admin", "password": "admin123"}, follow_redirects=False)
     assert r.status_code == 302
     assert "/admin/dashboard" in r.headers["Location"]
     # follow login
-    client.post("/admin/login", data={"username": "admin", "password": "admin123"})
+    client.post("/hanapanngbaddieguardsimarkus", data={"username": "admin", "password": "admin123"})
     assert client.get("/admin/dashboard").status_code == 200
 
 def test_login_lockout_after_5_fails(client):
     for _ in range(5):
-        r = client.post("/admin/login", data={"username": "admin", "password": "wrong"})
+        r = client.post("/hanapanngbaddieguardsimarkus", data={"username": "admin", "password": "wrong"})
         assert r.status_code in (401, 403)
     # 6th attempt should be locked (403)
-    r = client.post("/admin/login", data={"username": "admin", "password": "wrong"})
+    r = client.post("/hanapanngbaddieguardsimarkus", data={"username": "admin", "password": "wrong"})
     assert r.status_code == 403
 
 def test_api_weather_no_cache_503(client, app, monkeypatch):
@@ -131,3 +131,4 @@ def test_api_center_detail_closed_status(client, app):
         ).fetchone()
         cid = row["id"]
     assert client.get(f"/api/centers/{cid}").get_json()["occupancy_status"] == "Status Unavailable"
+

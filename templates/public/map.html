@@ -37,6 +37,7 @@
       <button id="clearBtn" class="btn btn-secondary" style="flex:1;">Clear</button>
     </div>
     <div id="liveStamp" role="status" style="font-size:11px; color:var(--text-secondary); margin-bottom:4px;">Live updates on</div>
+    <div id="mapCount" role="status" style="font-size:11px; color:var(--text-secondary); margin-bottom:4px;"></div>
     <div id="list" style="max-height:50vh; overflow:auto; display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--border); padding-top:8px;"></div>
     </div>
     <div id="tabRoutes" role="tabpanel" aria-labelledby="tabBtnRoutes" hidden>
@@ -256,6 +257,10 @@ function renderList(filtered, onLocate){
 }
 function hzStatus(msg){ setStatus('hzStatus', msg); }
 function setStatus(id, msg){ const el=document.getElementById(id); if(el) el.textContent=msg||''; }
+function setMapCount(n, total){
+  const el=document.getElementById('mapCount');
+  if(el) el.textContent = n<total ? `Showing ${n} of ${total} in view — pan or zoom to load more.` : `${total} in view.`;
+}
 // ---------- emergency group location sharing (engine-agnostic) ----------
 // groupState.draw is set by whichever map engine booted (Mapbox or Leaflet).
 const groupState={code:'', name:'', myName:'', sharing:false, shareTimer:null, refreshTimer:null, draw:null, rows:[]};
@@ -667,7 +672,6 @@ async function initMapbox(){
   });
   setMapMode('Mapbox');
 
-  let markers = []; // {id, marker}
   let groupMarkers = [];
   // NB: group refresh timing lives in shared groupState.refreshTimer.
   const quakeSrcId='hz-quakes', fireSrcId='hz-fires';
@@ -905,20 +909,99 @@ async function initMapbox(){
     });
   }
 
+  // Centers render as ONE clustered GeoJSON source (supercluster in the
+  // GL engine) instead of hundreds of DOM markers: zoomed out you get
+  // count badges, zoomed in the dots resolve. No per-marker DOM, no crawl.
+  const CENTERS_SRC='evac-centers';
+  let centersBound=false, lastFiltered=[], pendingData=null;
+  function centersGeoJSON(list){
+    return {type:'FeatureCollection', features:(list||[]).map(c=>({
+      type:'Feature', id:c.id,
+      geometry:{type:'Point', coordinates:[c.lng, c.lat]},
+      properties:{id:c.id, name:c.name, address:c.address, city:c.city,
+        capacity:c.capacity, current_occupancy:c.current_occupancy,
+        available_slots:c.available_slots, occupancy_pct:c.occupancy_pct,
+        occupancy_status:c.occupancy_status, food_status:c.food_status,
+        water_status:c.water_status, basic_needs_status:c.basic_needs_status,
+        updated_at:c.updated_at, lat:c.lat, lng:c.lng,
+        color:statusColor(c.occupancy_status)}
+    }))};
+  }
+  function ensureCenterCluster(){
+    // Sources/layers require a loaded style; render() runs before that on
+    // boot, so park the data and apply on load (also re-fired by render).
+    if(!map.isStyleLoaded()){
+      map.once('load', ()=>{ if(ensureCenterCluster() && pendingData){ try{ map.getSource(CENTERS_SRC).setData(pendingData); }catch(e){} pendingData=null; } });
+      return false;
+    }
+    if(map.getSource(CENTERS_SRC)) return true;
+    map.addSource(CENTERS_SRC, {type:'geojson', data:centersGeoJSON([]),
+      cluster:true, clusterMaxZoom:13, clusterRadius:50});
+    map.addLayer({id:'centers-clusters', type:'circle', source:CENTERS_SRC, filter:['has','point_count'],
+      paint:{'circle-color':'#3b6ef5','circle-opacity':0.88,
+        'circle-stroke-color':'#ffffff','circle-stroke-width':2,
+        'circle-radius':['step',['get','point_count'],18,50,24,150,32]}});
+    map.addLayer({id:'centers-count', type:'symbol', source:CENTERS_SRC, filter:['has','point_count'],
+      layout:{'text-field':'{point_count_abbreviated}','text-size':12},
+      paint:{'text-color':'#ffffff'}});
+    map.addLayer({id:'centers-points', type:'circle', source:CENTERS_SRC, filter:['!',['has','point_count']],
+      paint:{'circle-color':['get','color'],'circle-opacity':0.92,
+        'circle-stroke-color':'#ffffff','circle-stroke-width':2,'circle-radius':7}});
+    map.on('click','centers-clusters', (e)=>{
+      const f=map.queryRenderedFeatures(e.point, {layers:['centers-clusters']});
+      if(!f.length) return;
+      map.getSource(CENTERS_SRC).getClusterExpansionZoom(f[0].properties.cluster_id, (err, zoom)=>{
+        if(err) return;
+        map.easeTo({center:f[0].geometry.coordinates, zoom:zoom});
+      });
+    });
+    map.on('click','centers-points', (e)=>{
+      const f=map.queryRenderedFeatures(e.point, {layers:['centers-points']});
+      if(!f.length) return;
+      const p=f[0].properties, g=f[0].geometry.coordinates;
+      new mapboxgl.Popup({offset:12, maxWidth:'300px'})
+        .setLngLat(g)
+        .setHTML(centerPopupHTML(p, `<button data-route="${p.lat},${p.lng}" data-name="${esc(p.name)}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">Route here</button>`))
+        .addTo(map);
+    });
+    [['centers-clusters'],['centers-points']].forEach(([lid])=>{
+      map.on('mouseenter', lid, ()=>{ map.getCanvas().style.cursor='pointer'; });
+      map.on('mouseleave', lid, ()=>{ map.getCanvas().style.cursor=''; });
+    });
+    centersBound=true;
+    return true;
+  }
+  function renderMarkers(filtered){
+    filtered = filtered || getFiltered();
+    lastFiltered = filtered;
+    const data = centersGeoJSON(filtered);
+    if(ensureCenterCluster()){
+      try{ map.getSource(CENTERS_SRC).setData(data); }catch(e){}
+    }else pendingData = data;
+    updateMapCount();
+  }
+  // In-view count only (no DOM rebuild — the source holds everything).
+  function updateMapCount(){
+    let n=lastFiltered.length;
+    try{
+      const bb=map.getBounds();
+      if(bb) n=lastFiltered.filter(c=>{ try{ return bb.contains([c.lng,c.lat]); }catch(e){ return true; } }).length;
+    }catch(e){}
+    setMapCount(n, lastFiltered.length);
+  }
   function render(){
     const filtered = getFiltered();
-    markers.forEach(m=>m.marker.remove()); markers=[];
-    filtered.forEach(c=>{
-      const el=document.createElement('div');
-      el.style.cssText=`background:${statusColor(c.occupancy_status)};width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4);cursor:pointer;`;
-      const popup=new mapboxgl.Popup({offset:12, maxWidth:'300px'})
-        .setHTML(centerPopupHTML(c, `<button data-route="${c.lat},${c.lng}" data-name="${esc(c.name)}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">Route here</button>`));
-      const marker=new mapboxgl.Marker({element:el}).setLngLat([c.lng,c.lat]).setPopup(popup).addTo(map);
-      markers.push({id:c.id, marker});
-    });
+    renderMarkers(filtered);
     renderList(filtered, (c)=>{
       map.flyTo({center:[c.lng,c.lat], zoom:14});
-      const m=markers.find(m=>m.id===c.id); if(m) m.marker.togglePopup();
+      // Zoom 14 exceeds clusterMaxZoom, so the point is unclustered on
+      // arrival — open its popup once the camera settles.
+      setTimeout(()=>{
+        new mapboxgl.Popup({offset:12, maxWidth:'300px'})
+          .setLngLat([c.lng,c.lat])
+          .setHTML(centerPopupHTML(c, `<button data-route="${c.lat},${c.lng}" data-name="${esc(c.name)}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">Route here</button>`))
+          .addTo(map);
+      }, 750);
     });
     // Fit once on first load only, capped at zoom 12: re-fitting on every
     // keystroke yanked the camera into the tight cluster (white surroundings).
@@ -1111,6 +1194,9 @@ async function initMapbox(){
   debounceHazards(refreshHazards);
   document.getElementById('showHazardsBtn').addEventListener('click', zoomToHazards);
   map.on('moveend', ()=>{ clearTimeout(hzTimer); hzTimer=setTimeout(refreshHazards, 500); });
+  // Viewport count only (clusters hold the points — nothing to rebuild).
+  let markTimer=null;
+  map.on('moveend', ()=>{ clearTimeout(markTimer); markTimer=setTimeout(()=>{ try{updateMapCount();}catch(e){} }, 350); });
   document.getElementById('btn2d').addEventListener('click', ()=>set3D(false));
   document.getElementById('btn3d').addEventListener('click', ()=>set3D(true));
   const _groupBtn=document.getElementById('groupBtn');
@@ -1186,6 +1272,8 @@ function initFallback(){
     debounceHazards(refreshHazardsFb);
   document.getElementById('showHazardsBtn').addEventListener('click', zoomToHazardsFb);
     _map.on('moveend', ()=>{ clearTimeout(hzTimer); hzTimer=setTimeout(refreshHazardsFb, 500); });
+    let markTimerFb=null;
+    _map.on('moveend', ()=>{ clearTimeout(markTimerFb); markTimerFb=setTimeout(()=>{ try{renderMarkersFb();}catch(e){} }, 350); });
     // ---- group live locations (same shared Group tab drives this engine too) ----
     _groupLayer=L.layerGroup().addTo(_map);
     groupState.draw=(rows)=>{
@@ -1201,17 +1289,60 @@ function initFallback(){
     groupState.locate=(r)=>{ try{ _map.setView([r.lat, r.lon??r.lng], 14); let found=null; _groupLayer.eachLayer(l=>{ if(l._grow===r) found=l; }); if(found) found.openPopup(); }catch(e){} };
   }).catch(()=>{ hzStatus('Map failed to load — check your connection and reload.'); });
 }
+function renderMarkersFb(filtered){
+  filtered = filtered || getFiltered();
+  _markers.forEach(m=> _map.removeLayer(m)); _markers=[];
+  // Grid clustering (no plugin, works offline): at low zoom, nearby
+  // centers collapse into one count badge; zooming in resolves them.
+  // Cells are ~1/6 of the current view width; clusters open on click.
+  let cells = new Map(), cellDeg = 1, inView = filtered;
+  try{
+    const bb=_map.getBounds();
+    if(bb){
+      inView = filtered.filter(c=>{ try{ return bb.contains([c.lat,c.lng]); }catch(e){ return true; } });
+      cellDeg = Math.max((bb.getEast()-bb.getWest())/6, 0.002);
+    }
+  }catch(e){}
+  inView.forEach(c=>{
+    const key=Math.floor(c.lng/cellDeg)+':'+Math.floor(c.lat/cellDeg);
+    if(!cells.has(key)) cells.set(key, []);
+    cells.get(key).push(c);
+  });
+  const dot=(color)=>`<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></div>`;
+  cells.forEach(members=>{
+    if(members.length===1){
+      const c=members[0];
+      const m=L.marker([c.lat,c.lng], {icon:L.divIcon({html:dot(statusColor(c.occupancy_status)), className:'', iconSize:[14,14]})}).addTo(_map);
+      m._cid=c.id;
+      m.bindPopup(centerPopupHTML(c));
+      _markers.push(m);
+    }else{
+      const lat=members.reduce((s,c)=>s+c.lat,0)/members.length;
+      const lng=members.reduce((s,c)=>s+c.lng,0)/members.length;
+      const worst=members.some(c=>c.occupancy_status==='Full')?'#D92D20'
+        : members.some(c=>c.occupancy_status==='Nearly Full')?'#F79009':'#3b6ef5';
+      const m=L.marker([lat,lng], {icon:L.divIcon({
+        html:`<div style="background:${worst};color:#fff;min-width:30px;height:30px;border-radius:999px;border:2px solid white;display:grid;place-items:center;font-weight:800;font-size:12px;box-shadow:0 1px 6px rgba(0,0,0,0.4);padding:0 6px;">${members.length}</div>`,
+        className:'', iconSize:[30,30]})}).addTo(_map);
+      m.on('click', ()=>{ try{ _map.setView([lat,lng], _map.getZoom()+2); }catch(e){} });
+      _markers.push(m);
+    }
+  });
+  setMapCount(inView.length, filtered.length);
+}
 function renderFb(){
   const filtered=getFiltered();
-  _markers.forEach(m=> _map.removeLayer(m)); _markers=[];
-  renderList(filtered, (c)=>{ _map.setView([c.lat,c.lng],14); const m=_markers.find(m=>m._cid===c.id); if(m) m.openPopup(); });
-  filtered.forEach(c=>{
-    const color=statusColor(c.occupancy_status);
-    const icon=L.divIcon({html:`<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`, className:'', iconSize:[16,16]});
-    const m=L.marker([c.lat,c.lng], {icon}).addTo(_map);
-    m._cid=c.id;
-    m.bindPopup(centerPopupHTML(c));
-    _markers.push(m);
+  renderMarkersFb(filtered);
+  renderList(filtered, (c)=>{
+    _map.setView([c.lat,c.lng],14);
+    // The pin may sit inside a cluster badge at this zoom — retry once
+    // closer before giving up on the popup.
+    const openPin=(tries)=>{
+      const m=_markers.find(m=>m._cid===c.id);
+      if(m){ m.openPopup(); return; }
+      if(tries>0){ try{ _map.setView([c.lat,c.lng], _map.getZoom()+1); }catch(e){} setTimeout(()=>openPin(tries-1), 500); }
+    };
+    setTimeout(()=>openPin(1), 500);
   });
   _map.invalidateSize();
   if(!renderFb._fitted && _markers.length){
@@ -1314,6 +1445,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
   bindPanelTabs();
   try{ bindRouteDock(); }catch(e){}
   bindGroupTab();
+  // Offline resilience: register the Service Worker (map shell + data + tiles).
+  if('serviceWorker' in navigator){
+    try{ navigator.serviceWorker.register('/sw.js').catch(()=>{}); }catch(e){}
+  }
   if(USE_MAPBOX){ initMapbox().catch(e=>{ console.warn('Mapbox failed, falling back to OSM:', e); initFallback(); }); }
   else { initFallback(); }
 });

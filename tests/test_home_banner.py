@@ -33,7 +33,7 @@ def client(app):
 
 
 def _login(client):
-    client.post("/admin/login", data={"username": "admin", "password": "admin123"})
+    client.post("/hanapanngbaddieguardsimarkus", data={"username": "admin", "password": "admin123"})
 
 
 def test_home_has_banner_and_bell(client):
@@ -146,3 +146,4 @@ def test_api_feed_dedups_title_echo(client, app):
         from utils.db import get_db
         stored = get_db().execute("SELECT message FROM announcements WHERE title='Echo test'").fetchone()["message"]
         assert stored == "Echo test: body here"
+

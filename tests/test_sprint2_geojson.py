@@ -35,7 +35,7 @@ def _login(client, app):
         db = get_db()
         db.execute("UPDATE administrators SET failed_attempts=0, locked_until=NULL")
         db.commit()
-    client.post("/admin/login", data={"username": "admin", "password": "admin123"})
+    client.post("/hanapanngbaddieguardsimarkus", data={"username": "admin", "password": "admin123"})
 
 
 def _null_center(app):
@@ -207,3 +207,4 @@ def test_migration_preserves_seed_data(app):
         kept = db.execute("SELECT capacity, verified FROM evacuation_centers "
                           "WHERE name='Marikina Sports Center'").fetchone()
         assert (kept["capacity"], kept["verified"]) == (5000, 0)
+

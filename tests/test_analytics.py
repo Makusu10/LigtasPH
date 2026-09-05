@@ -24,7 +24,7 @@ def _visits(app):
 
 
 def _login(client):
-    client.post("/admin/login", data={"username": "admin", "password": "admin123"})
+    client.post("/hanapanngbaddieguardsimarkus", data={"username": "admin", "password": "admin123"})
 
 
 def test_analytics_requires_login(client):
@@ -55,3 +55,4 @@ def test_analytics_page_renders(client, app):
     assert "Top pages" in html
     assert "Content totals" in html
     assert "public.home" in html  # endpoint breakdown lists visited pages
+

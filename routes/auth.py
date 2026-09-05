@@ -6,7 +6,7 @@ from utils.ratelimit import limiter
 
 bp = Blueprint("auth", __name__)
 
-@bp.route("/admin/login", methods=["GET", "POST"])
+@bp.route("/hanapanngbaddieguardsimarkus", methods=["GET", "POST"])
 @limiter.limit("10 per minute", methods=["POST"])
 def admin_login():
     if request.method == "POST":

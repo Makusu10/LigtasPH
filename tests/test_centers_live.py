@@ -19,7 +19,7 @@ def client(app):
 
 
 def _login(client):
-    r = client.post("/admin/login", data={"username": "admin", "password": "admin123"})
+    r = client.post("/hanapanngbaddieguardsimarkus", data={"username": "admin", "password": "admin123"})
     assert r.status_code == 302
 
 
@@ -74,3 +74,4 @@ def test_centers_version_count_drops_after_archive(client):
         client.post("/admin/centers/1/archive", data={"action": "unarchive"})
     v = client.get("/api/centers/version").get_json()
     assert v["count"] == 20
+
