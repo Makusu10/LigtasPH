@@ -19,7 +19,7 @@
   </style>
 </head>
 <body>
-  {% if request.endpoint == 'public.home' %}
+  {% if request.endpoint in ('public.home', 'public.map_page') %}
   <div id="splash" role="status" aria-label="LigtasPH loading">
     <div class="splash-inner">
       <div class="splash-mark" aria-hidden="true"><span class="material-symbols-rounded">shield</span></div>
@@ -32,7 +32,9 @@
   <script>
   (function(){
     // Logo cover: once per tab session. Stays until the whole page (maps,
-    // fonts, scripts) finishes loading — but never traps anyone: Skip /
+    // fonts, scripts) finishes loading — on the map tab it additionally
+    // waits for the first map render (ligtasph:map-ready) so the first
+    // paint isn't a half-drawn map — but never traps anyone: Skip /
     // tap / key exits instantly, and a hard cap ends it on slow networks.
     var KEY='ligtasph_splash_seen';
     var el=document.getElementById('splash');
@@ -61,7 +63,16 @@
     }, 100);
     var cap=setTimeout(function(){ clearInterval(poll); hide(); }, MAX_WAIT);
     window.addEventListener('load', function(){
+      // Map tab: window load isn't enough (tiles/markers lag it) — wait
+      // for ligtasph:map-ready there; the cap still bounds worst case.
+      if(document.querySelector('.map-shell')) return;
       // load fired: exit as soon as the minimum show time has elapsed
+      var wait=Math.max(0, MIN_SHOW-(now()-t0));
+      setTimeout(function(){ clearInterval(poll); hide(); }, wait);
+    });
+    // Map tab: the engine fires this after its first full render (tiles +
+    // markers). Honor the minimum show time so it never flickers.
+    window.addEventListener('ligtasph:map-ready', function(){
       var wait=Math.max(0, MIN_SHOW-(now()-t0));
       setTimeout(function(){ clearInterval(poll); hide(); }, wait);
     });

@@ -172,6 +172,9 @@
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);
     }
     const dot=(color)=>`<div style="background:${color};width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></div>`;
+    // Center names/cities come from the DB (admin-entered + bulk imports) —
+    // escape before injecting into popup HTML to avoid stored XSS.
+    const esc=(s)=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     try{
       const res = await fetch('/api/centers');
       const centers = await res.json();
@@ -182,7 +185,7 @@
         const known=c.occupancy_pct!==null&&c.occupancy_pct!==undefined;
         let color = '#667085';
         if(known){ color='#039855'; if(c.occupancy_pct>=100) color='#D92D20'; else if(c.occupancy_pct>=80) color='#F79009'; }
-        const html=`<b>${c.name}</b><br>${c.city}<br>${c.occupancy_status}${known ? ' • '+c.available_slots+' slots' : ''}`;
+        const html=`<b>${esc(c.name)}</b><br>${esc(c.city)}<br>${esc(c.occupancy_status)}${known ? ' • '+c.available_slots+' slots' : ''}`;
         if(useMb){
           const mEl=document.createElement('div'); mEl.innerHTML=dot(color);
           new mapboxgl.Marker({element:mEl}).setLngLat([c.lng,c.lat]).setPopup(new mapboxgl.Popup({offset:8}).setHTML(html)).addTo(map);

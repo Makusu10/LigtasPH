@@ -184,6 +184,20 @@ def create_app(env=None):
             resp.headers["Expires"] = "0"
         return resp
 
+    # Baseline hardening headers (cheap, no behavior change for legit use).
+    # Full CSP is deliberately skipped: pages use inline scripts/styles, so a
+    # strict policy would break the UI; nosniff + framing + referrer cover the
+    # common drive-by vectors (MIME sniffing, clickjacking, URL leakage).
+    @app.after_request
+    def security_headers(resp):
+        resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+        resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        if (resp.mimetype or "").startswith("text/html"):
+            # No legitimate framing use anywhere in the app — block
+            # cross-origin embedding (clickjacking) while allowing same-origin.
+            resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        return resp
+
     # Error handlers
     @app.errorhandler(400)
     def bad_request(e): return render_template("errors/400.html"), 400

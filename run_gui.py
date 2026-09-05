@@ -14,7 +14,7 @@ import threading
 import time
 import webbrowser
 
-HOST = "127.0.0.1"
+HOST = os.environ.get("LIGTASPH_HOST", "127.0.0.1")
 PORT = 5000
 URL = f"http://{HOST}:{PORT}"
 
@@ -145,7 +145,9 @@ def main():
         # use_reloader=False: DevelopmentConfig has DEBUG=True, and
         # Flask defaults use_reloader to self.debug, so omitting this
         # spawns a reloader child that re-runs open_browser (double tab).
-        app.run(host="0.0.0.0", port=PORT, use_reloader=False)
+        # HOST defaults to 127.0.0.1 so the debug server is never exposed
+        # on the LAN; set LIGTASPH_HOST=0.0.0.0 explicitly for LAN demos.
+        app.run(host=HOST, port=PORT, use_reloader=False)
     except ImportError as e:
         print(f"[run_gui] Import failed: {e}. Did you activate venv and pip install -r requirements.txt?", file=sys.stderr)
         sys.exit(1)

@@ -212,6 +212,9 @@ let hzAbort={quake:null, fire:null}, hzTimer=null, lastFires=[], lastQuakes=[];
 function badgeClass(s){ return s==='Available'?'available':s==='Nearly Full'?'nearly':s==='Full'?'full':'unknown'; }
 function statusColor(s){ return s==='Available'?'#039855':s==='Nearly Full'?'#F79009':s==='Full'?'#D92D20':'#667085'; }
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+// Quake URLs come from the USGS feed (third-party data). Escaping alone can't
+// stop a `javascript:` URL, so only http(s) links through — anything else '#'.
+function safeUrl(u){ try{ const s=String(u||'').trim(); if(/^https?:\/\//i.test(s)) return esc(s); }catch(e){} return '#'; }
 function centerFig(c){
   if(c.occupancy_pct===null||c.occupancy_pct===undefined) return `Capacity unreported • ${esc(c.occupancy_status)}`;
   return `Capacity ${c.capacity} • Occupancy ${c.current_occupancy} • Available ${c.available_slots} • ${c.occupancy_pct}%`;
@@ -257,6 +260,10 @@ function renderList(filtered, onLocate){
 }
 function hzStatus(msg){ setStatus('hzStatus', msg); }
 function setStatus(id, msg){ const el=document.getElementById(id); if(el) el.textContent=msg||''; }
+// Splash cover (home/map tabs) waits for this: fired once the map has its
+// first full render, so users never stare at a half-drawn map.
+let _mapReadyFired=false;
+function mapReady(){ if(_mapReadyFired) return; _mapReadyFired=true; try{ window.dispatchEvent(new Event('ligtasph:map-ready')); }catch(e){} }
 function setMapCount(n, total){
   const el=document.getElementById('mapCount');
   if(el) el.textContent = n<total ? `Showing ${n} of ${total} in view — pan or zoom to load more.` : `${total} in view.`;
@@ -1093,7 +1100,7 @@ async function initMapbox(){
   }
   // quake/fire popups on click
   function quakePopupHTML(p){
-    return `<div style="min-width:200px"><div style="font-weight:800;">M${esc(p.mag)} — ${esc(p.place)}</div><div style="font-size:12px;color:var(--text-secondary);">Depth ${esc(p.depth??'?')} km • Est. felt radius ${esc(p.radius??quakeRadiusKm(p.mag))} km • <a href="${esc(p.url||'#')}" target="_blank" rel="noopener">USGS</a></div>${QUAKE_RING_NOTE}</div>`;
+    return `<div style="min-width:200px"><div style="font-weight:800;">M${esc(p.mag)} — ${esc(p.place)}</div><div style="font-size:12px;color:var(--text-secondary);">Depth ${esc(p.depth??'?')} km • Est. felt radius ${esc(p.radius??quakeRadiusKm(p.mag))} km • <a href="${safeUrl(p.url)}" target="_blank" rel="noopener">USGS</a></div>${QUAKE_RING_NOTE}</div>`;
   }
   function firePopupHTML(p){
     return `<div style="font-size:12px;"><b>Active fire</b> (${esc(p.confidence)})<br>Brightness ${esc(p.brightness)} • ${esc(p.date)} ${esc(p.time)}</div>${FIRE_RING_NOTE}`;
@@ -1204,6 +1211,7 @@ async function initMapbox(){
   bindNavSearch();
   bindNavControls();
   map.on('load', ()=>{ render(); });
+  map.once('idle', ()=>mapReady());
   render();
   initCentersLive(render);
 }
@@ -1232,6 +1240,7 @@ function initFallback(){
   const vt=document.getElementById('viewToggle'); if(vt) vt.style.display='none';
   ensureLeaflet().then(()=>{
     _map = L.map('map', {zoomControl:false}).setView([14.6308,121.0968],11);
+    _map.whenReady(()=>setTimeout(mapReady, 600));
     L.control.zoom({position:'topright'}).addTo(_map);
     // Visible ⌖ locate control (fallback has no GeolocateControl equivalent).
     const LocateCtl = L.Control.extend({options:{position:'topright'},
@@ -1383,10 +1392,10 @@ async function refreshHazardsFb(){
     jobs.push(fetchQuakes(lat, lon, hzAbort.quake.signal).then(data=>{
       (data.quakes||[]).slice(0,200).forEach(q=>{
         L.circle([q.lat,q.lon], {radius:quakeRadiusKm(q.mag)*1000, color:'#9333ea', weight:1, opacity:0.6, fillOpacity:0.12}).addTo(_quakeLayer)
-          .bindPopup(`<div style="min-width:200px"><div style="font-weight:800;">M${q.mag??'?'} — ${esc(q.place||'Earthquake')}</div><div style="font-size:12px;color:var(--text-secondary);">Depth ${q.depth_km??'?'} km • Est. felt radius ${quakeRadiusKm(q.mag)} km • <a href="${q.url||'#'}" target="_blank" rel="noopener">USGS</a></div>${QUAKE_RING_NOTE}</div>`);
+          .bindPopup(`<div style="min-width:200px"><div style="font-weight:800;">M${q.mag??'?'} — ${esc(q.place||'Earthquake')}</div><div style="font-size:12px;color:var(--text-secondary);">Depth ${q.depth_km??'?'} km • Est. felt radius ${quakeRadiusKm(q.mag)} km • <a href="${safeUrl(q.url)}" target="_blank" rel="noopener">USGS</a></div>${QUAKE_RING_NOTE}</div>`);
         const size=10+Math.min(14,(q.mag||0)*2);
         const m=L.marker([q.lat,q.lon], {icon:L.divIcon({html:`<div class="quake-pulse" style="width:${size}px;height:${size}px;"></div>`, className:'', iconSize:[size,size]}), title:`M${q.mag} ${q.place||''}`}).addTo(_quakeLayer);
-        m.bindPopup(`<div style="min-width:200px"><div style="font-weight:800;">M${q.mag??'?'} — ${esc(q.place||'Earthquake')}</div><div style="font-size:12px;color:var(--text-secondary);">Depth ${q.depth_km??'?'} km • <a href="${q.url||'#'}" target="_blank" rel="noopener">USGS</a></div></div>`);
+        m.bindPopup(`<div style="min-width:200px"><div style="font-weight:800;">M${q.mag??'?'} — ${esc(q.place||'Earthquake')}</div><div style="font-size:12px;color:var(--text-secondary);">Depth ${q.depth_km??'?'} km • <a href="${safeUrl(q.url)}" target="_blank" rel="noopener">USGS</a></div></div>`);
       });
       const _qfb=inViewCountFb((data.quakes||[]).slice(0,200));
       hzStatus(_qfb<0?quakeStatusText(data):`${quakeStatusText(data)} • ${_qfb} in view`);

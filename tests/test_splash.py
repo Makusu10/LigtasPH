@@ -28,7 +28,14 @@ def test_home_has_splash_cover(client):
 
 
 def test_other_pages_have_no_splash(client):
-    for page in ("/map", "/centers", "/weather", "/hotlines"):
+    # Home + map show the cover (map waits for first render); the rest never do.
+    for page in ("/centers", "/weather", "/hotlines", "/settings"):
         r = client.get(page)
         assert r.status_code == 200
         assert 'id="splash"' not in r.get_data(as_text=True)
+
+
+def test_map_splash_waits_for_map_ready(client):
+    html = client.get("/map").get_data(as_text=True)
+    assert 'id="splash"' in html
+    assert "ligtasph:map-ready" in html

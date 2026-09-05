@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app, Response
 from utils.db import get_db
+from utils.ratelimit import limiter
 
 bp = Blueprint("api", __name__)
 
@@ -337,6 +338,7 @@ def api_environment():
         return jsonify({"error":"Environment data unavailable", "retry": True}), 503
 
 @bp.route("/api/groups", methods=["POST"])
+@limiter.limit("10 per minute", methods=["POST"])
 def api_create_group():
     try:
         db = get_db()
@@ -382,6 +384,7 @@ def api_group_info(code):
         return jsonify({"error": "Could not load group", "retry": True}), 503
 
 @bp.route("/api/locations", methods=["POST"])
+@limiter.limit("60 per minute", methods=["POST"])
 def api_post_location():
     try:
         db = get_db()
