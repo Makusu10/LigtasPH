@@ -35,6 +35,9 @@ html, body { margin:0; padding:0; font-family: 'Inter', 'Roboto', system-ui, san
 @media (prefers-reduced-motion: no-preference){
   html { scroll-behavior: smooth; }
 }
+/* Reserve scrollbar space always: centered content no longer shifts when
+   pages with/without scrollbars swap (both classic and thin scrollbars). */
+html { scrollbar-gutter: stable; }
 /* Browser surfaces carry the design too: selection, scrollbars, link offset */
 ::selection { background: rgba(59,110,245,0.28); }
 [data-theme="dark"] ::selection { background: rgba(122,162,255,0.35); }
@@ -84,9 +87,12 @@ input, select, textarea { font-variant-numeric: tabular-nums; }
    + a fading glow — no layout properties, no blur on the pill itself. */
 #navPill { position:absolute; top:0; left:0; height:100%; width:0; border-radius:var(--radius-pill);
   background:rgba(59,110,245,0.14); border:1px solid rgba(59,110,245,0.28); z-index:0;
-  pointer-events:none; opacity:0;
-  transition:transform .38s cubic-bezier(.22,1,.36,1), box-shadow .5s ease-out, opacity .25s ease; }
+  transform-origin:left center;
+  pointer-events:none; opacity:0; contain:strict;
+  transition:transform .42s cubic-bezier(.65,0,.35,1), box-shadow .5s ease-out, opacity .25s ease; }
 #navPill.glow { box-shadow:0 0 16px 1px rgba(59,110,245,0.45); }
+/* Hover-follow runs quicker + lighter than the arrival glide. */
+#navPill.follow { transition:transform .18s ease-out, box-shadow .3s ease-out, opacity .25s ease; }
 .nav-links.pill-live a[aria-current="page"] { background:transparent; }
 [data-theme="dark"] #navPill { background:rgba(122,162,255,0.16); border-color:rgba(122,162,255,0.32); }
 [data-theme="dark"] #navPill.glow { box-shadow:0 0 16px 1px rgba(122,162,255,0.5); }

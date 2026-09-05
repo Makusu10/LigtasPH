@@ -104,12 +104,11 @@
       const menu = document.getElementById('mobileMenu');
       if(btn && menu){ btn.addEventListener('click', ()=> menu.classList.toggle('open')); }
     });
-    // Active-tab highlight: a matte overlay parked on the selected tab.
-    // On load it glides in from the previously tapped tab — both measured
-    // in THIS page's layout (no stale cross-page coordinates), GPU-only
-    // transform, with a one-second glow to mark the selection.
+    // Active-tab highlight: a matte overlay on the selected tab. One behavior
+    // only — it follows the cursor (sized to the nearest tab so it always
+    // fits the text) and springs home past a radius; a click just flashes
+    // the glow. GPU-only transform, mouse-only, reduced-motion safe.
     (function(){
-      const KEY='ligtasph_nav_from';
       function init(){
         const bar=document.querySelector('.nav-links');
         const active=bar && bar.querySelector('a[aria-current="page"]');
@@ -119,29 +118,88 @@
         let pill=document.getElementById('navPill');
         if(!pill){ pill=document.createElement('span'); pill.id='navPill'; pill.setAttribute('aria-hidden','true'); bar.appendChild(pill); }
         const box=bar.getBoundingClientRect(), r=active.getBoundingClientRect();
-        const place=(p)=>{ pill.style.left=p.left+'px'; pill.style.top=(p.top||0)+'px'; pill.style.width=p.width+'px'; pill.style.height=r.height+'px'; };
-        place({left:r.left-box.left, top:r.top-box.top, width:r.width, height:r.height});
+        pill.style.left=(r.left-box.left)+'px'; pill.style.top=(r.top-box.top)+'px';
+        pill.style.width=r.width+'px'; pill.style.height=r.height+'px';
         bar.classList.add('pill-live');
         pill.style.opacity='1';
-        let prevPath=null;
-        try{ prevPath=sessionStorage.getItem(KEY); }catch(e){}
-        const prevLink=prevPath && prevPath!==location.pathname
-          ? bar.querySelector('a[href="'+prevPath+'"]') : null;
-        if(prevLink && !reduce){
-          const q=prevLink.getBoundingClientRect();
-          const dx=(q.left-box.left)-(r.left-box.left), sx=q.width/r.width;
-          pill.style.transition='none';
-          pill.style.transform='translateX('+dx+'px) scaleX('+sx+')';
+        if(!reduce){
           pill.classList.add('glow');
-          void pill.offsetWidth; // commit start, then release
-          pill.style.transition='';
-          pill.style.transform='';
           setTimeout(()=>pill.classList.remove('glow'), 1000);
         }
-        bar.addEventListener('click', (e)=>{
-          const a=e.target.closest && e.target.closest('a'); if(!a) return;
-          try{ sessionStorage.setItem(KEY, a.getAttribute('href')); }catch(err){}
-        });
+        const home=()=>{ const b=bar.getBoundingClientRect(), q=active.getBoundingClientRect(); return {left:q.left-b.left, width:q.width}; };
+        const canHover=window.matchMedia && window.matchMedia('(hover: hover)').matches;
+        if(canHover && !reduce){
+            const links=Array.prototype.slice.call(bar.querySelectorAll('a'));
+            const RETURN_PX=140, EDGE_PAD=8, GRAB_PX=6, FAST_PXMS=1.0;
+            let rafId=0, holding=false, lastX=null, lastT=0, smoothV=0;
+            const springHome=()=>{
+              holding=false;
+              pill.classList.remove('follow');
+              pill.style.transform='';
+              pill.style.borderRadius='';
+              setTimeout(()=>pill.classList.remove('glow'), 400);
+            };
+            bar.addEventListener('mousemove', (e)=>{
+              if(rafId) return;
+              rafId=requestAnimationFrame(()=>{
+                rafId=0;
+                const box2=bar.getBoundingClientRect(), h=home();
+                // Re-park the base on the live active rect every frame
+                // (left/width aren't transitioned, so this is free): the
+                // parked base can never go stale relative to the math below.
+                const ar2=active.getBoundingClientRect();
+                pill.style.left=(ar2.left-box2.left)+'px';
+                pill.style.top=(ar2.top-box2.top)+'px';
+                pill.style.width=ar2.width+'px';
+                pill.style.height=ar2.height+'px';
+                // scaleX stretches corner radii too — counter-scale the
+                // radius so the pill keeps perfect ends at any tab width.
+                const fixRadius=(sx)=>{ pill.style.borderRadius=(ar2.height/2/Math.max(sx,0.01))+'px'; };
+                const x=e.clientX-box2.left;
+                const t=performance.now();
+                if(lastX!==null) smoothV=smoothV*0.7+(Math.abs(x-lastX)/Math.max(1,t-lastT))*0.3;
+                lastX=x; lastT=t;
+                let best=null, bestD=1e9, nearest=1e9, over=null;
+                links.forEach((a)=>{
+                  const q=a.getBoundingClientRect();
+                  const l=q.left-box2.left, r2=l+q.width, c=l+q.width/2;
+                  const edge=x<l ? l-x : x>r2 ? x-r2 : 0;
+                  if(edge<nearest) nearest=edge;
+                  if(x>=l-GRAB_PX && x<=r2+GRAB_PX) over={left:l, width:q.width};
+                  const d=Math.abs(x-c);
+                  if(d<bestD){ bestD=d; best={left:l, width:q.width}; }
+                });
+                if(nearest>RETURN_PX){ if(holding) springHome(); return; }
+                holding=true;
+                pill.classList.add('glow');
+                // Hovering any part of a tab snaps to THAT tab; center
+                // distance only decides the gaps between tabs.
+                const target=over || best;
+                if(!target){ if(holding) springHome(); return; }
+                if(smoothV>FAST_PXMS){
+                  // fast: trail the cursor 1:1, no transition lag
+                  pill.classList.remove('follow');
+                  pill.style.transition='none';
+                  const half=h.width/2;
+                  const cx=Math.max(half-EDGE_PAD, Math.min(box2.width-half+EDGE_PAD, x));
+                  fixRadius(1);
+                  pill.style.transform='translateX('+(cx-half-h.left)+'px) scaleX(1)';
+                }else{
+                  // slow: snap exactly onto the hovered tab (or nearest in gaps)
+                  pill.classList.add('follow');
+                  pill.style.transition='';
+                  const sx=target.width/h.width;
+                  fixRadius(sx);
+                  pill.style.transform='translateX('+(target.left-h.left)+'px) scaleX('+sx+')';
+                }
+              });
+            });
+          bar.addEventListener('mouseleave', springHome);
+          bar.addEventListener('click', ()=>pill.classList.add('glow'));
+        }
+        // Back/forward cache restores the DOM without rerunning init —
+        // re-place the pill so it never sticks to a stale tab.
+        window.addEventListener('pageshow', (e)=>{ if(e.persisted) init(); });
       }
       if(document.fonts && document.fonts.ready){ Promise.race([document.fonts.ready, new Promise(r=>setTimeout(r,800))]).then(init); }
       else if(document.readyState!=='loading') init();
