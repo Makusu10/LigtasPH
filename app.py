@@ -82,6 +82,21 @@ def create_app(env=None):
                 row = get_db().execute("SELECT COUNT(*) AS n FROM evacuation_centers").fetchone()
                 if (row["n"] if row else 0) == 0:
                     seed_db()
+                # Bulk dataset: data/ncr_evacuation_centers.geojson ships with
+                # the repo but the import is a manual CLI step — ephemeral
+                # hosts (Render free tier) would otherwise serve only the 20
+                # demo rows forever. Auto-import once: the importer is
+                # idempotent, so this is a no-op when rows already exist.
+                try:
+                    from scripts.import_evac_centers import import_geojson, DEFAULT_PATH
+                    have = get_db().execute(
+                        "SELECT COUNT(*) AS n FROM evacuation_centers "
+                        "WHERE source LIKE 'geojson:%'").fetchone()
+                    if (have["n"] if have else 0) == 0 and DEFAULT_PATH.exists():
+                        stats = import_geojson(get_db(), str(DEFAULT_PATH))
+                        app.logger.info("GeoJSON auto-import: %s", stats)
+                except Exception as ie:
+                    app.logger.warning("GeoJSON auto-import skipped: %s", ie)
         except Exception as e:
             app.logger.warning("Schema ensure failed for %s: %s", app.config["DATABASE"], e)
 

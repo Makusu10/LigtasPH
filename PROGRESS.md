@@ -44,6 +44,7 @@
 - Emergency **group location sharing**: create group → invite code → post expiring pins → poll.
 - `import-geojson` CLI for bulk center loads; `init-db`/`seed` idempotent (re-runnable; seed backfills without dupes).
 - Startup self-heals stale DB schemas; no-cache headers on dynamic HTML/JSON (kills stale-page syndrome on phones).
+- Bootstrapping: empty DBs seed demo data, then auto-import `data/ncr_evacuation_centers.geojson` once (idempotent) — ephemeral hosts like Render free tier serve the full ~857 centers, never just the 20 demo rows.
 - Client sync: announcements feed + home banner/bell revalidate every 5 min while visible (`LigtasPrefs.SYNC_MS`); brand-new critical banners interrupt with a modal, others wait silently. Weather re-fetches the current view silently on the same cadence; hotlines reload too. Centers/map use a faster 15s version poll.
 - Offline + cache-busting (from `gui-testing`): `static_asset()` boot-timestamp suffix on all local CSS/JS (no manual `?v=`); `/sw.js` service worker (map shell + datasets + Mapbox tiles cached, **navigations stay network-first** so the no-store policy holds); `/api/evac-centers.geojson` full-dataset stream; `/api/centers/<id>/status` honest not-available telemetry point.
 
