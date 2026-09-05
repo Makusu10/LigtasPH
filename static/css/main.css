@@ -32,6 +32,18 @@
 
 * { box-sizing: border-box; }
 html, body { margin:0; padding:0; font-family: 'Inter', 'Roboto', system-ui, sans-serif; font-size:16px; color:var(--text); background: var(--bg); background-image: var(--bg-gradient); background-attachment: fixed; min-height:100vh; }
+@media (prefers-reduced-motion: no-preference){
+  html { scroll-behavior: smooth; }
+}
+/* Browser surfaces carry the design too: selection, scrollbars, link offset */
+::selection { background: rgba(59,110,245,0.28); }
+[data-theme="dark"] ::selection { background: rgba(122,162,255,0.35); }
+* { scrollbar-width: thin; scrollbar-color: rgba(120,134,155,0.55) transparent; }
+*::-webkit-scrollbar { width:10px; height:10px; }
+*::-webkit-scrollbar-thumb { background: rgba(120,134,155,0.55); border-radius:999px; border:2px solid transparent; background-clip:content-box; }
+*::-webkit-scrollbar-track { background: transparent; }
+a { text-underline-offset: 3px; }
+input, select, textarea { font-variant-numeric: tabular-nums; }
 
 /* Utilities — Liquid Glass */
 .container { max-width:1200px; margin:0 auto; padding:0 16px; }
@@ -63,10 +75,21 @@ html, body { margin:0; padding:0; font-family: 'Inter', 'Roboto', system-ui, san
 .nav-inner { display:flex; align-items:center; justify-content:space-between; height:64px; gap:16px; }
 .nav-brand { display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:-0.02em; color:var(--navy); text-decoration:none; }
 .nav-brand-mark { width:32px; height:32px; background: linear-gradient(135deg, var(--primary) 0%, #5b8cff 100%); border-radius:10px; display:grid; place-items:center; color:white; font-weight:800; font-size:13px; box-shadow: 0 4px 12px rgba(59,110,245,0.3); }
-.nav-links { display:flex; gap:8px; align-items:center; }
-.nav-links a { color:var(--text-secondary); text-decoration:none; font-weight:500; font-size:14px; padding:8px 14px; border-radius:var(--radius-pill); transition: all 0.2s ease; }
+.nav-links { display:flex; gap:8px; align-items:center; position:relative; }
+.nav-links a { position:relative; z-index:1; color:var(--text-secondary); text-decoration:none; font-weight:500; font-size:14px; padding:8px 14px; border-radius:var(--radius-pill); transition: all 0.2s ease; }
 .nav-links a:hover { background: rgba(59,110,245,0.08); color:var(--primary); }
 .nav-links a[aria-current="page"] { background: var(--primary-container); color:var(--navy); font-weight:600; }
+/* Active-tab highlight (positioned by JS; static pill above is the no-JS fallback).
+   GPU-only: the pill sits on the active tab and only ever animates transform
+   + a fading glow — no layout properties, no blur on the pill itself. */
+#navPill { position:absolute; top:0; left:0; height:100%; width:0; border-radius:var(--radius-pill);
+  background:rgba(59,110,245,0.14); border:1px solid rgba(59,110,245,0.28); z-index:0;
+  pointer-events:none; opacity:0;
+  transition:transform .38s cubic-bezier(.22,1,.36,1), box-shadow .5s ease-out, opacity .25s ease; }
+#navPill.glow { box-shadow:0 0 16px 1px rgba(59,110,245,0.45); }
+.nav-links.pill-live a[aria-current="page"] { background:transparent; }
+[data-theme="dark"] #navPill { background:rgba(122,162,255,0.16); border-color:rgba(122,162,255,0.32); }
+[data-theme="dark"] #navPill.glow { box-shadow:0 0 16px 1px rgba(122,162,255,0.5); }
 .nav-toggle { display:none; background: var(--glass); border:1px solid var(--glass-border); border-radius:12px; padding:8px 10px; backdrop-filter: blur(12px); }
 .mobile-menu { display:none; flex-direction:column; gap:4px; padding:12px 0 16px; border-top:1px solid var(--border); }
 .mobile-menu a { padding:10px 14px; color:var(--text); text-decoration:none; font-weight:500; border-radius:12px; }
@@ -196,10 +219,20 @@ input:focus, select:focus, textarea:focus { border-color:var(--primary); backgro
 .splash-inner{ display:grid; justify-items:center; gap:10px; text-align:center; padding:24px; }
 .splash-mark{ width:96px; height:96px; border-radius:28px; display:grid; place-items:center; color:#fff;
   background:linear-gradient(135deg, var(--primary) 0%, #5b8cff 100%);
-  box-shadow:0 12px 40px rgba(59,110,245,.45); }
+  box-shadow:0 12px 40px rgba(59,110,245,.45); animation:splash-pop .55s cubic-bezier(.2,1.4,.4,1) both; }
 .splash-mark .material-symbols-rounded{ font-size:52px; }
-.splash-word{ color:#fff; font-weight:800; font-size:34px; letter-spacing:.04em; }
+.splash-word{ color:#fff; font-weight:800; font-size:34px; letter-spacing:.04em; animation:splash-rise .5s .25s ease both; }
 .splash-word span{ color:#8fb0ff; }
+.splash-tag{ color:rgba(255,255,255,.72); font-size:13px; animation:splash-rise .5s .4s ease both; }
+.splash-bar{ width:180px; height:4px; border-radius:999px; background:rgba(255,255,255,.18); overflow:hidden; animation:splash-rise .5s .5s ease both; }
+.splash-bar span{ display:block; height:100%; width:40%; border-radius:999px; background:#fff; animation:splash-load 1.1s .3s ease-in-out infinite; }
+@keyframes splash-pop{ 0%{ transform:scale(.4); opacity:0; } 100%{ transform:scale(1); opacity:1; } }
+@keyframes splash-rise{ 0%{ transform:translateY(10px); opacity:0; } 100%{ transform:none; opacity:1; } }
+@keyframes splash-load{ 0%{ margin-left:-40%; } 100%{ margin-left:100%; } }
+@media (prefers-reduced-motion: reduce){
+  .splash-mark,.splash-word,.splash-tag,.splash-bar{ animation:none; }
+  #splash.splash-hide{ transition-duration:.15s; }
+}
 
 /* Dark mode — enabled via <html data-theme="dark"> (see prefs.js).
  * Light theme above is untouched; every rule here is scoped under the
