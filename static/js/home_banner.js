@@ -18,6 +18,37 @@
   function store(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function isAcked(id) { try { return !!localStorage.getItem(ACK_PREFIX + id); } catch (e) { return false; } }
   function setAcked(id) { try { localStorage.setItem(ACK_PREFIX + id, new Date().toISOString()); } catch (e) {} }
+  function unack(ids) {
+    try { (ids || []).forEach(function (id) { localStorage.removeItem(ACK_PREFIX + id); }); } catch (e) {}
+  }
+  var undoTimer = null;
+  // 10-second undo after any dismiss: restores the ack keys, then repaints.
+  function showUndo(ids, label) {
+    var toast = document.getElementById('ann-undo');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'ann-undo';
+      toast.className = 'card';
+      toast.setAttribute('role', 'status');
+      toast.innerHTML = '<span id="ann-undo-msg"></span><button id="ann-undo-btn" class="btn btn-primary" style="padding:10px 16px; font-size:13px; min-height:44px;">Undo</button>';
+      document.body.appendChild(toast);
+      toast.querySelector('#ann-undo-btn').addEventListener('click', function () {
+        var back = toast._ids || [];
+        toast.hidden = true;
+        toast._ids = null;
+        if (undoTimer) { clearTimeout(undoTimer); undoTimer = null; }
+        unack(back);
+        loadLive().then(renderBanner);
+        refreshBadge();
+        if (!document.getElementById('ann-history').hidden) loadHistory();
+      });
+    }
+    toast._ids = ids || [];
+    toast.querySelector('#ann-undo-msg').textContent = label || 'Dismissed.';
+    toast.hidden = false;
+    if (undoTimer) clearTimeout(undoTimer);
+    undoTimer = setTimeout(function () { toast.hidden = true; toast._ids = null; undoTimer = null; }, 10000);
+  }
   function enabled() {
     var p = P();
     if (p) return p.announcementsEnabled();
@@ -136,6 +167,7 @@
       setAcked(next.id);
       renderBanner(list.filter(function (a) { return a.id !== next.id; }));
       refreshBadge();
+      showUndo([next.id], 'Banner dismissed.');
     };
   }
 
@@ -184,13 +216,14 @@
       if (!isAcked(a.id)) {
         var b = document.createElement('button');
         b.className = 'btn btn-secondary';
-        b.style.cssText = 'padding:4px 10px; font-size:11px; flex:0 0 auto; align-self:start;';
+        b.style.cssText = 'padding:10px 14px; font-size:13px; min-height:44px; flex:0 0 auto; align-self:start;';
         b.textContent = 'Dismiss';
         b.addEventListener('click', function () {
           setAcked(a.id);
           loadHistory();
           loadLive().then(renderBanner);
           refreshBadge();
+          showUndo([a.id], 'Announcement dismissed.');
         });
         item.appendChild(b);
       }
@@ -232,10 +265,12 @@
     document.getElementById('ann-dismiss-all').addEventListener('click', function () {
       if (!confirm('Dismiss all announcements, including critical ones?')) return;
       loadLive().then(function (list) {
-        list.forEach(function (a) { if (a && a.id != null) setAcked(a.id); });
+        var ids = list.filter(function (a) { return a && a.id != null; }).map(function (a) { return a.id; });
+        ids.forEach(setAcked);
         renderBanner([]);
         refreshBadge();
         loadHistory();
+        showUndo(ids, ids.length + ' announcement(s) dismissed.');
       });
     });
   });

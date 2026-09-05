@@ -51,6 +51,7 @@
 - **Tests**: 160 pytest, incl. settings/status/keys/banner/history/timezone suites. Windows note: suite assumes UTF-8 file reads (`encoding="utf-8"` fixed in `test_noah.py`).
 
 ## Recent milestones (newest first)
+- Dismiss **undo** (10s toast restores banner/bell dismissals), 44px touch targets, dead splash CSS removed.
 - `de5bb89` — Impeccable home refinement round 2 (operate hero, honest stats, severity text, PHT) + critique snapshot.
 - `e96c1eb` — Dark-mode contrast fixes (map popups, floating nav).
 - `c0ae2df` — Settings + dark mode, admin API keys + restart, home banner + bell history, 5 seeded announcements.
@@ -59,14 +60,11 @@
 - Mapbox 2D/3D GPS map, NOAH overlays + tabbed panel, NCR-wide search, admin CRUD + audit + POST logout, 17 national hotlines, Manila→UTC announcement times.
 
 ## Up next (gaps anyone may claim)
-1. **Map page critique** — obvious next Impeccable target (touch targets, bell overlap, preview interactivity).
+1. **Map page critique** — obvious next Impeccable target (preview interactivity, bell overlap, hero on 320px).
 2. **Tagalog/Taglish microcopy** pass (homepage still English-only; affects trust).
 3. **Real push notifications** (explicitly deferred; needs service worker + subscription backend).
 4. **Map dark tiles** (deferred by decision; UI is dark, tiles stay light).
-5. **Hero on 320px + 44px touch targets** (critique leftovers).
-6. **FIRMS key** for dev (fires layer is 503 without it).
-7. **Dead splash CSS** in `main.css` (home splash slimmed; styles orphaned — remove or reuse).
-8. **Undo for announcement dismiss** (currently confirm-only on Dismiss-all).
+5. **FIRMS key** for dev (fires layer is 503 without it).
 
 ## AI-tool conventions
 - Verify by execution: run `pytest -q` and boot the app before claiming done.
