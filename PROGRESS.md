@@ -7,10 +7,11 @@
 > *Up next*. Keep it short and factual — deep technical detail lives in
 > `AGENTS.md` (agents) and `README.md` (humans).
 
-## Snapshot (2026-09-05)
+## Snapshot (2026-09-06)
 
 - Stack: Flask 3.x + SQLite + vanilla JS + Leaflet/OSM, Mapbox 2D/3D when `MAPBOX_TOKEN` is set.
-- Entry: `run_gui.py` (dev launcher) / `wsgi.py` (prod). `pytest`: **160 passing**.
+- Entry: `run_gui.py` (dev launcher) / `wsgi.py` (prod). `pytest`: **187 passing** (180 local + 7 from `5948f1e`: map splash, security tests, `run_gui` typing).
+- API contract: standardized error envelope (`error` + `code` + `retry`; see `utils/api_errors.py`), shared validators (`utils/validation.py`), OpenAPI 3.1 spec at `static/openapi.yaml` served from `/api/openapi.yaml`.
 - Branch model: feature branches → `main`. Live branches have included `JOSH`, `Kus`, `STEVEN` (check `git branch -a`; delete merged ones).
 - AI design tooling: Impeccable skill installed **local-only** (gitignored `.opencode/` etc.) — never commit harness dirs.
 
@@ -40,7 +41,8 @@
 - **Restart button** — re-execs dev server so updates reflect; refused under gunicorn/waitress (redeploy there); clients detect the new `build_id` via `/api/status` and refresh caches.
 
 ### APIs & services
-- Centers (+`version` poll, detail), hotlines, NCR LGUs, weather, air-quality, environment (overall status = worst of heat/AQI), announcements (+history), earthquakes (USGS), fires (FIRMS, 503 without key), status (build id + provider booleans, **never secret values**).
+- Centers (+`version` poll, detail; `?page=`/`?per_page=` pagination with `X-Total-Count`/`X-Page`/`X-Per-Page`/`X-Total-Pages` headers, opt-in JSON envelope via `?envelope=1` or `Accept: application/vnd.ligtasph.v2+json`), hotlines (same pagination scheme), NCR LGUs, weather, air-quality, environment (overall status = worst of heat/AQI), announcements (+history), earthquakes (USGS), fires (FIRMS, 503 without key), status (build id + provider booleans, **never secret values**), OpenAPI spec (`/api/openapi.yaml`).
+- Emergency **group location sharing**: create group → invite code → post expiring pins → poll. POSTs accept `Idempotency-Key` header (24h `idempotency_keys` table, same-key+same-body replays cached response, same-key+new-body → `422`); pin upsert is an atomic `ON CONFLICT(group_id, display_name)` UPSERT with a matching UNIQUE index (init-time dedupe of legacy dupes).
 - Emergency **group location sharing**: create group → invite code → post expiring pins → poll.
 - `import-geojson` CLI for bulk center loads; `init-db`/`seed` idempotent (re-runnable; seed backfills without dupes).
 - Startup self-heals stale DB schemas; no-cache headers on dynamic HTML/JSON (kills stale-page syndrome on phones).
@@ -51,9 +53,10 @@
 ### Cross-cutting
 - **Dark mode**: var-driven `[data-theme="dark"]` over the whole UI; contrast passes done for nav, map popups, weather cards, badges, flashes, announcement modal.
 - **Offline honesty**: cached feeds + clear stale/offline states; no fabricated zeros anywhere.
-- **Tests**: 160 pytest, incl. settings/status/keys/banner/history/timezone suites. Windows note: suite assumes UTF-8 file reads (`encoding="utf-8"` fixed in `test_noah.py`).
+- **Tests**: 180 pytest (incl. `tests/test_api_standardization.py`: error-envelope codes, pagination headers/envelope, idempotency replay/conflict, location UPSERT), plus settings/status/keys/banner/history/timezone suites. Windows note: suite assumes UTF-8 file reads (`encoding="utf-8"` fixed in `test_noah.py`).
 
 ## Recent milestones (newest first)
+- **API standardization** — `utils/api_errors.py` (`api_error` envelope: `error` + machine `code` + `retry`; codes `NOT_FOUND`/`INVALID_COORDINATES`/`INVALID_RADIUS`/`INVALID_DAYS`/`INVALID_ACCURACY`/`MISSING_REQUIRED_FIELDS`/`SERVICE_UNAVAILABLE`/`INTERNAL_ERROR`/`GROUP_CREATION_FAILED`/`PLACE_NOT_FOUND`), `utils/validation.py` (shared coordinate + pagination parsing), `utils/idempotency.py` (header-based replay guard on group/location POSTs), OpenAPI 3.1 contract (`static/openapi.yaml` + `/api/openapi.yaml`); `routes/api.py` fully converted, `tests/test_api_standardization.py` added (160 → 180 passing).
 - Dismiss **undo** (10s toast restores banner/bell dismissals), 44px touch targets, dead splash CSS removed.
 - `de5bb89` — Impeccable home refinement round 2 (operate hero, honest stats, severity text, PHT) + critique snapshot.
 - `e96c1eb` — Dark-mode contrast fixes (map popups, floating nav).

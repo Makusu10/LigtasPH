@@ -1,5 +1,8 @@
 from flask import Blueprint, request, jsonify, current_app, Response
 from utils.db import get_db
+from utils.api_errors import api_error
+from utils.validation import validate_coordinates, parse_pagination
+from utils.idempotency import get_idempotency_key, claim_idempotency, record_idempotency
 from utils.ratelimit import limiter
 
 bp = Blueprint("api", __name__)
@@ -14,6 +17,7 @@ from pathlib import Path
 
 _BASEDIR = Path(__file__).resolve().parent.parent
 _EVAC_GEOJSON = _BASEDIR / "data" / "ncr_evacuation_centers.geojson"
+_OPENAPI_SPEC = _BASEDIR / "static" / "openapi.yaml"
 
 _SITE_RE = re.compile(r"([A-Z][A-Z /&.\-]+?)\s*[•·|]\s*(TEMPORARY|PERMANENT)\b")
 
@@ -125,7 +129,34 @@ def api_centers():
         out.sort(key=lambda x: x["occupancy_pct"] if x["occupancy_pct"] is not None else -1, reverse=True)
     else:
         out.sort(key=lambda x: x["updated_at"], reverse=True)
-    return jsonify(out)
+
+    limit, offset, page, is_paginated = parse_pagination(request.args)
+    total_count = len(out)
+    paged_out = out[offset : offset + limit] if is_paginated and limit is not None else out
+
+    envelope = (request.args.get("envelope", "").strip().lower() in ("1", "true")) or (
+        request.headers.get("Accept") == "application/vnd.ligtasph.v2+json"
+    )
+    if envelope:
+        total_pages = math.ceil(total_count / limit) if (is_paginated and limit) else 1
+        resp = jsonify({
+            "data": paged_out,
+            "pagination": {
+                "page": page,
+                "pageSize": limit or total_count,
+                "total": total_count,
+                "totalPages": total_pages,
+            },
+        })
+    else:
+        resp = jsonify(paged_out)
+
+    resp.headers["X-Total-Count"] = str(total_count)
+    if is_paginated and limit is not None:
+        resp.headers["X-Page"] = str(page)
+        resp.headers["X-Per-Page"] = str(limit)
+        resp.headers["X-Total-Pages"] = str(math.ceil(total_count / limit) if limit else 1)
+    return resp
 
 @bp.route("/api/centers/version")
 def api_centers_version():
@@ -144,7 +175,8 @@ def api_centers_version():
 def api_center_detail(cid):
     db=get_db()
     c=db.execute("SELECT * FROM evacuation_centers WHERE id=? AND archived=0", (cid,)).fetchone()
-    if not c: return jsonify({"error":"Not found"}),404
+    if not c:
+        return api_error("Not found", status_code=404, code="NOT_FOUND")
     d=dict(c)
     pct, avail, occ_status = _occupancy_status(c)
     d["occupancy_pct"]=pct; d["available_slots"]=avail
@@ -164,7 +196,7 @@ def api_evac_centers_geojson():
     which adds live occupancy but drops import provenance.
     """
     if not _EVAC_GEOJSON.exists():
-        return jsonify({"error": "evac dataset missing"}), 404
+        return api_error("evac dataset missing", status_code=404, code="NOT_FOUND")
     # Cacheable in the browser (immutable per deploy); clients re-fetch on
     # restart via cache-busting. Honors the offline SW precache list.
     return Response(
@@ -183,7 +215,7 @@ def api_center_status(cid):
     db = get_db()
     c = db.execute("SELECT id FROM evacuation_centers WHERE id=? AND archived=0", (cid,)).fetchone()
     if not c:
-        return jsonify({"error": "Not found"}), 404
+        return api_error("Not found", status_code=404, code="NOT_FOUND")
     return jsonify({
         "center_id": cid,
         "available": False,
@@ -213,7 +245,35 @@ def api_hotlines():
         params.extend([like,like,like])
     sql+=" ORDER BY last_verified DESC, updated_at DESC"
     rows=db.execute(sql, params).fetchall()
-    return jsonify([dict(r) for r in rows])
+
+    limit, offset, page, is_paginated = parse_pagination(request.args)
+    out = [dict(r) for r in rows]
+    total_count = len(out)
+    paged_out = out[offset : offset + limit] if is_paginated and limit is not None else out
+
+    envelope = (request.args.get("envelope", "").strip().lower() in ("1", "true")) or (
+        request.headers.get("Accept") == "application/vnd.ligtasph.v2+json"
+    )
+    if envelope:
+        total_pages = math.ceil(total_count / limit) if (is_paginated and limit) else 1
+        resp = jsonify({
+            "data": paged_out,
+            "pagination": {
+                "page": page,
+                "pageSize": limit or total_count,
+                "total": total_count,
+                "totalPages": total_pages,
+            },
+        })
+    else:
+        resp = jsonify(paged_out)
+
+    resp.headers["X-Total-Count"] = str(total_count)
+    if is_paginated and limit is not None:
+        resp.headers["X-Page"] = str(page)
+        resp.headers["X-Per-Page"] = str(limit)
+        resp.headers["X-Total-Pages"] = str(math.ceil(total_count / limit) if limit else 1)
+    return resp
 
 @bp.route("/api/ncr-lgus")
 def api_ncr_lgus():
@@ -255,19 +315,19 @@ def _resolve_place(lat, lon, city):
     has_lon = lon not in (None, "")
     label = (city or "").strip() or None
     if has_lat or has_lon:
-        try:
-            lat_f, lon_f = float(lat), float(lon)
-            if not (-90 <= lat_f <= 90 and -180 <= lon_f <= 180):
-                return None, None, None, (jsonify({"error": "Invalid coordinates"}), 400)
-            return lat_f, lon_f, label, None
-        except (TypeError, ValueError):
-            return None, None, None, (jsonify({"error": "Invalid coordinates"}), 400)
+        lat_f, lon_f, err = validate_coordinates(lat, lon, required=True)
+        if err:
+            return None, None, None, api_error(err, status_code=400, code="INVALID_COORDINATES")
+        return lat_f, lon_f, label, None
     if label:
         from services.weather_service import geocode_city
         hit = geocode_city(label)
         if not hit:
-            return None, None, None, (jsonify(
-                {"error": f"Place not found: {label}. Check spelling or pick an NCR LGU."}), 404)
+            return None, None, None, api_error(
+                f"Place not found: {label}. Check spelling or pick an NCR LGU.",
+                status_code=404,
+                code="PLACE_NOT_FOUND",
+            )
         glat, glon, _gname = hit
         return glat, glon, label, None
     return _DEFAULT_LAT, _DEFAULT_LON, None, None
@@ -286,9 +346,9 @@ def api_weather():
         data, err = fetch_weather(db, lat_f, lon_f, label)
         if data:
             return jsonify(data)
-        return jsonify({"error": err or "Weather unavailable", "retry": True}), 503
+        return api_error(err or "Weather unavailable", status_code=503, code="SERVICE_UNAVAILABLE", retry=True)
     except Exception:
-        return jsonify({"error":"Weather unavailable", "retry": True}), 503
+        return api_error("Weather unavailable", status_code=503, code="SERVICE_UNAVAILABLE", retry=True)
 
 @bp.route("/api/air-quality")
 def api_air_quality():
@@ -304,9 +364,9 @@ def api_air_quality():
         data, err = fetch_air_quality(db, lat_f, lon_f, label)
         if data:
             return jsonify(data)
-        return jsonify({"error": err or "Air quality unavailable", "retry": True}), 503
+        return api_error(err or "Air quality unavailable", status_code=503, code="SERVICE_UNAVAILABLE", retry=True)
     except Exception:
-        return jsonify({"error":"Air quality unavailable", "retry": True}), 503
+        return api_error("Air quality unavailable", status_code=503, code="SERVICE_UNAVAILABLE", retry=True)
 
 @bp.route("/api/environment")
 def api_environment():
@@ -335,13 +395,22 @@ def api_environment():
             "errors": {"weather": w_err, "air_quality": aq_err},
         })
     except Exception as e:
-        return jsonify({"error":"Environment data unavailable", "retry": True}), 503
+        return api_error("Environment data unavailable", status_code=503, code="SERVICE_UNAVAILABLE", retry=True)
 
 @bp.route("/api/groups", methods=["POST"])
 @limiter.limit("10 per minute", methods=["POST"])
 def api_create_group():
     try:
         db = get_db()
+        raw_payload = request.get_data() or b"{}"
+        idem_key = get_idempotency_key(request)
+        if idem_key:
+            state, cached, err_resp = claim_idempotency(db, idem_key, raw_payload)
+            if err_resp:
+                return err_resp
+            if state == "succeeded" and cached:
+                return Response(cached["response_body"], status=cached["status_code"], mimetype="application/json")
+
         body = request.get_json(silent=True) or {}
         name = str(body.get("name", "Group") or "Group").strip()[:80] or "Group"
         for _ in range(5):
@@ -356,12 +425,17 @@ def api_create_group():
                     "SELECT id, invite_code, name, created_at FROM emergency_groups WHERE id=?",
                     (cur.lastrowid,),
                 ).fetchone()
-                return jsonify(dict(row)), 201
+                out = dict(row)
+                if idem_key:
+                    record_idempotency(db, idem_key, 201, json.dumps(out), succeeded=True)
+                return jsonify(out), 201
             except sqlite3.IntegrityError:
                 continue
-        return jsonify({"error": "Could not create group", "retry": True}), 503
+        if idem_key:
+            record_idempotency(db, idem_key, 503, json.dumps({"error": "Could not create group", "retry": True}), succeeded=False)
+        return api_error("Could not create group", status_code=503, code="GROUP_CREATION_FAILED", retry=True)
     except Exception:
-        return jsonify({"error": "Could not create group", "retry": True}), 503
+        return api_error("Could not create group", status_code=503, code="INTERNAL_ERROR", retry=True)
 
 @bp.route("/api/groups/<code>")
 def api_group_info(code):
@@ -372,7 +446,7 @@ def api_group_info(code):
             ((code or "").strip(),),
         ).fetchone()
         if not group:
-            return jsonify({"error": "Group not found"}), 404
+            return api_error("Group not found", status_code=404, code="NOT_FOUND")
         live = db.execute(
             "SELECT COUNT(*) AS n FROM live_locations WHERE group_id=? AND expires_at > datetime('now')",
             (group["id"],),
@@ -381,62 +455,80 @@ def api_group_info(code):
         out["live_count"] = live["n"] if live else 0
         return jsonify(out)
     except Exception:
-        return jsonify({"error": "Could not load group", "retry": True}), 503
+        return api_error("Could not load group", status_code=503, code="INTERNAL_ERROR", retry=True)
 
 @bp.route("/api/locations", methods=["POST"])
 @limiter.limit("60 per minute", methods=["POST"])
 def api_post_location():
     try:
         db = get_db()
+        raw_payload = request.get_data() or b"{}"
+        idem_key = get_idempotency_key(request)
+        if idem_key:
+            state, cached, err_resp = claim_idempotency(db, idem_key, raw_payload)
+            if err_resp:
+                return err_resp
+            if state == "succeeded" and cached:
+                return Response(cached["response_body"], status=cached["status_code"], mimetype="application/json")
+
         body = request.get_json(silent=True) or {}
         invite = str(body.get("invite_code", "")).strip()
         display = str(body.get("display_name", "")).strip()[:40]
         if not invite or not display:
-            return jsonify({"error": "invite_code and display_name are required"}), 400
-        try:
-            lat = float(body.get("lat"))
-            lng = float(body.get("lon", body.get("lng")))
-            if not (-90 <= lat <= 90 and -180 <= lng <= 180):
-                return jsonify({"error": "Invalid coordinates"}), 400
-        except (TypeError, ValueError):
-            return jsonify({"error": "Invalid coordinates"}), 400
+            return api_error("invite_code and display_name are required", status_code=400, code="MISSING_REQUIRED_FIELDS")
+
+        lat_raw = body.get("lat")
+        lon_raw = body.get("lon") if "lon" in body else body.get("lng")
+        lat_f, lon_f, coord_err = validate_coordinates(lat_raw, lon_raw, required=True)
+        if coord_err:
+            return api_error(coord_err, status_code=400, code="INVALID_COORDINATES")
+
         accuracy = body.get("accuracy")
         if accuracy is not None:
             try:
                 accuracy = float(accuracy)
                 if accuracy < 0:
-                    return jsonify({"error": "Invalid accuracy"}), 400
+                    return api_error("Invalid accuracy", status_code=400, code="INVALID_ACCURACY")
             except (TypeError, ValueError):
-                return jsonify({"error": "Invalid accuracy"}), 400
+                return api_error("Invalid accuracy", status_code=400, code="INVALID_ACCURACY")
+
         group = db.execute(
             "SELECT id FROM emergency_groups WHERE invite_code=? COLLATE NOCASE",
             (invite,),
         ).fetchone()
         if not group:
-            return jsonify({"error": "Group not found"}), 404
+            return api_error("Group not found", status_code=404, code="NOT_FOUND")
+
+        # Atomic UPSERT per member: re-sharing replaces previous coordinates
+        # and preserves casing updates atomically via ON CONFLICT
         try:
-            # Upsert per person: re-sharing replaces the sender's previous pin
-            # so the live list stays one row per display_name (case-insensitive).
             db.execute(
-                "DELETE FROM live_locations WHERE group_id=? AND display_name=? COLLATE NOCASE",
-                (group["id"], display),
-            )
-            cur = db.execute(
                 """INSERT INTO live_locations
-                   (group_id, display_name, lat, lng, accuracy, expires_at)
-                   VALUES (?, ?, ?, ?, ?, datetime('now', '+2 hours'))""",
-                (group["id"], display, lat, lng, accuracy),
+                   (group_id, display_name, lat, lng, accuracy, expires_at, shared_at)
+                   VALUES (?, ?, ?, ?, ?, datetime('now', '+2 hours'), datetime('now'))
+                   ON CONFLICT(group_id, display_name COLLATE NOCASE) DO UPDATE SET
+                       display_name=excluded.display_name,
+                       lat=excluded.lat,
+                       lng=excluded.lng,
+                       accuracy=excluded.accuracy,
+                       expires_at=excluded.expires_at,
+                       shared_at=datetime('now')""",
+                (group["id"], display, lat_f, lon_f, accuracy),
             )
             db.commit()
         except sqlite3.IntegrityError:
-            return jsonify({"error": "Invalid coordinates"}), 400
+            return api_error("Invalid coordinates", status_code=400, code="INVALID_COORDINATES")
+
         row = db.execute(
-            "SELECT id, expires_at FROM live_locations WHERE id=?",
-            (cur.lastrowid,),
+            "SELECT id, expires_at FROM live_locations WHERE group_id=? AND display_name=? COLLATE NOCASE",
+            (group["id"], display),
         ).fetchone()
-        return jsonify(dict(row)), 201
+        out = dict(row)
+        if idem_key:
+            record_idempotency(db, idem_key, 201, json.dumps(out), succeeded=True)
+        return jsonify(out), 201
     except Exception:
-        return jsonify({"error": "Could not share location", "retry": True}), 503
+        return api_error("Could not share location", status_code=503, code="INTERNAL_ERROR", retry=True)
 
 @bp.route("/api/groups/<code>/locations")
 def api_group_locations(code):
@@ -447,7 +539,7 @@ def api_group_locations(code):
             ((code or "").strip(),),
         ).fetchone()
         if not group:
-            return jsonify({"error": "Group not found"}), 404
+            return api_error("Group not found", status_code=404, code="NOT_FOUND")
         db.execute(
             "DELETE FROM live_locations WHERE expires_at <= datetime('now')"
         )
@@ -470,7 +562,7 @@ def api_group_locations(code):
             out.append(d)
         return jsonify(out)
     except Exception:
-        return jsonify({"error": "Could not load locations", "retry": True}), 503
+        return api_error("Could not load locations", status_code=503, code="INTERNAL_ERROR", retry=True)
 
 
 def _haversine_km(lat1, lon1, lat2, lon2):
@@ -504,18 +596,13 @@ def api_announcements():
         db = get_db()
         city = (request.args.get("city", "") or "").strip()
         lat = request.args.get("lat")
-        lon = request.args.get("lon", request.args.get("lng"))
+        lon = request.args.get("lon") if "lon" in request.args else request.args.get("lng")
         history = (request.args.get("history", "") or "").strip() == "1"
-        try:
-            lat_f = float(lat) if lat not in (None, "") else None
-            lon_f = float(lon) if lon not in (None, "") else None
-            if (lat_f is not None and lon_f is None) or (lat_f is None and lon_f is not None):
-                return jsonify({"error": "Both lat and lon are required"}), 400
-            if lat_f is not None and lon_f is not None:
-                if not (-90 <= lat_f <= 90 and -180 <= lon_f <= 180):
-                    return jsonify({"error": "Invalid coordinates"}), 400
-        except (TypeError, ValueError):
-            return jsonify({"error": "Invalid coordinates"}), 400
+
+        lat_f, lon_f, coord_err = validate_coordinates(lat, lon, required=False)
+        if coord_err:
+            return api_error(coord_err, status_code=400, code="INVALID_COORDINATES")
+
         if history:
             rows = db.execute(
                 """SELECT id, title, message, scope, city, center_lat, center_lng,
@@ -558,9 +645,36 @@ def api_announcements():
                 d["distance_km"] = round(dist, 1)
             # scope 'all' always included
             out.append(d)
-        return jsonify(out)
+
+        limit, offset, page, is_paginated = parse_pagination(request.args)
+        total_count = len(out)
+        paged_out = out[offset : offset + limit] if is_paginated and limit is not None else out
+
+        envelope = (request.args.get("envelope", "").strip().lower() in ("1", "true")) or (
+            request.headers.get("Accept") == "application/vnd.ligtasph.v2+json"
+        )
+        if envelope:
+            total_pages = math.ceil(total_count / limit) if (is_paginated and limit) else 1
+            resp = jsonify({
+                "data": paged_out,
+                "pagination": {
+                    "page": page,
+                    "pageSize": limit or total_count,
+                    "total": total_count,
+                    "totalPages": total_pages,
+                },
+            })
+        else:
+            resp = jsonify(paged_out)
+
+        resp.headers["X-Total-Count"] = str(total_count)
+        if is_paginated and limit is not None:
+            resp.headers["X-Page"] = str(page)
+            resp.headers["X-Per-Page"] = str(limit)
+            resp.headers["X-Total-Pages"] = str(math.ceil(total_count / limit) if limit else 1)
+        return resp
     except Exception:
-        return jsonify({"error": "Could not load announcements", "retry": True}), 503
+        return api_error("Could not load announcements", status_code=503, code="INTERNAL_ERROR", retry=True)
 
 @bp.route("/api/earthquakes")
 def api_earthquakes():
@@ -570,25 +684,24 @@ def api_earthquakes():
         lat = request.args.get("lat")
         lon = request.args.get("lon")
         radius = request.args.get("radius_km", "500")
+
+        lat_f, lon_f, coord_err = validate_coordinates(lat, lon, required=False)
+        if coord_err:
+            return api_error(coord_err, status_code=400, code="INVALID_COORDINATES")
+
         try:
-            lat_f = float(lat) if lat not in (None, "") else None
-            lon_f = float(lon) if lon not in (None, "") else None
             radius_f = float(radius)
-            if (lat_f is None) != (lon_f is None):
-                return jsonify({"error": "Both lat and lon are required"}), 400
-            if lat_f is not None and lon_f is not None:
-                if not (-90 <= lat_f <= 90 and -180 <= lon_f <= 180):
-                    return jsonify({"error": "Invalid coordinates"}), 400
             if not (10 <= radius_f <= 2000):
-                return jsonify({"error": "radius_km must be 10-2000"}), 400
+                return api_error("radius_km must be 10-2000", status_code=400, code="INVALID_RADIUS")
         except (TypeError, ValueError):
-            return jsonify({"error": "Invalid coordinates"}), 400
+            return api_error("Invalid coordinates", status_code=400, code="INVALID_COORDINATES")
+
         data, err = fetch_earthquakes(db, lat_f, lon_f, radius_f)
         if data:
             return jsonify(data)
-        return jsonify({"error": err or "Earthquake data unavailable", "retry": True}), 503
+        return api_error(err or "Earthquake data unavailable", status_code=503, code="SERVICE_UNAVAILABLE", retry=True)
     except Exception:
-        return jsonify({"error": "Earthquake data unavailable", "retry": True}), 503
+        return api_error("Earthquake data unavailable", status_code=503, code="SERVICE_UNAVAILABLE", retry=True)
 
 @bp.route("/api/fires")
 def api_fires():
@@ -598,19 +711,33 @@ def api_fires():
         lat = request.args.get("lat", "14.6308")
         lon = request.args.get("lon", "121.0968")
         days = request.args.get("days", "1")
+
+        lat_f, lon_f, coord_err = validate_coordinates(lat, lon, required=False)
+        if coord_err:
+            return api_error(coord_err, status_code=400, code="INVALID_COORDINATES")
+
         try:
-            lat_f = float(lat); lon_f = float(lon)
-            if not (-90 <= lat_f <= 90 and -180 <= lon_f <= 180):
-                return jsonify({"error": "Invalid coordinates"}), 400
             days_i = int(days)
             if days_i not in (1, 2):
-                return jsonify({"error": "days must be 1 or 2"}), 400
+                return api_error("days must be 1 or 2", status_code=400, code="INVALID_DAYS")
         except (TypeError, ValueError):
-            return jsonify({"error": "Invalid coordinates"}), 400
+            return api_error("Invalid coordinates", status_code=400, code="INVALID_COORDINATES")
+
         data, err = fetch_fires(db, lat_f, lon_f, days_i)
         if data:
             return jsonify(data)
-        status = 503
-        return jsonify({"error": err or "Fire data unavailable", "retry": True}), status
+        return api_error(err or "Fire data unavailable", status_code=503, code="SERVICE_UNAVAILABLE", retry=True)
     except Exception:
-        return jsonify({"error": "Fire data unavailable", "retry": True}), 503
+        return api_error("Fire data unavailable", status_code=503, code="SERVICE_UNAVAILABLE", retry=True)
+
+@bp.route("/api/openapi.yaml")
+def api_openapi_spec():
+    """Stream the OpenAPI 3.1 contract specification."""
+    if not _OPENAPI_SPEC.exists():
+        return api_error("OpenAPI specification missing", status_code=404, code="NOT_FOUND")
+    return Response(
+        _OPENAPI_SPEC.read_text(encoding="utf-8"),
+        mimetype="application/yaml",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+

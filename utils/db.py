@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS live_locations (
 );
 CREATE INDEX IF NOT EXISTS idx_live_group ON live_locations(group_id);
 CREATE INDEX IF NOT EXISTS idx_live_expires ON live_locations(expires_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_live_group_member ON live_locations(group_id, display_name COLLATE NOCASE);
 
 CREATE TABLE IF NOT EXISTS hazards_cache (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -165,6 +166,19 @@ CREATE TABLE IF NOT EXISTS visits (
     endpoint TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_visits_ts ON visits(ts);
+
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT UNIQUE NOT NULL,
+    request_hash TEXT NOT NULL,
+    status_code INTEGER,
+    response_body TEXT,
+    state TEXT NOT NULL DEFAULT 'in_progress' CHECK (state IN ('in_progress', 'succeeded', 'failed')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT NOT NULL DEFAULT (datetime('now', '+24 hours'))
+);
+CREATE INDEX IF NOT EXISTS idx_idempotency_key ON idempotency_keys(key);
+CREATE INDEX IF NOT EXISTS idx_idempotency_expires ON idempotency_keys(expires_at);
 """
 
 def get_db():
@@ -300,5 +314,15 @@ def init_db():
     db = get_db()
     _migrate_weather_cache(db)
     _migrate_centers(db)
+    try:
+        db.execute(
+            """DELETE FROM live_locations
+               WHERE id NOT IN (
+                   SELECT MAX(id) FROM live_locations GROUP BY group_id, LOWER(display_name)
+               )"""
+        )
+        db.commit()
+    except Exception:
+        pass
     db.executescript(SCHEMA)
     db.commit()
