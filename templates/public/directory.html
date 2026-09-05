@@ -102,7 +102,10 @@ function render(){
       ? `Capacity ${c.capacity} • Occupancy ${c.current_occupancy} • <b>${c.available_slots} slots</b> • ${pct}%`
       : `Capacity unreported • <b>${c.occupancy_status}</b>`;
     const bar = known
-      ? `<div style="background:#F9FAFB; border:1px solid var(--border); border-radius:8px; height:10px; overflow:hidden; margin:6px 0;"><div style="width:${Math.min(pct,100)}%; background:${color}; height:100%;"></div></div>`
+      ? `<div style="background:var(--glass); border:1px solid var(--border); border-radius:8px; height:10px; overflow:hidden; margin:6px 0;"><div style="width:${Math.min(pct,100)}%; background:${color}; height:100%;"></div></div>`
+      : ``;
+    const site = (c.site_kind || c.facility_type)
+      ? `<div style="color:var(--text-secondary); font-size:12px;">${[c.facility_type, c.site_kind].filter(Boolean).join(' • ')}</div>`
       : ``;
     card.innerHTML=`
       <div style="display:flex; justify-content:space-between; gap:8px; align-items:start;">
@@ -110,6 +113,7 @@ function render(){
         <span class="badge badge-${c.occupancy_status==='Available'?'available':c.occupancy_status==='Nearly Full'?'nearly':c.occupancy_status==='Full'?'full':'unknown'}">${c.occupancy_status}</span>
       </div>
       <div style="color:var(--text-secondary); font-size:13px;">${c.address}, ${c.city}</div>
+      ${site}
       <div style="font-size:13px; margin:6px 0;">${fig}</div>
       ${bar}
       <div style="display:flex; gap:6px; flex-wrap:wrap; margin:6px 0;">

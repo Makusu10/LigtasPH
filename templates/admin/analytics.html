@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}Analytics — LigtasPH{% endblock %}
+{% block content %}
+{% include 'partials/nav_admin.html' %}
+<h1 style="margin:12px 0 4px;">Analytics</h1>
+<p style="color:var(--text-secondary); margin:0 0 12px; font-size:13px;">Page-view counts only — no IPs, accounts, or tracking. "Users" below means page views; one visitor loading 5 pages counts as 5.</p>
+
+<div class="grid-4">
+  <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; text-transform:uppercase;">Visits · 24h</div><div style="font-size:28px; font-weight:800;">{{ visits_24h }}</div></div>
+  <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; text-transform:uppercase;">Visits · 1h</div><div style="font-size:28px; font-weight:800;">{{ visits_1h }}</div></div>
+  <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; text-transform:uppercase;">Active · 5 min</div><div style="font-size:28px; font-weight:800; color:var(--green);">{{ visits_5m }}</div></div>
+  <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; text-transform:uppercase;">Uptime</div><div style="font-size:28px; font-weight:800;">{{ uptime or '—' }}</div><div style="font-size:12px; color:var(--text-secondary);">since {{ boot or 'unknown' }}</div></div>
+</div>
+
+<div class="grid-4" style="margin-top:12px;">
+  <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; text-transform:uppercase;">Avg response</div><div style="font-size:22px; font-weight:800;">{{ '%.0f'|format(avg_ms) + ' ms' if avg_ms is not none else '—' }}</div><div style="font-size:12px; color:var(--text-secondary);">last 500 requests</div></div>
+  <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; text-transform:uppercase;">p95 response</div><div style="font-size:22px; font-weight:800;">{{ '%.0f'|format(p95_ms) + ' ms' if p95_ms is not none else '—' }}</div><div style="font-size:12px; color:var(--text-secondary);">last 500 requests</div></div>
+  <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; text-transform:uppercase;">Requests · boot</div><div style="font-size:22px; font-weight:800;">{{ req_count }}</div><div style="font-size:12px; color:var(--text-secondary);">{{ err_count }} server errors</div></div>
+  <div class="card stat-card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; text-transform:uppercase;">Database</div><div style="font-size:22px; font-weight:800;">{{ '%.1f MB'|format(db_size/1048576) if db_size is not none else '—' }}</div><div style="font-size:12px; color:var(--text-secondary);">{{ totals.centers_total }} centers · {{ totals.hotlines_live }} hotlines</div></div>
+</div>
+
+<div class="card" style="margin-top:12px;">
+  <h3 style="margin:0 0 8px;">Visits per hour · last 24h</h3>
+  {% if hours and peak %}
+  <div style="display:flex; align-items:end; gap:3px; height:120px;" role="img" aria-label="Hourly visits bar chart, peak {{ peak }}">
+    {% for h in hours %}
+    <div title="{{ h.label }} — {{ h.n }}" style="flex:1; min-width:0; background:var(--primary); opacity:{{ 0.25 + 0.75*(h.n/peak) }}; height:{{ (100*h.n/peak)|round(1) if peak else 0 }}%; min-height:{{ '3px' if h.n else '0' }}; border-radius:3px 3px 0 0;"></div>
+    {% endfor %}
+  </div>
+  <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-secondary); margin-top:4px;"><span>{{ hours[0].label }}</span><span>{{ hours[11].label }}</span><span>{{ hours[23].label }}</span></div>
+  {% else %}<p style="color:var(--text-secondary);">No visits recorded yet.</p>{% endif %}
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:12px;" class="map-layout">
+  <div class="card">
+    <h3 style="margin:0 0 8px;">Top pages · 24h</h3>
+    <table>
+      <thead><tr><th>Page</th><th>Views</th></tr></thead>
+      <tbody>
+        {% for t in top_endpoints %}
+        <tr><td style="font-weight:600;">{{ t['endpoint'] }}</td><td>{{ t['n'] }}</td></tr>
+        {% else %}<tr><td colspan="2" style="color:var(--text-secondary);">No visits yet.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h3 style="margin:0 0 8px;">Content totals</h3>
+    <table>
+      <tbody>
+        <tr><td>Evacuation centers (live / total)</td><td style="font-weight:700;">{{ totals.centers_live }} / {{ totals.centers_total }}</td></tr>
+        <tr><td>Announcements (live / total)</td><td style="font-weight:700;">{{ totals.announcements_active }} / {{ totals.announcements_total }}</td></tr>
+        <tr><td>Hotlines (live)</td><td style="font-weight:700;">{{ totals.hotlines_live }}</td></tr>
+        <tr><td>Admin accounts</td><td style="font-weight:700;">{{ totals.admins }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

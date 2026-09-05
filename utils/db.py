@@ -158,6 +158,13 @@ CREATE TABLE IF NOT EXISTS announcements (
 );
 CREATE INDEX IF NOT EXISTS idx_ann_active_time ON announcements(is_active, starts_at, ends_at);
 CREATE INDEX IF NOT EXISTS idx_ann_scope ON announcements(scope);
+
+CREATE TABLE IF NOT EXISTS visits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts TEXT NOT NULL DEFAULT (datetime('now')),
+    endpoint TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_visits_ts ON visits(ts);
 """
 
 def get_db():

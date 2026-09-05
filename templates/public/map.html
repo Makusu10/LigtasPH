@@ -216,10 +216,15 @@ function centerFig(c){
   return `Capacity ${c.capacity} • Occupancy ${c.current_occupancy} • Available ${c.available_slots} • ${c.occupancy_pct}%`;
 }
 function centerPopupHTML(c, routeBtn){
+  const site=[c.facility_type, c.site_kind].filter(Boolean).join(' • ');
+  const verified=c.location_verified
+    ? '<span class="badge badge-available">Verified location</span>'
+    : (c.site_kind ? '<span class="badge badge-nearly">Unverified location</span>' : '');
   return `<div style="min-width:220px">
     <div style="font-weight:800;">${esc(c.name)}</div>
     <div style="color:var(--text-secondary); font-size:13px;">${esc(c.address)}, ${esc(c.city)}</div>
-    <div style="margin:8px 0; font-size:13px;">${centerFig(c)}<br><span class="badge badge-${badgeClass(c.occupancy_status)}">${esc(c.occupancy_status)}</span></div>
+    ${site?`<div style="color:var(--text-secondary); font-size:12px;">${esc(site)}</div>`:''}
+    <div style="margin:8px 0; font-size:13px;">${centerFig(c)}<br><span class="badge badge-${badgeClass(c.occupancy_status)}">${esc(c.occupancy_status)}</span> ${verified}</div>
     <div style="font-size:12px;">Food ${esc(c.food_status)} • Water ${esc(c.water_status)} • Basic ${esc(c.basic_needs_status)}</div>
     <div style="font-size:12px; color:var(--text-secondary);">Updated ${esc(c.updated_at)}</div>
     <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;"><a href="/centers/${c.id}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">View Details</a>${routeBtn||''}<a href="https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}" target="_blank" rel="noopener" class="btn btn-primary" style="padding:6px 8px; font-size:12px;">Get Directions</a></div>

@@ -271,6 +271,26 @@
     } catch (e) {}
     var bell = document.getElementById('ann-bell');
     var panel = document.getElementById('ann-history');
+    // Mobile: dock the bell into the hamburger menu (same button, moved —
+    // a floating bottom-right bell goes unnoticed). Desktop: fixed right.
+    function placeBell() {
+      var menu = document.getElementById('mobileMenu');
+      var mobile = false;
+      try { mobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches; } catch (e) {}
+      if (mobile && menu) {
+        if (bell.parentNode !== menu) menu.insertBefore(bell, menu.firstChild);
+        bell.classList.add('in-menu');
+      } else {
+        if (bell.parentNode !== document.body) document.body.appendChild(bell);
+        bell.classList.remove('in-menu');
+      }
+    }
+    placeBell();
+    try {
+      var bellMq = window.matchMedia('(max-width: 768px)');
+      if (bellMq.addEventListener) bellMq.addEventListener('change', placeBell);
+      else if (bellMq.addListener) bellMq.addListener(placeBell);
+    } catch (e) {}
     bell.addEventListener('click', function () {
       var open = panel.hidden;
       panel.hidden = !open;

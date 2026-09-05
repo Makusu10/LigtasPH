@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
 from utils.db import get_db
 from utils.security import login_required
 from utils.validators import validate_phone
@@ -355,5 +355,102 @@ def restart_app():
             os._exit(3)  # noqa: SLF001 — last resort so a supervisor restarts us
 
     threading.Thread(target=_do, daemon=True).start()
-    flash("Restarting… the app will be back in a few seconds. Clients refresh cached data automatically.", "info")
+    flash("Restarting. the app will be back in a few seconds. Clients refresh cached data automatically.", "info")
     return redirect(url_for("admin.api_keys"))
+
+
+@bp.route("/admin/analytics")
+@login_required
+def analytics():
+    """Server analytics: traffic, performance, uptime, content totals.
+
+    "Online users" is approximated honestly as page-view counts — the app
+    has no accounts or tracking, so no per-user identity exists to count.
+    """
+    import datetime as _dt
+    from pathlib import Path
+    db = get_db()
+
+    def _count(sql, args=()):
+        try:
+            r = db.execute(sql, args).fetchone()
+            return r[0] if r else 0
+        except Exception:
+            return 0
+
+    visits_24h = _count("SELECT COUNT(*) FROM visits WHERE ts >= datetime('now', '-1 day')")
+    visits_1h = _count("SELECT COUNT(*) FROM visits WHERE ts >= datetime('now', '-1 hour')")
+    visits_5m = _count("SELECT COUNT(*) FROM visits WHERE ts >= datetime('now', '-5 minutes')")
+
+    # Hourly buckets for the last 24h (oldest -> newest) for the bar chart.
+    hours = []
+    try:
+        rows = db.execute(
+            """SELECT strftime('%Y-%m-%d %H:00', ts) AS h, COUNT(*) AS n
+               FROM visits WHERE ts >= datetime('now', '-1 day')
+               GROUP BY h ORDER BY h""").fetchall()
+        by_h = {r["h"]: r["n"] for r in rows}
+        now = _dt.datetime.now(_dt.timezone.utc).replace(minute=0, second=0, microsecond=0)
+        for i in range(23, -1, -1):
+            slot = now - _dt.timedelta(hours=i)
+            key = slot.strftime("%Y-%m-%d %H:00")
+            hours.append({"label": slot.strftime("%H:00"), "n": by_h.get(key, 0)})
+    except Exception:
+        hours = []
+    peak = max([h["n"] for h in hours] + [1])
+
+    top_endpoints = []
+    try:
+        top_endpoints = db.execute(
+            """SELECT endpoint, COUNT(*) AS n FROM visits
+               WHERE ts >= datetime('now', '-1 day')
+               GROUP BY endpoint ORDER BY n DESC LIMIT 10""").fetchall()
+    except Exception:
+        pass
+
+    samples = list(getattr(current_app, "perf_samples", []) or [])
+    if samples:
+        ordered = sorted(samples)
+        avg_ms = sum(samples) / len(samples)
+        p95_ms = ordered[min(len(ordered) - 1, int(len(ordered) * 0.95))]
+    else:
+        avg_ms = p95_ms = None
+
+    boot = current_app.config.get("STARTED_AT", "") or ""
+    uptime = ""
+    try:
+        if boot:
+            started = _dt.datetime.strptime(boot, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=_dt.timezone.utc)
+            delta = _dt.datetime.now(_dt.timezone.utc) - started
+            days, rem = divmod(int(delta.total_seconds()), 86400)
+            hrs, rem = divmod(rem, 3600)
+            mins, _ = divmod(rem, 60)
+            uptime = (f"{days}d " if days else "") + f"{hrs}h {mins}m"
+    except Exception:
+        pass
+
+    db_size = None
+    try:
+        p = Path(current_app.config.get("DATABASE", ""))
+        if p.name != ":memory:" and p.exists():
+            db_size = p.stat().st_size
+    except Exception:
+        pass
+
+    totals = {
+        "centers_live": _count("SELECT COUNT(*) FROM evacuation_centers WHERE archived=0"),
+        "centers_total": _count("SELECT COUNT(*) FROM evacuation_centers"),
+        "announcements_active": _count("SELECT COUNT(*) FROM announcements WHERE is_active=1 AND datetime('now') BETWEEN datetime(starts_at) AND datetime(ends_at)"),
+        "announcements_total": _count("SELECT COUNT(*) FROM announcements"),
+        "hotlines_live": _count("SELECT COUNT(*) FROM emergency_hotlines WHERE archived=0"),
+        "admins": _count("SELECT COUNT(*) FROM administrators"),
+    }
+    return render_template(
+        "admin/analytics.html",
+        visits_24h=visits_24h, visits_1h=visits_1h, visits_5m=visits_5m,
+        hours=hours, peak=peak, top_endpoints=top_endpoints,
+        avg_ms=avg_ms, p95_ms=p95_ms,
+        req_count=getattr(current_app, "req_count", 0),
+        err_count=getattr(current_app, "err_count", 0),
+        boot=boot, uptime=uptime, db_size=db_size, totals=totals,
+    )

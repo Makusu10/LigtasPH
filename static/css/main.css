@@ -334,7 +334,18 @@ input[type="checkbox"], input[type="radio"] { width:18px; height:18px; flex:0 0 
 #ann-undo{ position:fixed; left:50%; transform:translateX(-50%); bottom:16px; z-index:700;
   display:flex; gap:10px; align-items:center; padding:10px 14px; font-size:13px; }
 #ann-undo[hidden]{ display:none; }
-@media (max-width:768px){ #ann-bell{ top:auto; bottom:16px; } #ann-history{ top:auto; bottom:68px; } #ann-undo{ bottom:68px; } }
+@media (max-width:768px){
+  /* Bell docks into the hamburger menu (moved there by JS) instead of
+     floating bottom-right where it goes unnoticed. */
+  #ann-bell{ display:none; }
+  #ann-bell.in-menu{ display:flex; position:static; width:100%; height:auto; border-radius:12px;
+    border:none; box-shadow:none; background:transparent; justify-content:flex-start;
+    padding:10px 14px; font-weight:500; color:var(--text); }
+  #ann-bell.in-menu #ann-bell-label{ display:inline !important; font-size:14px; }
+  #ann-bell.in-menu #ann-bell-count{ position:static; margin-left:auto; }
+  #ann-history{ top:128px; bottom:auto; }
+  #ann-undo{ bottom:16px; }
+}
 /* Weather page: backend severity tints are light pastels — in dark mode the
    card wash is dropped (severity cue survives via border + badge). */
 [data-theme="dark"] .env-card.env-tinted { background: var(--glass) !important; }

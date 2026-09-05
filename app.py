@@ -1,8 +1,10 @@
 import os
+import time
 import datetime as _dt
+from collections import deque
 from pathlib import Path
 import click
-from flask import Flask, render_template
+from flask import Flask, render_template, g, request
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -114,6 +116,37 @@ def create_app(env=None):
         csrf.exempt(api_bp)
     except Exception as e:
         app.logger.warning("CSRF exempt failed: %s", e)
+
+    # Lightweight analytics: per-request timing (in-memory rolling sample)
+    # plus a persistent visits log (endpoint only — no IPs, no user agents).
+    # Static assets are excluded so CSS/JS fetches don't inflate counts.
+    if not hasattr(app, "perf_samples"):
+        app.perf_samples = deque(maxlen=500)
+        app.req_count = 0
+        app.err_count = 0
+
+    @app.before_request
+    def _perf_start():
+        g._t0 = time.perf_counter()
+
+    @app.after_request
+    def track_visit(resp):
+        try:
+            t0 = g.pop("_t0", None)
+            if t0 is not None:
+                app.perf_samples.append((time.perf_counter() - t0) * 1000)
+            app.req_count += 1
+            if resp.status_code >= 500:
+                app.err_count += 1
+            ep = request.endpoint or ""
+            if ep and ep != "static":
+                db = get_db()
+                db.execute("INSERT INTO visits (endpoint) VALUES (?)", (ep,))
+                db.execute("DELETE FROM visits WHERE ts < datetime('now', '-30 days')")
+                db.commit()
+        except Exception:
+            app.logger.debug("visit tracking skipped", exc_info=True)
+        return resp
 
     # Kill stale-page syndrome: phone browsers aggressively heuristic-cache
     # HTML/JSON (no validators sent), hiding new tabs like Group/Routes.

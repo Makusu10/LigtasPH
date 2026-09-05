@@ -47,7 +47,11 @@ def center_detail(center_id):
         pct = round(c["current_occupancy"]/c["capacity"]*100,1) if c["capacity"] else 0
         avail = c["capacity"] - c["current_occupancy"]
         status = "Full" if pct>=100 else "Nearly Full" if pct>=80 else "Available" if c["operational_status"]=="Open" else "Status Unavailable"
-    return render_template("public/center_detail.html", c=c, pct=pct, avail=avail, status=status, mapbox_token=current_app.config.get("MAPBOX_TOKEN", ""))
+    from routes.api import site_info
+    site_kind, facility_type = site_info(c)
+    try: location_verified = bool(c["verified"])
+    except (KeyError, IndexError, TypeError): location_verified = False
+    return render_template("public/center_detail.html", c=c, pct=pct, avail=avail, status=status, site_kind=site_kind, facility_type=facility_type, location_verified=location_verified, mapbox_token=current_app.config.get("MAPBOX_TOKEN", ""))
 
 @bp.route("/weather")
 def weather_page():

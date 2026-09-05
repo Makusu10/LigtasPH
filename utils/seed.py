@@ -81,6 +81,20 @@ def seed_db():
         ("Coast Guard Hotline (Globe)","Rescue","0917-724-3682","National","","Public directory 2026-09-04, unverified","2026-09-04"),
         ("Makati C3 Command Center","DRRMO","(02) 870-1940","Makati","","Public directory 2026-09-04, unverified","2026-09-04"),
         ("Mandaluyong Emergency Hotline","DRRMO","(02) 588-2200","Mandaluyong","","Public directory 2026-09-04, unverified","2026-09-04"),
+        # NCR LGU DRRMO lines (one primary per LGU; media/LGU-reported, unverified).
+        ("Manila DRRMO","DRRMO","8927-1335","Manila","","Reported by PhilSTAR/GMA 2024, unverified","2024-09-03"),
+        ("Taguig Command Center","DRRMO","(02) 8789-3200","Taguig","","taguig.gov.ph official, unverified","2026-09-05"),
+        ("Taguig Rescue","DRRMO","0919-070-3112","Taguig","","taguig.gov.ph official, unverified","2026-09-05"),
+        ("Pasay Emergency Hotline","DRRMO","8551-7777","Pasay","","Reported by PhilSTAR/GMA 2024, unverified","2024-09-03"),
+        ("Parañaque DRRMO","DRRMO","8829-0922","Parañaque","","Reported by PhilSTAR/GMA 2024, unverified","2024-09-03"),
+        ("Las Piñas DRRMO","DRRMO","(02) 8552-7694","Las Piñas","","LGU directory via LPGMA, unverified","2024-09-03"),
+        ("Muntinlupa Emergency Hotline","DRRMO","137-175","Muntinlupa","","Reported by PhilSTAR 2024, unverified","2024-09-03"),
+        ("Valenzuela DRRMO (911 Center)","DRRMO","(02) 8352-5000","Valenzuela","","e911.gov.ph official listing, unverified","2026-09-05"),
+        ("Caloocan DRRMO (Dial 888)","DRRMO","888","Caloocan","","Caloocan DRRMO 2026-08, unverified","2026-08-03"),
+        ("Malabon DRRMO","DRRMO","8921-6009","Malabon","","Reported by PhilSTAR 2024, unverified","2024-09-03"),
+        ("Navotas DRRMO","DRRMO","8281-1111","Navotas","","Reported by PhilSTAR 2024, unverified","2024-09-03"),
+        ("San Juan Emergency Hotline","DRRMO","8238-4333","San Juan","","Reported by GMA 2024, unverified","2024-07-24"),
+        ("Pateros DRRMO","DRRMO","8642-5159","Pateros","","Reported by PhilSTAR/GMA 2024, unverified","2024-09-03"),
     ]
     # Data fix: early seeds stored the Red Cross trunkline on the PAGASA row.
     # Correct it in existing DBs (fresh DBs get the right number directly).

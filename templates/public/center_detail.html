@@ -8,20 +8,26 @@
       <h1 style="margin:0;">{{ c['name'] }}</h1>
       <div style="color:var(--text-secondary);">{{ c['address'] }}, {{ c['barangay'] }}, {{ c['city'] }}, {{ c['province'] }}</div>
       <div style="color:var(--text-secondary); font-size:13px;">Lat {{ c['lat'] }}, Lng {{ c['lng'] }} • {{ c['operational_status'] }}</div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+        {% if site_kind %}<span class="badge badge-unknown">{{ site_kind }}</span>{% endif %}
+        {% if facility_type %}<span class="badge badge-unknown">{{ facility_type }}</span>{% endif %}
+        {% if location_verified %}<span class="badge badge-available">Verified location</span>
+        {% elif site_kind %}<span class="badge badge-nearly">Unverified location</span>{% endif %}
+      </div>
       <div id="liveStamp" role="status" style="color:var(--text-secondary); font-size:12px; margin-top:4px;">Live updates on • checking every 15s…</div>
     </div>
     <span id="occBadge" class="badge badge-{{ 'available' if status=='Available' else 'nearly' if status=='Nearly Full' else 'full' if status=='Full' else 'unknown' }}">{{ status }}</span>
   </div>
   <div class="grid-4">
-    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Capacity</div><div id="statCapacity" style="font-size:22px; font-weight:800;">{{ c['capacity'] if c['capacity'] is not none else 'Unreported' }}</div></div>
-    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Occupancy</div><div id="statOcc" style="font-size:22px; font-weight:800;">{{ c['current_occupancy'] if c['current_occupancy'] is not none else 'Unreported' }}</div></div>
-    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Available Slots</div><div id="statAvail" style="font-size:22px; font-weight:800; color:var(--green);">{{ avail if avail is not none else 'Unreported' }}</div></div>
-    <div class="card" style="background:#F9FAFB;"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Occupancy %</div><div id="statPct" style="font-size:22px; font-weight:800;">{{ pct ~ '%' if pct is not none else 'Unreported' }}</div></div>
+    <div class="card"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Capacity</div><div id="statCapacity" style="font-size:22px; font-weight:800;">{{ c['capacity'] if c['capacity'] is not none else 'Unreported' }}</div></div>
+    <div class="card"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Occupancy</div><div id="statOcc" style="font-size:22px; font-weight:800;">{{ c['current_occupancy'] if c['current_occupancy'] is not none else 'Unreported' }}</div></div>
+    <div class="card"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Available Slots</div><div id="statAvail" style="font-size:22px; font-weight:800; color:var(--green);">{{ avail if avail is not none else 'Unreported' }}</div></div>
+    <div class="card"><div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">Occupancy %</div><div id="statPct" style="font-size:22px; font-weight:800;">{{ pct ~ '%' if pct is not none else 'Unreported' }}</div></div>
   </div>
   {% if pct is not none %}
-  <div style="background:#F9FAFB; border:1px solid var(--border); border-radius:8px; height:14px; overflow:hidden;"><div id="occBar" style="width:{{ pct if pct<=100 else 100 }}%; background: {{ '#D92D20' if pct>=100 else '#F79009' if pct>=80 else '#039855' }}; height:100%;"></div></div>
+  <div style="background:var(--glass); border:1px solid var(--border); border-radius:8px; height:14px; overflow:hidden;"><div id="occBar" style="width:{{ pct if pct<=100 else 100 }}%; background: {{ '#D92D20' if pct>=100 else '#F79009' if pct>=80 else '#039855' }}; height:100%;"></div></div>
   {% else %}
-  <div style="background:#F9FAFB; border:1px solid var(--border); border-radius:8px; padding:8px 12px; color:var(--text-secondary); font-size:13px;">Occupancy not yet reported for this center — an admin needs to set its capacity.</div>
+  <div style="border:1px solid var(--border); border-radius:8px; padding:8px 12px; color:var(--text-secondary); font-size:13px;">Live headcount not reported{% if site_kind == 'Temporary site — activated during disasters' %} — temporary sites like this one open their doors during disasters; call the LGU/DRRMO hotline to confirm{% endif %} — an admin needs to set its capacity.</div>
   {% endif %}
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
     <span id="supFood" class="badge badge-unknown">Food {{ c['food_status'] }}</span>
@@ -34,7 +40,7 @@
     {% if c['contact_number'] %}<a href="tel:{{ c['contact_number'] }}" class="btn btn-secondary">Call {{ c['contact_number'] }}</a>{% endif %}
     <a href="https://www.google.com/maps/dir/?api=1&destination={{ c['lat'] }},{{ c['lng'] }}" target="_blank" rel="noopener" class="btn btn-primary">Get Directions</a>
   </div>
-  {% if c['notes'] %}<div id="centerNotes" style="background:#FFFAEB; border:1px solid #FEDF89; padding:10px 12px; border-radius:8px; color:#7A4D07;">Notes: {{ c['notes'] }}</div>{% endif %}
+  {% if c['notes'] %}<div id="centerNotes" class="flash flash-warning" style="margin-bottom:0;">Notes: {{ c['notes'] }}</div>{% endif %}
   <div id="updatedLine" style="color:var(--text-secondary); font-size:12px;">Last updated: {{ c['updated_at'] }} • Created: {{ c['created_at'] }}</div>
   <div id="detailMap" style="height:280px; border:1px solid var(--border); border-radius:8px;"></div>
 </div>

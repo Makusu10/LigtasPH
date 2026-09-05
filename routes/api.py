@@ -4,9 +4,33 @@ from utils.db import get_db
 bp = Blueprint("api", __name__)
 
 import math
+import re
 import secrets
 import sqlite3
 import string
+
+_SITE_RE = re.compile(r"([A-Z][A-Z /&.\-]+?)\s*[•·|]\s*(TEMPORARY|PERMANENT)\b")
+
+def site_info(row):
+    """Return (site_kind, facility_type) parsed from import notes.
+
+    Sprint 2 import notes embed "<TYPE> • TEMPORARY|PERMANENT • ...".
+    That flag describes the SITE's nature — a standing evacuation center
+    vs. a school/court activated during disasters — NOT live open/closed,
+    so it is surfaced with honest wording, never as occupancy.
+    Returns (None, None) for hand-entered rows without import notes.
+    """
+    try:
+        notes = row["notes"] or ""
+    except (KeyError, IndexError, TypeError):
+        return None, None
+    m = _SITE_RE.search(notes or "")
+    if not m:
+        return None, None
+    ftype, perm = m.group(1).strip(), m.group(2)
+    kind = ("Permanent evacuation center" if perm == "PERMANENT"
+            else "Temporary site — activated during disasters")
+    return kind, ftype.title() if ftype else None
 
 _INVITE_ALPHABET = string.ascii_uppercase + string.digits
 
@@ -77,6 +101,10 @@ def api_centers():
         d=dict(c)
         pct, avail, occ_status = _occupancy_status(c)
         d["occupancy_pct"]=pct; d["available_slots"]=avail; d["occupancy_status"]=occ_status
+        kind, ftype = site_info(c)
+        d["site_kind"]=kind; d["facility_type"]=ftype
+        try: d["location_verified"]=bool(c["verified"])
+        except (KeyError, IndexError, TypeError): d["location_verified"]=False
         if supply and supply not in (c["food_status"], c["water_status"], c["medicine_status"], c["hygiene_status"], c["basic_needs_status"]):
             continue
         if status and occ_status!=status:
@@ -115,6 +143,10 @@ def api_center_detail(cid):
     pct, avail, occ_status = _occupancy_status(c)
     d["occupancy_pct"]=pct; d["available_slots"]=avail
     d["occupancy_status"]=occ_status
+    kind, ftype = site_info(c)
+    d["site_kind"]=kind; d["facility_type"]=ftype
+    try: d["location_verified"]=bool(c["verified"])
+    except (KeyError, IndexError, TypeError): d["location_verified"]=False
     return jsonify(d)
 
 @bp.route("/api/hotlines")
