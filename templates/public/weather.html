@@ -130,11 +130,15 @@ document.getElementById('lguSelect').addEventListener('change', e=>{
   fetchWeather(lat, lon, name);
 });
 
-async function fetchWeather(lat, lon, city){
-  card.style.display='none'; errEl.style.display='none'; hourlyWrap.style.display='none';
-  envSection.style.display='none'; envSkeleton.style.display='block';
-  skeleton.style.display='block';
-  statusEl.textContent='Fetching weather…';
+var lastView={lat:14.6308, lon:121.0968, city:null};
+async function fetchWeather(lat, lon, city, silent){
+  lastView={lat:lat, lon:lon, city:city};
+  if(!silent){
+    card.style.display='none'; errEl.style.display='none'; hourlyWrap.style.display='none';
+    envSection.style.display='none'; envSkeleton.style.display='block';
+    skeleton.style.display='block';
+    statusEl.textContent='Fetching weather…';
+  }
   let url='/api/environment?';
   // Send real coordinates when we have them (LGU preset, GPS). For typed
   // text with no coordinates, send the city alone so the backend geocodes
@@ -167,6 +171,7 @@ async function fetchWeather(lat, lon, city){
   }catch(e){
     skeleton.style.display='none';
     envSkeleton.style.display='none';
+    if(silent) return; // background tick: keep last good data, stay quiet
     statusEl.textContent='';
     errEl.style.display='block';
     // A 404 means the place itself was unresolvable (geocode miss) — say
@@ -408,5 +413,20 @@ function renderEnvironment(weatherData, aqData, overall, lat, lon){
 
 // auto fetch default
 fetchWeather(14.6308,121.0968,null);
+// Revalidate the current view on the shared SYNC_MS cadence (silent:
+// no skeleton flash, failures keep last good data).
+(function(){
+  var ms=5*60*1000;
+  try{ if(window.LigtasPrefs && window.LigtasPrefs.SYNC_MS) ms=window.LigtasPrefs.SYNC_MS; }catch(e){}
+  function tick(){
+    if(document.hidden) return;
+    if(typeof navigator!=='undefined' && 'onLine' in navigator && !navigator.onLine) return;
+    try{ fetchWeather(lastView.lat, lastView.lon, lastView.city, true); }catch(e){}
+  }
+  try{
+    if(window.LigtasPrefs && window.LigtasPrefs.everyVisible) window.LigtasPrefs.everyVisible(ms, tick);
+    else setInterval(tick, ms);
+  }catch(e){}
+})();
 </script>
 {% endblock %}

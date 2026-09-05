@@ -19,6 +19,15 @@ document.addEventListener('DOMContentLoaded', async()=>{
   document.getElementById('city').addEventListener('change', load);
   document.getElementById('city').addEventListener('change', (e)=>{ try{ localStorage.setItem('ligtasph_ann_city_v1', e.target.value || ''); }catch(_){} });
   document.getElementById('cat').addEventListener('change', load);
+  // Revalidate on the shared SYNC_MS cadence (skips while typing: load()
+  // reads the live filter inputs, so a tick never clobbers user input).
+  try{
+    let ms=5*60*1000;
+    if(window.LigtasPrefs && window.LigtasPrefs.SYNC_MS) ms=window.LigtasPrefs.SYNC_MS;
+    const tick=()=>{ load().catch(()=>{}); };
+    if(window.LigtasPrefs && window.LigtasPrefs.everyVisible) window.LigtasPrefs.everyVisible(ms, tick);
+    else setInterval(()=>{ if(!document.hidden) tick(); }, ms);
+  }catch(e){}
 });
 async function load(){
   const q=document.getElementById('q').value.trim();

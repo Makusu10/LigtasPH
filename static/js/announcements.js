@@ -182,7 +182,43 @@
     queue = (Array.isArray(list) ? list : []).filter(function (a) {
       return a && a.id != null && !isAcked(a.id) && inWindow(a);
     });
+    noteSeen(queue);
     showNext();
+  }
+
+  // IDs already shown this session — used to spot genuinely new banners
+  // arriving between syncs (vs. ones the user already saw/dismissed).
+  var seenIds = {};
+  function noteSeen(list) {
+    (list || []).forEach(function (a) { if (a && a.id != null) seenIds[a.id] = 1; });
+  }
+
+  // Background sync: revalidate the feed every SYNC_MS while visible.
+  // A brand-new critical banner interrupts with a modal (emergency use);
+  // new non-critical ones wait silently in queue for the next navigation.
+  function syncTick() {
+    if (!popupsEnabled()) return;
+    if (document.getElementById('ann-modal-overlay')) return; // don't stack
+    fetchLive().then(function (data) {
+      var fresh = (Array.isArray(data) ? data : []).filter(function (a) {
+        return a && a.id != null && !isAcked(a.id) && inWindow(a);
+      });
+      var crit = null, i, a;
+      for (i = 0; i < fresh.length; i++) {
+        a = fresh[i];
+        if (!seenIds[a.id] && a.severity === 'critical' && !crit) crit = a;
+      }
+      noteSeen(fresh);
+      queue = fresh;
+      if (crit) showModal(crit);
+    }, function () {});
+  }
+
+  function syncMs() {
+    try {
+      if (window.LigtasPrefs && window.LigtasPrefs.SYNC_MS) return window.LigtasPrefs.SYNC_MS;
+    } catch (e) {}
+    return 5 * 60 * 1000;
   }
 
   // Master kill-switch from Settings (LigtasPrefs may load after us —
@@ -202,5 +238,15 @@
     if (!popupsEnabled()) return;
     refreshPos();
     fetchLive().then(run, function () { run(loadCache()); });
+    // Keep the feed in sync while the tab stays open (SYNC_MS cadence).
+    try {
+      if (window.LigtasPrefs && window.LigtasPrefs.everyVisible) {
+        window.LigtasPrefs.everyVisible(syncMs(), syncTick);
+      } else {
+        setInterval(function () {
+          if (!document.hidden) { try { syncTick(); } catch (e) {} }
+        }, syncMs());
+      }
+    } catch (e) {}
   });
 })();

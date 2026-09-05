@@ -106,6 +106,17 @@
     setAnnouncementsEnabled: setAnnouncementsEnabled,
     resetAcknowledged: resetAcknowledged,
     clearServerCaches: clearServerCaches,
-    checkBuildId: checkBuildId
+    checkBuildId: checkBuildId,
+    // Client↔server sync cadence: feeds revalidate this often while the
+    // tab is visible (directory/map use a faster 15s version poll).
+    SYNC_MS: 5 * 60 * 1000,
+    // Run fn every ms, but only while the tab is visible and online.
+    everyVisible: function (ms, fn) {
+      setInterval(function () {
+        if (document.hidden) return;
+        if (typeof navigator !== 'undefined' && 'onLine' in navigator && !navigator.onLine) return;
+        try { fn(); } catch (e) {}
+      }, ms);
+    }
   };
 })(window);

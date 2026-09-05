@@ -243,6 +243,32 @@
   document.addEventListener('DOMContentLoaded', function () {
     if (!document.getElementById('home-ann-banner')) return; // home only
     loadLive().then(function (list) { renderBanner(list); refreshBadge(); });
+    // Same SYNC_MS cadence as the modal feed: the banner + bell badge
+    // follow newly published banners without needing a refresh.
+    function syncMs() {
+      try {
+        if (window.LigtasPrefs && window.LigtasPrefs.SYNC_MS) return window.LigtasPrefs.SYNC_MS;
+      } catch (e) {}
+      return 5 * 60 * 1000;
+    }
+    function syncTick() {
+      // Don't yank the text while the user is reading it expanded.
+      var exp = document.getElementById('home-ann-expand');
+      var reading = !!(exp && !exp.hidden && exp.textContent !== 'Show more');
+      loadLive().then(function (list) {
+        if (!reading) renderBanner(list);
+        refreshBadge();
+      });
+    }
+    try {
+      if (window.LigtasPrefs && window.LigtasPrefs.everyVisible) {
+        window.LigtasPrefs.everyVisible(syncMs(), syncTick);
+      } else {
+        setInterval(function () {
+          if (!document.hidden) { try { syncTick(); } catch (e) {} }
+        }, syncMs());
+      }
+    } catch (e) {}
     var bell = document.getElementById('ann-bell');
     var panel = document.getElementById('ann-history');
     bell.addEventListener('click', function () {

@@ -44,6 +44,7 @@
 - Emergency **group location sharing**: create group → invite code → post expiring pins → poll.
 - `import-geojson` CLI for bulk center loads; `init-db`/`seed` idempotent (re-runnable; seed backfills without dupes).
 - Startup self-heals stale DB schemas; no-cache headers on dynamic HTML/JSON (kills stale-page syndrome on phones).
+- Client sync: announcements feed + home banner/bell revalidate every 5 min while visible (`LigtasPrefs.SYNC_MS`); brand-new critical banners interrupt with a modal, others wait silently. Weather re-fetches the current view silently on the same cadence; hotlines reload too. Centers/map use a faster 15s version poll.
 
 ### Cross-cutting
 - **Dark mode**: var-driven `[data-theme="dark"]` over the whole UI; contrast passes done for nav, map popups, weather cards, badges, flashes, announcement modal.

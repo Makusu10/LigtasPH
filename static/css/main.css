@@ -120,10 +120,12 @@ th, td { padding:12px 14px; border-bottom:1px solid var(--border); text-align:le
 th { background: rgba(255,255,255,0.5); color:var(--text-secondary); font-size:11px; text-transform:uppercase; letter-spacing:0.06em; font-weight:600; }
 tr:last-child td { border-bottom:none; }
 
-/* Forms — Material filled */
+/* Forms — Material filled (checkboxes/radios keep native sizing) */
 label { font-size:11px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-secondary); }
-input, select, textarea { width:100%; padding:11px 14px; border:1px solid var(--border-strong); border-radius:12px; font-size:14px; background: rgba(255,255,255,0.7); backdrop-filter: blur(8px); transition: all 0.2s ease; }
-input:focus, select:focus, textarea:focus { border-color:var(--primary); background: white; box-shadow:0 0 0 3px rgba(59,110,245,0.12); outline:none; }
+input:not([type="checkbox"]):not([type="radio"]), select, textarea { width:100%; padding:11px 14px; border:1px solid var(--border-strong); border-radius:12px; font-size:14px; background: rgba(255,255,255,0.7); backdrop-filter: blur(8px); transition: all 0.2s ease; }
+input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:focus { border-color:var(--primary); background: white; box-shadow:0 0 0 3px rgba(59,110,245,0.12); outline:none; }
+input[type="checkbox"], input[type="radio"] { width:18px; height:18px; flex:0 0 auto; margin:0; accent-color:var(--primary); cursor:pointer; }
+#hzBadge { white-space:nowrap; }
 
 .flash { padding:12px 14px; border-radius:12px; margin-bottom:12px; font-size:14px; backdrop-filter: blur(12px); border:1px solid transparent; }
 .flash-danger { background: rgba(254,243,242,0.85); color:#7A271A; border-color: rgba(254,205,202,0.7); }
