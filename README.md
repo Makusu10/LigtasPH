@@ -280,10 +280,10 @@ The development application opens at `http://127.0.0.1:5000`.
 
 - Username: `admin`
 - Password: `admin123`
-- Login: hidden staff URL — tap the version line in Settings 5×, or ask the team (deliberately unpublished).
+- Login: `/admin/login` (listed explicitly — see GH issue #3). The version line in Settings also reveals a staff sign-in button after 5 taps; that is clutter-reduction, **not** a security control, and the old obscure path remains as an identical alias.
 
 > [!CAUTION]
-> Change the default username, password, and `SECRET_KEY` before production deployment. Login requests are limited to 10 per minute, and five consecutive failures lock the account for 15 minutes.
+> Change the default username, password, and `SECRET_KEY` before production deployment. Login requests are limited to 10 per minute; five consecutive failures return `429` for 15 minutes. Bad credentials always return the same generic `401` message whether or not the username exists.
 
 ## CLI commands
 
@@ -316,6 +316,19 @@ All API routes use the `/api` prefix.
 - `POST /api/locations`: submit one member's temporary location.
 - `GET /api/groups/<code>/locations`: retrieve unexpired group locations.
 - `GET /api/hotlines`: search hotlines by city, category, or text.
+
+### Offline cache scope and purge (operators)
+
+The map page registers `/sw.js`, which precaches the app shell, the
+stripped `/api/evac-centers.geojson` export (only when it carries
+`X-Dataset-Sha256` provenance headers), NOAH layers, and Mapbox tiles.
+Cache version is stamped with the server build id on every
+deploy/restart, so old caches purge automatically — there is no manual
+purge step. If users report stale shelter data: (1) confirm the deploy
+restarted (new `build_id` on `/api/status`), (2) have them reload `/map`
+online once, (3) check `X-Dataset-Sha256` on `/api/centers` matches the
+imported file. Offline map views show a dated staleness banner; cached
+data must be verified with the DRRMO before moving.
 
 ## Database
 

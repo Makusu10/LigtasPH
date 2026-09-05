@@ -1,4 +1,6 @@
+import hashlib
 import os
+import threading
 import time
 import datetime as _dt
 from collections import deque
@@ -16,6 +18,25 @@ STARTED_AT = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 from config import config_by_name
 from utils.db import get_db, close_db, init_db
 from utils.seed import seed_db
+
+def geojson_import_action(db, path):
+    """Decide the boot-time dataset action (GH #7, unit-testable).
+
+    Returns (current_sha, recorded_sha, action) where action is one of:
+      "skip"    — recorded hash matches the file; nothing to do.
+      "import"  — no recorded hash (fresh DB or pre-#7 DB); import + record.
+      "refresh" — recorded hash differs; refresh-only re-import + flag.
+    """
+    from scripts.import_evac_centers import DEFAULT_PATH as _default
+    from utils.db import get_meta
+    target = path or _default
+    current_sha = hashlib.sha256(target.read_bytes()).hexdigest()
+    recorded_sha = get_meta(db, "geojson.sha256")
+    if recorded_sha and recorded_sha == current_sha:
+        return current_sha, recorded_sha, "skip"
+    if recorded_sha:
+        return current_sha, recorded_sha, "refresh"
+    return current_sha, recorded_sha, "import"
 
 def create_app(env=None):
     if env is None:
@@ -85,16 +106,54 @@ def create_app(env=None):
                 # Bulk dataset: data/ncr_evacuation_centers.geojson ships with
                 # the repo but the import is a manual CLI step — ephemeral
                 # hosts (Render free tier) would otherwise serve only the 20
-                # demo rows forever. Auto-import once: the importer is
-                # idempotent, so this is a no-op when rows already exist.
+                # demo rows forever. GH #7 trust model: the file is pinned by
+                # sha256 in app_meta. Same hash -> no-op. Changed hash ->
+                # refresh-only re-import (admin numbers never clobbered) plus
+                # a WARNING naming old/new hashes — flagged, never silent.
+                # Runs in a daemon thread so cold-boot serving never waits on
+                # the 868-feature parse (own app context -> own SQLite conn).
                 try:
-                    from scripts.import_evac_centers import import_geojson, DEFAULT_PATH
-                    have = get_db().execute(
-                        "SELECT COUNT(*) AS n FROM evacuation_centers "
-                        "WHERE source LIKE 'geojson:%'").fetchone()
-                    if (have["n"] if have else 0) == 0 and DEFAULT_PATH.exists():
-                        stats = import_geojson(get_db(), str(DEFAULT_PATH))
-                        app.logger.info("GeoJSON auto-import: %s", stats)
+                    from scripts.import_evac_centers import DEFAULT_PATH
+                    from utils.db import get_meta, set_meta
+                    if DEFAULT_PATH.exists():
+                        current_sha, recorded_sha, action = geojson_import_action(
+                            get_db(), DEFAULT_PATH)
+                        if action == "skip":
+                            app.logger.info(
+                                "GeoJSON dataset unchanged (sha256 %.12s…), skipping import.",
+                                current_sha)
+                        else:
+                            if action == "refresh":
+                                app.logger.warning(
+                                    "GeoJSON dataset CHANGED (%.12s… -> %.12s…): "
+                                    "re-importing with refresh-only semantics. "
+                                    "Review the data-file diff before trusting new rows.",
+                                    recorded_sha, current_sha)
+                            def _bg_import(app_ref, prev_sha):
+                                try:
+                                    with app_ref.app_context():
+                                        from scripts.import_evac_centers import import_geojson
+                                        db = get_db()
+                                        stats = import_geojson(db, str(DEFAULT_PATH))
+                                        set_meta(db, "geojson.sha256",
+                                                 stats["dataset_sha256"])
+                                        set_meta(db, "geojson.imported_at",
+                                                 STARTED_AT)
+                                        set_meta(db, "geojson.build_id", STARTED_AT)
+                                        set_meta(db, "geojson.prev_sha256",
+                                                 prev_sha or "")
+                                        db.commit()
+                                        app_ref.logger.info(
+                                            "GeoJSON auto-import: %s", stats)
+                                except Exception as ie:
+                                    app_ref.logger.warning(
+                                        "GeoJSON auto-import failed: %s", ie)
+                            threading.Thread(
+                                target=_bg_import,
+                                args=(app, recorded_sha),
+                                daemon=True,
+                                name="geojson-auto-import",
+                            ).start()
                 except Exception as ie:
                     app.logger.warning("GeoJSON auto-import skipped: %s", ie)
         except Exception as e:
@@ -122,7 +181,13 @@ def create_app(env=None):
         from scripts.import_evac_centers import import_geojson, DEFAULT_PATH
         src = path or str(DEFAULT_PATH)
         with app.app_context():
-            stats = import_geojson(get_db(), src)
+            from utils.db import set_meta
+            db = get_db()
+            stats = import_geojson(db, src)
+            set_meta(db, "geojson.sha256", stats["dataset_sha256"])
+            set_meta(db, "geojson.imported_at", STARTED_AT)
+            set_meta(db, "geojson.build_id", STARTED_AT)
+            db.commit()
             print(_json.dumps(stats, indent=2))
 
     # Blueprints — organized routes/

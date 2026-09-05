@@ -39,12 +39,14 @@ def test_standardized_error_envelope_400(client):
 
 
 def test_centers_backward_compatible_and_pagination(client):
-    # Backward-compatible default: bare array with all centers
+    # Bounded default (GH #7): bare array, max 50 rows, with pagination
+    # metadata headers. Explicit limit fetches more.
     r_default = client.get("/api/centers")
     assert r_default.status_code == 200
     data = r_default.get_json()
     assert isinstance(data, list)
     assert len(data) >= 20
+    assert len(data) <= 50
     assert "X-Total-Count" in r_default.headers
     total = int(r_default.headers["X-Total-Count"])
     assert total >= 20

@@ -74,7 +74,7 @@
     var sel = el('setCity');
     var cur = '';
     try { cur = localStorage.getItem('ligtasph_ann_city_v1') || ''; } catch (e) {}
-    fetch('/api/centers?sort=name', { headers: { Accept: 'application/json' } }).then(function (r) {
+    fetch('/api/centers?sort=name&limit=1000', { headers: { Accept: 'application/json' } }).then(function (r) {
       return r.ok ? r.json() : [];
     }).then(function (centers) {
       var cities = [];

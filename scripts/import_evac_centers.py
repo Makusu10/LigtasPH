@@ -26,6 +26,7 @@ Mapping decisions (see Sprint 2 report):
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
@@ -142,10 +143,12 @@ def _provenance_note(props) -> str:
 def import_geojson(db, path) -> dict:
     """Load features into evacuation_centers / staging_centers. Returns stats."""
     path = Path(path)
-    data = json.loads(path.read_text(encoding="utf-8"))
+    raw_bytes = path.read_bytes()
+    data = json.loads(raw_bytes.decode("utf-8"))
     features = data.get("features") or []
     stats = {"features": len(features), "imported": 0, "updated": 0,
-             "quarantined": 0, "skipped": 0, "needs_review": 0, "verified": 0}
+             "quarantined": 0, "skipped": 0, "needs_review": 0, "verified": 0,
+             "dataset_sha256": hashlib.sha256(raw_bytes).hexdigest()}
     db.execute("DELETE FROM staging_centers")
 
     # Pass 1: validate. Bad rows are quarantined; valid rows are collected

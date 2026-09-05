@@ -9,7 +9,7 @@
  *    font glyphs use them; caching those can serve corrupted glyphs).
  *  - Everything else: network-first with cache fallback.
  */
-const VERSION = 'ligtasph-sw-v1';
+const VERSION = 'ligtasph-sw-__BUILD_ID__';
 const PRECACHE = [
   '/',
   '/map',
@@ -29,7 +29,21 @@ const PRECACHE = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(VERSION).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting())
+    caches.open(VERSION)
+      .then((cache) => cache.addAll(PRECACHE))
+      // GH #5: refuse to precache a dataset body that carries no
+      // provenance headers — a headerless (possibly poisoned or ancient)
+      // copy must never become the offline "live" dataset.
+      .then(() => caches.open(VERSION).then((cache) =>
+        cache.match('/api/evac-centers.geojson').then((hit) => {
+          const sha = hit && hit.headers.get('X-Dataset-Sha256');
+          if (!hit || !sha) {
+            return cache.delete('/api/evac-centers.geojson');
+          }
+          return null;
+        })
+      ))
+      .then(() => self.skipWaiting())
   );
 });
 

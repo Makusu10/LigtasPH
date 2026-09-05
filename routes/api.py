@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app, Response
-from utils.db import get_db
+from utils.db import get_db, get_meta
 from utils.api_errors import api_error
 from utils.validation import validate_coordinates, parse_pagination
 from utils.idempotency import get_idempotency_key, claim_idempotency, record_idempotency
@@ -8,6 +8,8 @@ from utils.ratelimit import limiter
 bp = Blueprint("api", __name__)
 
 import json
+import hashlib
+import datetime as _dt
 import math
 import re
 import secrets
@@ -20,6 +22,24 @@ _EVAC_GEOJSON = _BASEDIR / "data" / "ncr_evacuation_centers.geojson"
 _OPENAPI_SPEC = _BASEDIR / "static" / "openapi.yaml"
 
 _SITE_RE = re.compile(r"([A-Z][A-Z /&.\-]+?)\s*[•·|]\s*(TEMPORARY|PERMANENT)\b")
+
+# Public list contract (GH #4, API-001): import-provenance internals never
+# leave the server in list responses — they identify unverified rows for
+# rumor targeting. Full detail stays on GET /api/centers/<id>.
+_LIST_DROP = frozenset({
+    "notes", "source", "verified", "needs_review", "review_reason",
+    "created_at",
+})
+# Same rule for the offline GeoJSON export (API-002): display fields only.
+# Dropped: *_input raw strings, confidence, geocode_provider/query,
+# uncertainty_radius_m, verified, needs_review, review_reason.
+_GEOJSON_KEEP = frozenset({
+    "name", "barangay_resolved", "municipality_input",
+    "facility_type", "facility_status",
+})
+# Stripped export bytes, rebuilt only when the source file changes
+# (immutable per deploy in practice). Avoids a 608 KB parse per request.
+_GEOJSON_CACHE = {"mtime": None, "etag": None, "body": None}
 
 def site_info(row):
     """Return (site_kind, facility_type) parsed from import notes.
@@ -89,6 +109,7 @@ def _occupancy_status(row):
     return pct, avail, status
 
 @bp.route("/api/centers")
+@limiter.limit("120 per minute")
 def api_centers():
     db = get_db()
     q = request.args.get("q","").strip()
@@ -108,7 +129,7 @@ def api_centers():
     centers = db.execute(sql, params).fetchall()
     out=[]
     for c in centers:
-        d=dict(c)
+        d={k: v for k, v in dict(c).items() if k not in _LIST_DROP}
         pct, avail, occ_status = _occupancy_status(c)
         d["occupancy_pct"]=pct; d["available_slots"]=avail; d["occupancy_status"]=occ_status
         kind, ftype = site_info(c)
@@ -130,7 +151,11 @@ def api_centers():
     else:
         out.sort(key=lambda x: x["updated_at"], reverse=True)
 
-    limit, offset, page, is_paginated = parse_pagination(request.args)
+    # GH #7: the default list response is bounded (50 rows + pagination
+    # headers). Clients that need the whole dataset for clustering/cards
+    # pass an explicit ?limit= (up to 1000) — see map/directory/home/settings.
+    limit, offset, page, is_paginated = parse_pagination(
+        request.args, default_limit=50, max_limit=1000)
     total_count = len(out)
     paged_out = out[offset : offset + limit] if is_paginated and limit is not None else out
 
@@ -156,6 +181,11 @@ def api_centers():
         resp.headers["X-Page"] = str(page)
         resp.headers["X-Per-Page"] = str(limit)
         resp.headers["X-Total-Pages"] = str(math.ceil(total_count / limit) if limit else 1)
+    # GH #7: dataset provenance rides on every list response so clients and
+    # the SW staleness banner (#5) can label data age. Empty when no import
+    # has been recorded yet (fresh DBs serve seed rows only).
+    resp.headers["X-Dataset-Sha256"] = get_meta(db, "geojson.sha256")
+    resp.headers["X-Dataset-Imported-At"] = get_meta(db, "geojson.imported_at")
     return resp
 
 @bp.route("/api/centers/version")
@@ -188,21 +218,63 @@ def api_center_detail(cid):
     return jsonify(d)
 
 @bp.route("/api/evac-centers.geojson")
+@limiter.limit("30 per minute")
 def api_evac_centers_geojson():
-    """Stream the full Sprint-2 evacuation-center dataset for GL-native
-    clustered map sources. This is the raw import (name, barangay,
-    municipality, facility_type/status, confidence, verified,
-    uncertainty_radius_m, needs_review...) — richer than /api/centers,
-    which adds live occupancy but drops import provenance.
+    """Serve the stripped Sprint-2 evacuation-center dataset for the offline
+    Service Worker precache (the Mapbox GL map builds from /api/centers).
+
+    Display fields only — no import provenance (GH #4, API-002). Bytes are
+    rebuilt only when the source file changes; ETag + 304 supported.
+    Cache-Control is no-store (API data, consistent app-wide) — the SW
+    Cache API precaches it explicitly, and #5 will label its age via the
+    X-Dataset-* headers below.
     """
     if not _EVAC_GEOJSON.exists():
         return api_error("evac dataset missing", status_code=404, code="NOT_FOUND")
-    # Cacheable in the browser (immutable per deploy); clients re-fetch on
-    # restart via cache-busting. Honors the offline SW precache list.
+    try:
+        mtime = _EVAC_GEOJSON.stat().st_mtime
+    except OSError:
+        return api_error("evac dataset missing", status_code=404, code="NOT_FOUND")
+    if _GEOJSON_CACHE["mtime"] != mtime or not _GEOJSON_CACHE["body"]:
+        try:
+            raw_bytes = _EVAC_GEOJSON.read_bytes()
+            raw = json.loads(raw_bytes.decode("utf-8"))
+        except (OSError, ValueError):
+            return api_error("evac dataset unreadable", status_code=503,
+                             code="SERVICE_UNAVAILABLE", retry=True)
+        feats = []
+        for f in raw.get("features", []) or []:
+            props = (f.get("properties") or {}) if isinstance(f, dict) else {}
+            feats.append({
+                "type": "Feature",
+                "geometry": f.get("geometry") if isinstance(f, dict) else None,
+                "properties": {k: props.get(k) for k in _GEOJSON_KEEP},
+            })
+        body = json.dumps({"type": "FeatureCollection", "features": feats})
+        _GEOJSON_CACHE.update(
+            mtime=mtime,
+            etag='"%s"' % hashlib.sha1(body.encode("utf-8")).hexdigest(),
+            body=body,
+            sha256=hashlib.sha256(raw_bytes).hexdigest(),
+        )
+    etag = _GEOJSON_CACHE["etag"]
+    if request.headers.get("If-None-Match") == etag:
+        return Response(status=304)
+    try:
+        file_mtime = _dt.datetime.fromtimestamp(
+            mtime, tz=_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    except (OSError, OverflowError, ValueError):
+        file_mtime = ""
     return Response(
-        _EVAC_GEOJSON.read_text(encoding="utf-8"),
+        _GEOJSON_CACHE["body"],
         mimetype="application/geo+json",
-        headers={"Cache-Control": "public, max-age=3600"},
+        headers={
+            "Cache-Control": "no-store",
+            "ETag": etag,
+            "X-Dataset-Build": current_app.config.get("STARTED_AT", ""),
+            "X-Dataset-File-Mtime": file_mtime,
+            "X-Dataset-Sha256": _GEOJSON_CACHE.get("sha256") or "",
+        },
     )
 
 @bp.route("/api/centers/<int:cid>/status")

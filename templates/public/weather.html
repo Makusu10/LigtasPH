@@ -88,7 +88,7 @@ function lucideIconFor(code, desc){
   return 'cloud-sun';
 }
 function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
-function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 document.getElementById('locBtn').addEventListener('click', ()=>{
   if(!navigator.geolocation){ statusEl.textContent='Geolocation not supported. Enter city manually.'; return; }
@@ -164,7 +164,7 @@ async function fetchWeather(lat, lon, city, silent){
     } else {
       card.style.display='none';
       errEl.style.display='block';
-      errEl.innerHTML=`<div style="display:flex; gap:10px; align-items:start;"><i data-lucide="triangle-alert" style="width:20px;height:20px;color:var(--red);"></i><div><div style="font-weight:800; color:var(--red);">Weather unavailable</div><div style="font-size:13px; color:var(--text-secondary);">${env.errors?.weather || 'No data'}</div></div></div>`;
+      errEl.innerHTML=`<div style="display:flex; gap:10px; align-items:start;"><i data-lucide="triangle-alert" style="width:20px;height:20px;color:var(--red);"></i><div><div style="font-weight:800; color:var(--red);">Weather unavailable</div><div style="font-size:13px; color:var(--text-secondary);">${esc(env.errors?.weather || 'No data')}</div></div></div>`;
     }
     renderEnvironment(data, aq, overall, lat, lon);
     try{ lucide.createIcons(); }catch(e){}
@@ -177,9 +177,11 @@ async function fetchWeather(lat, lon, city, silent){
     // A 404 means the place itself was unresolvable (geocode miss) — say
     // so plainly instead of the generic "unavailable" + retry loop.
     const notFound=/not found/i.test(e.message||'');
+    // e.message can echo server error text that includes the typed city
+    // ("Place not found: <label>...") — escape it (GH #6, reflected XSS).
     errEl.innerHTML=`<div style="display:flex; gap:10px; align-items:start;">
       <i data-lucide="triangle-alert" style="width:20px;height:20px;color:var(--red); flex:0 0 auto;"></i>
-      <div><div style="font-weight:800; color:var(--red);">${notFound?'Place not found':'Environment data unavailable'}</div><div style="color:var(--text-secondary); font-size:13px; margin-top:4px;">${e.message}</div>
+      <div><div style="font-weight:800; color:var(--red);">${notFound?'Place not found':'Environment data unavailable'}</div><div style="color:var(--text-secondary); font-size:13px; margin-top:4px;">${esc(e.message)}</div>
       <button class="btn btn-secondary" style="margin-top:10px;" type="button" onclick="fetchWeather(${lat ?? 'null'},${lon ?? 'null'},${city?`'${String(city).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}'`: 'null'})">Retry</button></div></div>`;
     // Fallback: try to show cached weather even if environment failed
     try{
@@ -321,7 +323,7 @@ function renderHourly(hourly){
       <div class="h-time">${label}</div>
       <div style="margin:6px 0; color:var(--primary);"><i data-lucide="${icon}" style="width:20px;height:20px;"></i></div>
       <div class="h-temp">${temp}°</div>
-      <div style="font-size:11px; color:var(--text-secondary);">${h.desc||''}</div>
+      <div style="font-size:11px; color:var(--text-secondary);">${esc(h.desc||'')}</div>
       ${h.pop!=null ? `<div style="font-size:11px; color:var(--primary);">💧${h.pop}%</div>` : ''}
     `;
     hourlyStrip.appendChild(cardEl);
@@ -357,12 +359,12 @@ function renderEnvironment(weatherData, aqData, overall, lat, lon){
     const pct = hi.value_c!=null ? Math.max(4, Math.min(100, ((hi.value_c - 20)/35)*100)) : 0;
     const c = hi.colors || {};
     heatCard = `<div class="card env-card env-tinted" style="background:${c.tint || 'var(--glass)'}; border-color:${c.border || 'var(--glass-border)'}">
-      <div class="env-card-head"><div class="env-card-icon" style="color:#d93d2a;"><i data-lucide="thermometer-sun" style="width:18px;height:18px;"></i></div><span style="font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-secondary);">Heat Index</span><span class="env-badge" style="margin-left:auto; background:${c.badge}; border-color:${c.border}; color:${c.text};">${hi.category}</span></div>
+      <div class="env-card-head"><div class="env-card-icon" style="color:#d93d2a;"><i data-lucide="thermometer-sun" style="width:18px;height:18px;"></i></div><span style="font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-secondary);">Heat Index</span><span class="env-badge" style="margin-left:auto; background:${c.badge}; border-color:${c.border}; color:${c.text};">${esc(hi.category)}</span></div>
       <div class="env-measure" aria-label="Heat index ${hi.value_c} degrees Celsius">${hi.value_c!=null? hi.value_c.toFixed(1):'—'}<span class="env-unit">°C</span></div>
       <div class="env-bar" role="progressbar" aria-valuenow="${hi.value_c||0}" aria-valuemin="20" aria-valuemax="55" aria-label="Heat index"><div class="env-bar-fill" style="width:${pct}%; background:${c.bar};"></div></div>
       <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); margin-top:3px;"><span>20°C</span><span>55°C</span></div>
-      <div class="env-reco">${hi.recommendation}</div>
-      <div class="env-meta"><span>Source: ${hi.method||'—'}</span><span>• ${weatherData.source||''}</span><span>• ${weatherData.fetched_at? new Date(weatherData.fetched_at).toLocaleString('en-PH',{timeZone:'Asia/Manila'}) : ''}</span></div>
+      <div class="env-reco">${esc(hi.recommendation)}</div>
+      <div class="env-meta"><span>Source: ${esc(hi.method||'—')}</span><span>• ${esc(weatherData.source||'')}</span><span>• ${weatherData.fetched_at? new Date(weatherData.fetched_at).toLocaleString('en-PH',{timeZone:'Asia/Manila'}) : ''}</span></div>
       <details class="env-expand"><summary>Details</summary><div style="font-size:12px; color:var(--text-secondary); line-height:1.5;">Heat Index is the apparent temperature felt by the body. Calculated from air temperature ${weatherData.main?.temp??'—'}°C and humidity ${weatherData.main?.humidity??'—'}% using the Rothfusz regression (NWS). PAGASA categories: &lt;27 Not Hazardous, 27–32 Caution, 33–41 Extreme Caution, 42–51 Danger, ≥52 Extreme Danger. Not a substitute for official PAGASA/medical advice.</div></details>
     </div>`;
   } else {
@@ -377,13 +379,13 @@ function renderEnvironment(weatherData, aqData, overall, lat, lon){
     // AQI (US EPA 0-300) is primary measure — PM2.5 is secondary context
     const pct = aqiVal!=null ? Math.max(4, Math.min(100, (aqiVal/300)*100)) : (pm25!=null? Math.max(4, Math.min(100, (pm25/90)*100)) : 0);
     aqiCard = `<div class="card env-card env-card--aqi env-tinted" style="background:${c.tint}; border-color:${c.border};">
-      <div class="env-card-head"><div class="env-card-icon" style="color:#0e7490;"><i data-lucide="wind" style="width:20px;height:20px;"></i></div><span style="font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-secondary);">Air Quality — Primary</span><span class="env-badge" style="margin-left:auto; background:${c.badge}; border-color:${c.border}; color:${c.text};">${aqData.category}</span></div>
+      <div class="env-card-head"><div class="env-card-icon" style="color:#0e7490;"><i data-lucide="wind" style="width:20px;height:20px;"></i></div><span style="font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-secondary);">Air Quality — Primary</span><span class="env-badge" style="margin-left:auto; background:${c.badge}; border-color:${c.border}; color:${c.text};">${esc(aqData.category)}</span></div>
       ${aqiVal!=null ? `<div class="env-measure" aria-label="AQI ${aqiVal}">${aqiVal}<span class="env-unit"> US AQI</span></div>` : (pm25!=null? `<div class="env-measure">${Number(pm25).toFixed(1)}<span class="env-unit">µg/m³ PM2.5</span></div>` : `<div class="env-measure">—</div>`)}
-      ${aqiVal!=null && pm25!=null ? `<div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">${Number(pm25).toFixed(1)} µg/m³ PM2.5 • ${aqData.dominant_pollutant||'PM2.5'}</div>` : (pm25!=null? `<div style="font-size:11px; color:var(--text-muted);">${Number(pm25).toFixed(1)} µg/m³ PM2.5 • ${aqData.dominant_pollutant||''}</div>` : ``)}
-      ${aqiVal!=null ? `<div style="font-size:11px; color:var(--text-muted);">${aqData.aqi_scale||'US EPA'} • DENR PM2.5 category shown</div>` : ``}
+      ${aqiVal!=null && pm25!=null ? `<div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">${Number(pm25).toFixed(1)} µg/m³ PM2.5 • ${esc(aqData.dominant_pollutant||'PM2.5')}</div>` : (pm25!=null? `<div style="font-size:11px; color:var(--text-muted);">${Number(pm25).toFixed(1)} µg/m³ PM2.5 • ${esc(aqData.dominant_pollutant||'')}</div>` : ``)}
+      ${aqiVal!=null ? `<div style="font-size:11px; color:var(--text-muted);">${esc(aqData.aqi_scale||'US EPA')} • DENR PM2.5 category shown</div>` : ``}
       <div class="env-bar" role="progressbar" aria-valuenow="${aqiVal||pm25||0}" aria-label="Air quality"><div class="env-bar-fill" style="width:${pct}%; background:${c.bar};"></div></div>
-      <div class="env-reco" style="font-size:13px;">${aqData.recommendation}</div>
-      <div class="env-meta"><span>Source: ${aqData.source} (${aqData.scale})</span><span>• ${aqData.fetched_at? new Date(aqData.fetched_at).toLocaleString('en-PH',{timeZone:'Asia/Manila'}) : ''}</span></div>
+      <div class="env-reco" style="font-size:13px;">${esc(aqData.recommendation)}</div>
+      <div class="env-meta"><span>Source: ${esc(aqData.source)} (${esc(aqData.scale)})</span><span>• ${aqData.fetched_at? new Date(aqData.fetched_at).toLocaleString('en-PH',{timeZone:'Asia/Manila'}) : ''}</span></div>
       <details class="env-expand"><summary>Details</summary><div style="font-size:12px; color:var(--text-secondary); line-height:1.5;">DENR DAO 2020-14 PM2.5: 0–25 Good, 25.1–35 Fair, 35.1–45 Unhealthy for Sensitive Groups, 45.1–55 Very Unhealthy, 55.1–90 Acutely Unhealthy, &gt;91 Emergency. US AQI (0–500 EPA) shown as main value — PM2.5 µg/m³ is secondary with DENR category. Separate scales, correct units.</div></details>
     </div>`;
   } else {
@@ -398,8 +400,8 @@ function renderEnvironment(weatherData, aqData, overall, lat, lon){
       <div class="env-overall-icon" style="background:${overall && overall.severity>=3 ? 'rgba(217,61,42,0.12)' : 'rgba(59,110,245,0.12)'}; color:${overall && overall.severity>=3 ? 'var(--red)' : 'var(--primary)'};"><i data-lucide="${overallIcon}" style="width:18px;height:18px;"></i></div>
       <div style="min-width:0; flex:1;">
         <div style="font-size:12px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; color:var(--text-secondary);">Overall outdoor safety</div>
-        <div style="font-weight:800; font-size:15px; line-height:1.2;">${overallText}</div>
-        <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">${overallReco}</div>
+        <div style="font-weight:800; font-size:15px; line-height:1.2;">${esc(overallText)}</div>
+        <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">${esc(overallReco)}</div>
       </div>
       <span class="env-badge" style="background:${overall && hasHeat && overall.source==='heat' ? (document.createElement('div').innerHTML='', '') : ''}; display:none;"></span>
     </div>

@@ -179,6 +179,15 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (
 );
 CREATE INDEX IF NOT EXISTS idx_idempotency_key ON idempotency_keys(key);
 CREATE INDEX IF NOT EXISTS idx_idempotency_expires ON idempotency_keys(expires_at);
+
+-- Dataset provenance (GH #7): pins which repo data file revision was
+-- ingested (sha256), when, and under which server build. Trivial KV by
+-- design — no relations, no migrations beyond this table.
+CREATE TABLE IF NOT EXISTS app_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 def get_db():
@@ -215,6 +224,25 @@ def close_db(e=None):
         db.close()
     except Exception:
         pass
+
+def get_meta(db, key, default=""):
+    """Read one app_meta value. Returns default when the table/row is absent
+    (e.g. pre-#7 databases before the self-heal creates the table)."""
+    try:
+        row = db.execute("SELECT value FROM app_meta WHERE key=?", (key,)).fetchone()
+    except Exception:
+        return default
+    return row["value"] if row else default
+
+def set_meta(db, key, value):
+    """Upsert one app_meta value. Caller owns the commit."""
+    db.execute(
+        """INSERT INTO app_meta (key, value, updated_at)
+           VALUES (?, ?, datetime('now'))
+           ON CONFLICT(key) DO UPDATE SET
+             value=excluded.value, updated_at=datetime('now')""",
+        (key, value),
+    )
 
 def _migrate_weather_cache(db):
     try:

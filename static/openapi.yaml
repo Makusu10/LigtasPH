@@ -39,7 +39,7 @@ paths:
   /api/centers:
     get:
       summary: List Evacuation Centers
-      description: Returns list of evacuation centers with live occupancy and verification details. Supports pagination headers and envelope mode.
+      description: Returns list of evacuation centers with live occupancy and verification details. Supports pagination headers and envelope mode. List responses exclude import-provenance internals (notes, source, verified, needs_review, review_reason, created_at) — full detail is on GET /api/centers/{cid}. Rate limited (120/min per IP). The default response is bounded to 50 rows with pagination metadata; pass an explicit limit (up to 1000) for the full dataset.
       parameters:
         - name: q
           in: query
@@ -71,7 +71,8 @@ paths:
           schema:
             type: integer
             minimum: 1
-            maximum: 200
+            maximum: 1000
+            default: 50
         - name: page
           in: query
           schema:
@@ -97,6 +98,14 @@ paths:
             X-Total-Pages:
               schema:
                 type: integer
+            X-Dataset-Sha256:
+              schema:
+                type: string
+              description: sha256 of the ingested GeoJSON file (empty pre-import)
+            X-Dataset-Imported-At:
+              schema:
+                type: string
+              description: server build stamp that performed the import
           content:
             application/json:
               schema:
@@ -175,14 +184,31 @@ paths:
 
   /api/evac-centers.geojson:
     get:
-      summary: Evacuation Centers GeoJSON FeatureCollection
+      summary: Evacuation Centers GeoJSON FeatureCollection (stripped, offline precache)
+      description: Stripped offline dataset (name, resolved barangay/municipality, facility type/status only — no import provenance). Served with ETag + 304, no-store cache policy, and X-Dataset-Build / X-Dataset-File-Mtime age headers. Rate limited (30/min per IP).
       responses:
         '200':
-          description: GeoJSON dataset with full import provenance
+          description: Stripped GeoJSON dataset for the Service Worker precache
+          headers:
+            ETag:
+              schema:
+                type: string
+            X-Dataset-Build:
+              schema:
+                type: string
+            X-Dataset-File-Mtime:
+              schema:
+                type: string
+            X-Dataset-Sha256:
+              schema:
+                type: string
+              description: sha256 of the source GeoJSON file
           content:
             application/geo+json:
               schema:
                 type: object
+        '304':
+          description: Not modified (If-None-Match matched current ETag)
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
@@ -572,6 +598,7 @@ paths:
 components:
   schemas:
     EvacuationCenter:
+      description: Public list shape. Import-provenance internals (notes, source, verified, needs_review, review_reason, created_at) are excluded here; GET /api/centers/{cid} returns the full row.
       type: object
       properties:
         id:
