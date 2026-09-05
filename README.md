@@ -85,68 +85,69 @@ The platform aggregates verified evacuation centers, real-time occupancy and rel
 ## 🏛️ Architecture & System Design
 
 ```mermaid
-flowchart TD
-    subgraph Client ["Client Tier (Browser / Mobile Web)"]
-        UI["Responsive UI (HTML5 / CSS3 Liquid-Glass)"]
-        LeafletMap["Leaflet 1.9 Map (Mapbox 2D/3D / OSM)"]
-        Polling["Live Polling Worker (/api/centers/version)"]
+flowchart LR
+    subgraph Client["1 — Client Tier<br/>(Browser / Mobile Web)"]
+        direction TB
+        Pages["Pages: Home, Directory,<br/>Weather, Hotlines, Group Radar"]
+        Map["Leaflet 1.9 Map<br/>Mapbox 2D/3D → OSM/CartoDB fallback<br/>+ NOAH overlays (flood/landslide/surge)"]
+        Poll["Polling worker<br/>GET /api/centers/version<br/>(max_updated_at + count)"]
     end
 
-    subgraph AppServer ["Flask Application Server (WSGI)"]
-        Factory["App Factory (app.py: create_app)"]
-        
-        subgraph Blueprints ["Modular Blueprints"]
-            BP_Public["routes/public.py (Home, Map, Centers, Weather, Hotlines)"]
-            BP_Admin["routes/admin.py (Dashboard, Center & Hotline CRUD, Alerts)"]
-            BP_Auth["routes/auth.py (Rate-Limited Login / Lockout / Logout)"]
-            BP_API["routes/api.py (REST Endpoints, CSRF Exempt)"]
-        end
-
-        subgraph Security ["Security & Middleware"]
-            CSRF["Flask-WTF CSRF Protection"]
-            Limiter["Flask-Limiter (10 req/min, 5-attempt lockout)"]
-            AuthGuard["login_required Decorator"]
-        end
-
-        subgraph Services ["Service & Fallback Layer"]
-            WService["services/weather_service.py"]
-            AQService["services/air_quality_service.py"]
-            HService["services/hazards_service.py"]
-            EnvUtils["utils/environment.py (Rothfusz Heat Index / DENR AQI)"]
-        end
+    subgraph Flask["2 — Flask App Server<br/>(app.py: create_app)"]
+        direction TB
+        CLI["CLI: init-db / seed / import-geojson<br/>(836 live + 32 staged)"]
+        BPub["routes/public.py<br/>Home, Map, Centers, Weather"]
+        BApi["routes/api.py<br/>REST /api/* (CSRF-exempt)"]
+        BAdm["routes/admin.py<br/>Dashboard + CRUD (login_required)"]
+        BAuth["routes/auth.py<br/>Login 10/min, 5-fail → 15-min lockout"]
+        Sec["Middleware: CSRF + Limiter<br/>+ no-store on HTML/JSON"]
     end
 
-    subgraph DataStorage ["Data & Cache Storage"]
-        DB[(SQLite File / WAL Mode<br/>10 Relational Tables)]
-        NOAH[("Pre-converted NOAH GeoJSON<br/>Flood, Landslide, Storm Surge")]
+    subgraph Services["3 — Service & Fallback Layer"]
+        direction TB
+        W["weather_service.py<br/>fresh 10m → OpenWeather → Open-Meteo<br/>→ stale 1h → 503 + retry:true"]
+        AQ["air_quality_service.py<br/>Open-Meteo Air → OpenWeather Air<br/>→ stale → 503"]
+        HZ["hazards_service.py<br/>USGS quakes + FIRMS fires<br/>PH-bbox clamped"]
+        ENV["utils/environment.py<br/>Rothfusz heat index + DENR DAO 2020-14"]
     end
 
-    subgraph ExternalFeeds ["External Live APIs"]
-        OWM["OpenWeather API"]
-        OM["Open-Meteo API (Keyless Fallback)"]
-        USGS["USGS Earthquake Hazards Feed"]
-        FIRMS["NASA FIRMS Satellite Thermal Feed"]
+    subgraph Data["4 — Data Tier<br/>(SQLite WAL, FK ON)"]
+        direction TB
+        Core["Core: evacuation_centers<br/>staging_centers, status_updates<br/>hotlines, announcements"]
+        Eph["Ephemeral: emergency_groups<br/>live_locations (2-h TTL, pruned)"]
+        Cache["Cache: weather_cache<br/>hazards_cache"]
+        Static["Static: data/*.geojson<br/>static/noah/*.geojson"]
     end
 
-    UI --> Factory
-    LeafletMap --> BP_API
-    Polling --> BP_API
-    
-    Factory --> Blueprints
-    BP_Admin --> Security
-    BP_Auth --> Security
+    subgraph Ext["5 — External Feeds"]
+        direction TB
+        OW["OpenWeather"]
+        OM["Open-Meteo (keyless)"]
+        USGS["USGS Earthquakes"]
+        FIRMS["NASA FIRMS (+ relay)"]
+        Tiles["Mapbox / OSM"]
+    end
 
-    BP_API --> Services
-    BP_Public --> DB
-    BP_Admin --> DB
-    
-    Services --> DB
-    Services -.-> OWM
-    Services -.-> OM
-    Services -.-> USGS
-    Services -.-> FIRMS
-    
-    LeafletMap -.-> NOAH
+    Pages --> BPub & BApi
+    Map --> BApi
+    Map -.-> Static
+    Poll --> BApi
+    BAdm --> Core
+    BAuth --> Sec
+    CLI --> Core & Static
+
+    BApi --> W & AQ & HZ
+    BApi --> Core & Cache
+    BPub --> Core
+    W & AQ & HZ --> Cache
+    W -.-> OW & OM
+    AQ -.-> OM & OW
+    HZ -.-> USGS & FIRMS
+    Map -.-> Tiles
+    ENV -.-> W & AQ
+
+    classDef tier fill:#0d1117,stroke:#58a6ff,color:#e6edf3;
+    class Client,Flask,Services,Data,Ext tier;
 ```
 
 ---
