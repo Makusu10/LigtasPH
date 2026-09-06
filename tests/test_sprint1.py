@@ -98,10 +98,11 @@ def test_login_valid_and_dashboard(client):
 def test_login_lockout_after_5_fails(client):
     for _ in range(5):
         r = client.post("/hanapanngbaddieguardsimarkus", data={"username": "admin", "password": "wrong"})
-        assert r.status_code in (401, 403)
-    # 6th attempt should be locked (403)
+        assert r.status_code == 401
+    # 6th attempt is locked: 429 + generic wording, no 403 oracle (GH #3)
     r = client.post("/hanapanngbaddieguardsimarkus", data={"username": "admin", "password": "wrong"})
-    assert r.status_code == 403
+    assert r.status_code == 429
+    assert b"Too many failed attempts. Try again later." in r.data
 
 def test_api_weather_no_cache_503(client, app, monkeypatch):
     # clear cache and force external fetches to fail → should return 503 with retry

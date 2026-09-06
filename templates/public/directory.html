@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', async()=>{
 });
 async function load(){
   const sort=document.getElementById('sort')?.value || 'updated';
-  const res=await fetch('/api/centers?sort='+sort);
+  const res=await fetch('/api/centers?sort='+sort+'&limit=1000');
   all=await res.json();
   const cities=[...new Set(all.map(c=>c.city))].sort();
   const sel=document.getElementById('city');
@@ -78,9 +78,11 @@ async function load(){
   }catch(e){ sel.value=cur; }
   render();
 }
+// Center fields come from the DB (admin-entered + bulk imports) — escape
+// before injecting into card HTML to avoid stored XSS (GH #6).
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function render(){
-  const q=document.getElementById('q').value.toLowerCase();
-  const city=document.getElementById('city').value;
+  const q=document.getElementById('q').value.toLowerCase();  const city=document.getElementById('city').value;
   const status=document.getElementById('status').value;
   let filtered=all.filter(c=>{
     if(q && !(c.name.toLowerCase().includes(q)||c.city.toLowerCase().includes(q)||c.address.toLowerCase().includes(q))) return false;
@@ -100,26 +102,26 @@ function render(){
     card.className='card';
     const fig = known
       ? `Capacity ${c.capacity} • Occupancy ${c.current_occupancy} • <b>${c.available_slots} slots</b> • ${pct}%`
-      : `Capacity unreported • <b>${c.occupancy_status}</b>`;
+      : `Capacity unreported • <b>${esc(c.occupancy_status)}</b>`;
     const bar = known
       ? `<div style="background:var(--glass); border:1px solid var(--border); border-radius:8px; height:10px; overflow:hidden; margin:6px 0;"><div style="width:${Math.min(pct,100)}%; background:${color}; height:100%;"></div></div>`
       : ``;
     const site = (c.site_kind || c.facility_type)
-      ? `<div style="color:var(--text-secondary); font-size:12px;">${[c.facility_type, c.site_kind].filter(Boolean).join(' • ')}</div>`
+      ? `<div style="color:var(--text-secondary); font-size:12px;">${[c.facility_type, c.site_kind].filter(Boolean).map(esc).join(' • ')}</div>`
       : ``;
     card.innerHTML=`
       <div style="display:flex; justify-content:space-between; gap:8px; align-items:start;">
-        <div style="font-weight:800;">${c.name}</div>
-        <span class="badge badge-${c.occupancy_status==='Available'?'available':c.occupancy_status==='Nearly Full'?'nearly':c.occupancy_status==='Full'?'full':'unknown'}">${c.occupancy_status}</span>
+        <div style="font-weight:800;">${esc(c.name)}</div>
+        <span class="badge badge-${c.occupancy_status==='Available'?'available':c.occupancy_status==='Nearly Full'?'nearly':c.occupancy_status==='Full'?'full':'unknown'}">${esc(c.occupancy_status)}</span>
       </div>
-      <div style="color:var(--text-secondary); font-size:13px;">${c.address}, ${c.city}</div>
+      <div style="color:var(--text-secondary); font-size:13px;">${esc(c.address)}, ${esc(c.city)}</div>
       ${site}
       <div style="font-size:13px; margin:6px 0;">${fig}</div>
       ${bar}
       <div style="display:flex; gap:6px; flex-wrap:wrap; margin:6px 0;">
-        <span class="badge badge-unknown">Food ${c.food_status}</span><span class="badge badge-unknown">Water ${c.water_status}</span><span class="badge badge-unknown">Basic ${c.basic_needs_status}</span>
+        <span class="badge badge-unknown">Food ${esc(c.food_status)}</span><span class="badge badge-unknown">Water ${esc(c.water_status)}</span><span class="badge badge-unknown">Basic ${esc(c.basic_needs_status)}</span>
       </div>
-      <div style="color:var(--text-secondary); font-size:12px;">Updated ${c.updated_at}</div>
+      <div style="color:var(--text-secondary); font-size:12px;">Updated ${esc(c.updated_at)}</div>
       <div style="display:flex; gap:8px; margin-top:8px;"><a href="/map" class="btn btn-secondary" style="flex:1; padding:6px;">Locate on Map</a><a href="/centers/${c.id}" class="btn btn-primary" style="flex:1; padding:6px;">View Details</a></div>
     `;
     grid.appendChild(card);

@@ -136,7 +136,7 @@ def test_admin_announcements_crud(client, app):
     # Unauthenticated access redirects
     r = client.get("/admin/announcements")
     assert r.status_code == 302
-    assert "/hanapanngbaddieguardsimarkus" in r.headers["Location"]
+    assert "/admin/login" in r.headers["Location"]
 
     _login(client)
 

@@ -1,0 +1,749 @@
+openapi: 3.1.0
+info:
+  title: LigtasPH Public & Emergency API
+  description: >
+    Production REST interface for disaster response, evacuation center directory,
+    live occupancy, emergency hotlines, family group locators, and environmental hazards.
+  version: 2.0.0
+  contact:
+    name: LigtasPH Team
+paths:
+  /api/status:
+    get:
+      summary: Health & Provider Status
+      description: Returns server build ID and boolean flags indicating third-party provider configuration.
+      responses:
+        '200':
+          description: Status information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  build_id:
+                    type: string
+                  is_demo:
+                    type: boolean
+                  providers:
+                    type: object
+                    properties:
+                      openweather:
+                        type: boolean
+                      open_meteo:
+                        type: boolean
+                      mapbox:
+                        type: boolean
+                      firms:
+                        type: boolean
+
+  /api/centers:
+    get:
+      summary: List Evacuation Centers
+      description: Returns list of evacuation centers with live occupancy and verification details. Supports pagination headers and envelope mode. List responses exclude import-provenance internals (notes, source, verified, needs_review, review_reason, created_at) — full detail is on GET /api/centers/{cid}. Rate limited (120/min per IP). The default response is bounded to 50 rows with pagination metadata; pass an explicit limit (up to 1000) for the full dataset.
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Search query matching name, city, or address
+        - name: city
+          in: query
+          schema:
+            type: string
+          description: Filter by exact city name
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Available, Nearly Full, Full, Status Unavailable]
+        - name: supply
+          in: query
+          schema:
+            type: string
+            enum: [Unknown, Low, Adequate, High]
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [updated, name, available, occupancy]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 50
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: envelope
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List or paginated envelope of centers
+          headers:
+            X-Total-Count:
+              schema:
+                type: integer
+            X-Page:
+              schema:
+                type: integer
+            X-Per-Page:
+              schema:
+                type: integer
+            X-Total-Pages:
+              schema:
+                type: integer
+            X-Dataset-Sha256:
+              schema:
+                type: string
+              description: sha256 of the ingested GeoJSON file (empty pre-import)
+            X-Dataset-Imported-At:
+              schema:
+                type: string
+              description: server build stamp that performed the import
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/EvacuationCenter'
+                  - $ref: '#/components/schemas/PaginatedCenters'
+
+  /api/centers/version:
+    get:
+      summary: Evacuation Centers Version & Count
+      description: Lightweight sync endpoint returning latest center update timestamp and total active count.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  max_updated_at:
+                    type: string
+                    nullable: true
+                  count:
+                    type: integer
+
+  /api/centers/{cid}:
+    get:
+      summary: Evacuation Center Details
+      parameters:
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvacuationCenter'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/centers/{cid}/status:
+    get:
+      summary: Live Center Supply Status
+      parameters:
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  center_id:
+                    type: integer
+                  available:
+                    type: boolean
+                  status:
+                    type: string
+                  message:
+                    type: string
+                  source:
+                    type: string
+                  updated_at:
+                    type: string
+                    nullable: true
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/evac-centers.geojson:
+    get:
+      summary: Evacuation Centers GeoJSON FeatureCollection (stripped, offline precache)
+      description: Stripped offline dataset (name, resolved barangay/municipality, facility type/status only — no import provenance). Served with ETag + 304, no-store cache policy, and X-Dataset-Build / X-Dataset-File-Mtime age headers. Rate limited (30/min per IP).
+      responses:
+        '200':
+          description: Stripped GeoJSON dataset for the Service Worker precache
+          headers:
+            ETag:
+              schema:
+                type: string
+            X-Dataset-Build:
+              schema:
+                type: string
+            X-Dataset-File-Mtime:
+              schema:
+                type: string
+            X-Dataset-Sha256:
+              schema:
+                type: string
+              description: sha256 of the source GeoJSON file
+          content:
+            application/geo+json:
+              schema:
+                type: object
+        '304':
+          description: Not modified (If-None-Match matched current ETag)
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/hotlines:
+    get:
+      summary: List Emergency Hotlines
+      parameters:
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [National, DRRMO, Police, Fire, Medical, Rescue, Hospital, Utility]
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Hotline'
+
+  /api/ncr-lgus:
+    get:
+      summary: List 17 NCR Local Government Units
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    lat:
+                      type: number
+                    lon:
+                      type: number
+
+  /api/weather:
+    get:
+      summary: Weather Forecast & Current Conditions
+      parameters:
+        - name: lat
+          in: query
+          schema:
+            type: number
+        - name: lon
+          in: query
+          schema:
+            type: number
+        - name: city
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Weather information
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/air-quality:
+    get:
+      summary: Air Quality & PM2.5 Telemetry
+      parameters:
+        - name: lat
+          in: query
+          schema:
+            type: number
+        - name: lon
+          in: query
+          schema:
+            type: number
+        - name: city
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/environment:
+    get:
+      summary: Consolidated Environment & Weather Dashboard
+      parameters:
+        - name: lat
+          in: query
+          schema:
+            type: number
+        - name: lon
+          in: query
+          schema:
+            type: number
+        - name: city
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  weather:
+                    type: object
+                    nullable: true
+                  air_quality:
+                    type: object
+                    nullable: true
+                  overall:
+                    type: string
+                  errors:
+                    type: object
+
+  /api/groups:
+    post:
+      summary: Create Family Emergency Group
+      description: Generates a new emergency sharing group with an alphanumeric invite code. Supports Idempotency-Key.
+      headers:
+        Idempotency-Key:
+          schema:
+            type: string
+          description: Optional idempotency token guaranteeing retry safety.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  default: Group
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/groups/{code}:
+    get:
+      summary: Get Emergency Group Info
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/locations:
+    post:
+      summary: Share Live Location to Group
+      description: Atomically upserts user pin in the specified emergency group with 2-hour TTL.
+      headers:
+        Idempotency-Key:
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [invite_code, display_name, lat]
+              properties:
+                invite_code:
+                  type: string
+                display_name:
+                  type: string
+                lat:
+                  type: number
+                lon:
+                  type: number
+                lng:
+                  type: number
+                accuracy:
+                  type: number
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  expires_at:
+                    type: string
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/groups/{code}/locations:
+    get:
+      summary: List Active Group Locations
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: since
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    display_name:
+                      type: string
+                    lat:
+                      type: number
+                    lng:
+                      type: number
+                    lon:
+                      type: number
+                    accuracy:
+                      type: number
+                      nullable: true
+                    shared_at:
+                      type: string
+
+  /api/announcements:
+    get:
+      summary: Active Emergency Announcements Feed
+      parameters:
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: lat
+          in: query
+          schema:
+            type: number
+        - name: lon
+          in: query
+          schema:
+            type: number
+        - name: history
+          in: query
+          schema:
+            type: string
+            enum: ['0', '1']
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Announcement'
+
+  /api/earthquakes:
+    get:
+      summary: USGS Earthquake Proxies
+      parameters:
+        - name: lat
+          in: query
+          schema:
+            type: number
+        - name: lon
+          in: query
+          schema:
+            type: number
+        - name: radius_km
+          in: query
+          schema:
+            type: number
+            default: 500
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  features:
+                    type: array
+
+  /api/fires:
+    get:
+      summary: NASA FIRMS Thermal Hotspots
+      parameters:
+        - name: lat
+          in: query
+          schema:
+            type: number
+        - name: lon
+          in: query
+          schema:
+            type: number
+        - name: days
+          in: query
+          schema:
+            type: integer
+            enum: [1, 2]
+            default: 1
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  features:
+                    type: array
+
+  /api/openapi.yaml:
+    get:
+      summary: OpenAPI Specification
+      description: Returns this OpenAPI 3.1 specification document in YAML format.
+      responses:
+        '200':
+          content:
+            application/yaml:
+              schema:
+                type: string
+
+components:
+  schemas:
+    EvacuationCenter:
+      description: Public list shape. Import-provenance internals (notes, source, verified, needs_review, review_reason, created_at) are excluded here; GET /api/centers/{cid} returns the full row.
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        address:
+          type: string
+        barangay:
+          type: string
+          nullable: true
+        city:
+          type: string
+        lat:
+          type: number
+        lng:
+          type: number
+        capacity:
+          type: integer
+          nullable: true
+        current_occupancy:
+          type: integer
+          nullable: true
+        occupancy_pct:
+          type: number
+          nullable: true
+        available_slots:
+          type: integer
+          nullable: true
+        occupancy_status:
+          type: string
+        operational_status:
+          type: string
+        food_status:
+          type: string
+        water_status:
+          type: string
+        medicine_status:
+          type: string
+        hygiene_status:
+          type: string
+        basic_needs_status:
+          type: string
+        site_kind:
+          type: string
+          nullable: true
+        facility_type:
+          type: string
+          nullable: true
+        location_verified:
+          type: boolean
+        updated_at:
+          type: string
+
+    PaginatedCenters:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvacuationCenter'
+        pagination:
+          type: object
+          properties:
+            page:
+              type: integer
+            pageSize:
+              type: integer
+            total:
+              type: integer
+            totalPages:
+              type: integer
+
+    Hotline:
+      type: object
+      properties:
+        id:
+          type: integer
+        agency:
+          type: string
+        category:
+          type: string
+        contact_number:
+          type: string
+        city:
+          type: string
+        address_area:
+          type: string
+          nullable: true
+
+    Group:
+      type: object
+      properties:
+        id:
+          type: integer
+        invite_code:
+          type: string
+        name:
+          type: string
+        live_count:
+          type: integer
+        created_at:
+          type: string
+
+    Announcement:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        message:
+          type: string
+        scope:
+          type: string
+        city:
+          type: string
+          nullable: true
+        severity:
+          type: string
+        starts_at:
+          type: string
+        ends_at:
+          type: string
+        distance_km:
+          type: number
+          nullable: true
+
+  responses:
+    ErrorResponse:
+      description: Standardized API Error envelope
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                description: Human-readable error message (legacy compatible)
+              code:
+                type: string
+                description: Machine-readable uppercase error token
+              retry:
+                type: boolean
+                description: Whether request may be safely retried
+              details:
+                type: object
+                description: Optional structured field error context

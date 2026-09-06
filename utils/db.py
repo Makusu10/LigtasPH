@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS live_locations (
 );
 CREATE INDEX IF NOT EXISTS idx_live_group ON live_locations(group_id);
 CREATE INDEX IF NOT EXISTS idx_live_expires ON live_locations(expires_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_live_group_member ON live_locations(group_id, display_name COLLATE NOCASE);
 
 CREATE TABLE IF NOT EXISTS hazards_cache (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -165,6 +166,28 @@ CREATE TABLE IF NOT EXISTS visits (
     endpoint TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_visits_ts ON visits(ts);
+
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT UNIQUE NOT NULL,
+    request_hash TEXT NOT NULL,
+    status_code INTEGER,
+    response_body TEXT,
+    state TEXT NOT NULL DEFAULT 'in_progress' CHECK (state IN ('in_progress', 'succeeded', 'failed')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT NOT NULL DEFAULT (datetime('now', '+24 hours'))
+);
+CREATE INDEX IF NOT EXISTS idx_idempotency_key ON idempotency_keys(key);
+CREATE INDEX IF NOT EXISTS idx_idempotency_expires ON idempotency_keys(expires_at);
+
+-- Dataset provenance (GH #7): pins which repo data file revision was
+-- ingested (sha256), when, and under which server build. Trivial KV by
+-- design — no relations, no migrations beyond this table.
+CREATE TABLE IF NOT EXISTS app_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 def get_db():
@@ -201,6 +224,25 @@ def close_db(e=None):
         db.close()
     except Exception:
         pass
+
+def get_meta(db, key, default=""):
+    """Read one app_meta value. Returns default when the table/row is absent
+    (e.g. pre-#7 databases before the self-heal creates the table)."""
+    try:
+        row = db.execute("SELECT value FROM app_meta WHERE key=?", (key,)).fetchone()
+    except Exception:
+        return default
+    return row["value"] if row else default
+
+def set_meta(db, key, value):
+    """Upsert one app_meta value. Caller owns the commit."""
+    db.execute(
+        """INSERT INTO app_meta (key, value, updated_at)
+           VALUES (?, ?, datetime('now'))
+           ON CONFLICT(key) DO UPDATE SET
+             value=excluded.value, updated_at=datetime('now')""",
+        (key, value),
+    )
 
 def _migrate_weather_cache(db):
     try:
@@ -300,5 +342,15 @@ def init_db():
     db = get_db()
     _migrate_weather_cache(db)
     _migrate_centers(db)
+    try:
+        db.execute(
+            """DELETE FROM live_locations
+               WHERE id NOT IN (
+                   SELECT MAX(id) FROM live_locations GROUP BY group_id, LOWER(display_name)
+               )"""
+        )
+        db.commit()
+    except Exception:
+        pass
     db.executescript(SCHEMA)
     db.commit()

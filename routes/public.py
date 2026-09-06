@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, current_app, send_from_directory
+from flask import Blueprint, render_template, current_app
 from utils.db import get_db
 
 bp = Blueprint("public", __name__)
@@ -32,9 +32,24 @@ def map_page():
 
 @bp.route("/sw.js")
 def service_worker():
-    """Offline-resilience Service Worker (map page). Served from static so the
-    SW can be updated by simply replacing static/js/sw.js."""
-    return send_from_directory(current_app.static_folder, "js/sw.js", mimetype="application/javascript")
+    """Offline-resilience Service Worker (map page). GH #5 lifecycle rules:
+    - The cache VERSION is stamped with the server build id (STARTED_AT),
+      so every deploy/restart retires old caches automatically via the
+      SW activate handler — no manual VERSION bumps, no stale-as-live.
+    - Served no-store: a HTTP-cached sw.js would pin the old VERSION.
+    """
+    from flask import Response
+    from pathlib import Path
+    build_id = current_app.config.get("STARTED_AT", "") or "dev"
+    src = (Path(current_app.static_folder) / "js" / "sw.js").read_text(encoding="utf-8")
+    if "__BUILD_ID__" not in src:  # fail loud, never serve an unversioned SW
+        return Response("// misconfigured service worker", status=500,
+                        mimetype="application/javascript")
+    return Response(
+        src.replace("__BUILD_ID__", build_id),
+        mimetype="application/javascript",
+        headers={"Cache-Control": "no-store"},
+    )
 
 @bp.route("/centers")
 def centers_page():

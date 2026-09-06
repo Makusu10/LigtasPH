@@ -158,7 +158,9 @@ def test_full_dataset_stats(app):
 
 def test_null_capacity_api_reports_unavailable(client, app):
     cid = _null_center(app)
-    rows = client.get("/api/centers").get_json()
+    # Explicit full fetch: the default list is bounded (GH #7) and a
+    # same-second row sorts below millisecond-precision import rows.
+    rows = client.get("/api/centers", query_string={"limit": 1000}).get_json()
     row = next(r for r in rows if r["id"] == cid)
     assert row["occupancy_status"] == "Status Unavailable"
     assert row["occupancy_pct"] is None and row["available_slots"] is None

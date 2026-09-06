@@ -5,6 +5,7 @@
   <div class="map-shell">
     <div id="map"></div>
     <div id="tileFallback" role="status" aria-live="polite" style="display:none; position:absolute; bottom:16px; left:50%; transform:translateX(-50%); z-index:1002; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:8px 14px; font-size:12px; max-width:380px; text-align:center; box-shadow:0 2px 10px rgba(0,0,0,0.12); pointer-events:none;">Map background blocked — try hotspot or disable adblocker. Center dots still work.</div>
+    <div id="staleBanner" role="alert" style="display:none; position:absolute; top:12px; left:50%; transform:translateX(-50%); z-index:1003; background:var(--glass); border:2px solid var(--orange); border-radius:10px; padding:8px 14px; font-size:12px; font-weight:600; max-width:min(440px, 92vw); text-align:center; box-shadow:0 2px 10px rgba(0,0,0,0.12);">⚠ <span id="staleBannerText">You are offline — showing cached data. Verify shelter status with your DRRMO before moving.</span></div>
     <button id="panelOpen" class="btn btn-secondary" style="display:none; position:absolute; top:12px; left:12px; z-index:1001; padding:8px 12px; font-size:13px;" aria-label="Show details panel">☰ Details</button>
     <aside id="sidePanel" class="card" aria-label="Map details and filters">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -233,7 +234,7 @@ let allCenters=[];
 let hzAbort={quake:null, fire:null}, hzTimer=null, lastFires=[], lastQuakes=[];
 function badgeClass(s){ return s==='Available'?'available':s==='Nearly Full'?'nearly':s==='Full'?'full':'unknown'; }
 function statusColor(s){ return s==='Available'?'#039855':s==='Nearly Full'?'#F79009':s==='Full'?'#D92D20':'#667085'; }
-function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 // Quake URLs come from the USGS feed (third-party data). Escaping alone can't
 // stop a `javascript:` URL, so only http(s) links through — anything else '#'.
 function safeUrl(u){ try{ const s=String(u||'').trim(); if(/^https?:\/\//i.test(s)) return esc(s); }catch(e){} return '#'; }
@@ -560,7 +561,18 @@ function noahLabel(feat){
   return `<div style="min-width:180px"><div style="font-weight:800; text-transform:capitalize;">${esc(hz)} — ${esc(lv)}${esc(adv)}</div><div style="font-size:12px;color:var(--text-secondary);">Source: Project NOAH (DOST)</div></div>`;
 }
 async function loadCenters(){
-  const res = await fetch('/api/centers');
+  const res = await fetch('/api/centers?limit=1000');
+  // Record dataset age for the offline staleness banner (GH #5): the
+  // values ride on X-Dataset-* headers (#7), stored with a local timestamp.
+  try{
+    localStorage.setItem('ligtasph_data_age_v1', JSON.stringify({
+      at: Date.now(),
+      sha: res.headers.get('X-Dataset-Sha256') || '',
+      build: res.headers.get('X-Dataset-Build') || '',
+      importedAt: res.headers.get('X-Dataset-Imported-At') || '',
+    }));
+  }catch(e){}
+  updateStaleBanner();
   allCenters = await res.json();
   const cities = [...new Set(allCenters.map(c=>c.city))].sort();
   const sel=document.getElementById('cityFilter');
@@ -1539,6 +1551,26 @@ function useLocationFb(){
     _map.setView([lat,lng],13);
   }, err=>{ hzStatus('Location denied — search by city or address.'); }, {enableHighAccuracy:true, timeout:8000});
 }
+function updateStaleBanner(){
+  // Hoisted function declaration — safe to call from loadCenters().
+  var banner=null, label=null;
+  try{
+    banner=document.getElementById('staleBanner');
+    label=document.getElementById('staleBannerText');
+    if(!banner || !label) return;
+    if(navigator.onLine !== false){ banner.style.display='none'; return; }
+    var age=null;
+    try{ age=JSON.parse(localStorage.getItem('ligtasph_data_age_v1')||'null'); }catch(e){ age=null; }
+    var when='an unknown date';
+    if(age && age.at){
+      try{
+        when=new Date(age.at).toLocaleString('en-PH',{timeZone:'Asia/Manila', dateStyle:'medium', timeStyle:'short'})+' PHT';
+      }catch(e){ when=new Date(age.at).toString(); }
+    }
+    label.textContent='You are offline — showing cached data from '+when+'. Verify shelter status with your DRRMO before moving.';
+    banner.style.display='block';
+  }catch(e){}
+}
 document.addEventListener('DOMContentLoaded', ()=>{
   bindPanelToggle();
   bindPanelTabs();
@@ -1548,6 +1580,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
   if('serviceWorker' in navigator){
     try{ navigator.serviceWorker.register('/sw.js').catch(()=>{}); }catch(e){}
   }
+  // GH #5 staleness banner: any cache-fallback render must be labeled —
+  // stale shelter data presented as live is a safety issue. Shown whenever
+  // the browser is offline, dated from the last successful centers fetch.
+  updateStaleBanner();
+  try{
+    window.addEventListener('online', updateStaleBanner);
+    window.addEventListener('offline', updateStaleBanner);
+  }catch(e){}
   if(USE_MAPBOX){ initMapbox().catch(e=>{ console.warn('Mapbox failed, falling back to OSM:', e); initFallback(); }); }
   else { initFallback(); }
 });
