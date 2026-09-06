@@ -650,6 +650,83 @@ def api_group_locations(code):
         return api_error("Could not load locations", status_code=503, code="INTERNAL_ERROR", retry=True)
 
 
+RAIN_INTENSITIES = ("none", "light", "heavy")
+RAIN_WINDOW_HOURS = 3
+
+@bp.route("/api/rain-reports", methods=["POST"])
+@limiter.limit("10 per minute", methods=["POST"])
+def api_rain_report():
+    """Community ground truth: is it raining where you are? Anonymous —
+    intensity plus optional city/coords only, no identity, no account link.
+    Reports count for RAIN_WINDOW_HOURS, then expire out of reads."""
+    try:
+        db = get_db()
+        body = request.get_json(silent=True) or {}
+        intensity = str(body.get("intensity", "")).strip().lower()
+        if intensity not in RAIN_INTENSITIES:
+            return api_error("intensity must be one of: none, light, heavy",
+                             status_code=400, code="MISSING_REQUIRED_FIELDS")
+        city = str(body.get("city", "") or "").strip()[:80] or None
+        lat = lng = None
+        if body.get("lat") is not None or body.get("lon") is not None or body.get("lng") is not None:
+            lat, lng, coord_err = validate_coordinates(
+                body.get("lat"), body.get("lon", body.get("lng")), required=True)
+            if coord_err:
+                return api_error("Invalid coordinates", status_code=400,
+                                 code="INVALID_COORDINATES")
+        flooding = None
+        if intensity == "heavy":
+            f = body.get("flooding", None)
+            if f is not None:
+                flooding = 1 if str(f).strip().lower() in ("1", "true", "yes") else 0
+        cur = db.execute(
+            "INSERT INTO rain_reports (city, lat, lng, intensity, flooding)"
+            " VALUES (?,?,?,?,?)",
+            (city, lat, lng, intensity, flooding),
+        )
+        # Prune day-old rows opportunistically; live reads only see the window.
+        db.execute("DELETE FROM rain_reports WHERE reported_at <= datetime('now', '-24 hours')")
+        db.commit()
+        return jsonify({"id": cur.lastrowid, "intensity": intensity}), 201
+    except Exception:
+        return api_error("Could not save report", status_code=503,
+                         code="INTERNAL_ERROR", retry=True)
+
+
+@bp.route("/api/rain-reports")
+@limiter.limit("60 per minute")
+def api_rain_summary():
+    """Aggregate counts over live (unexpired) reports, optionally narrowed
+    to a city. Counts only — individual rows are never returned, so no
+    single reporter's pin is exposed."""
+    try:
+        db = get_db()
+        city = (request.args.get("city", "") or "").strip()
+        sql = ("SELECT intensity, flooding, COUNT(*) AS n, MAX(reported_at) AS latest"
+               " FROM rain_reports WHERE reported_at > datetime('now', '-3 hours')")
+        params = []
+        if city:
+            sql += " AND city=? COLLATE NOCASE"
+            params.append(city)
+        sql += " GROUP BY intensity, flooding"
+        rows = db.execute(sql, params).fetchall()
+        out = {"city": city or None, "window_hours": RAIN_WINDOW_HOURS,
+               "total": 0, "none": 0, "light": 0, "heavy": 0,
+               "flooding": 0, "latest_at": None}
+        for r in rows:
+            out["total"] += r["n"]
+            if r["intensity"] in out:
+                out[r["intensity"]] += r["n"]
+            if r["flooding"] == 1:
+                out["flooding"] += r["n"]
+            if r["latest"] and (out["latest_at"] is None or r["latest"] > out["latest_at"]):
+                out["latest_at"] = r["latest"]
+        return jsonify(out)
+    except Exception:
+        return api_error("Could not load rain reports", status_code=503,
+                         code="INTERNAL_ERROR", retry=True)
+
+
 def _haversine_km(lat1, lon1, lat2, lon2):
     try:
         r = 6371.0

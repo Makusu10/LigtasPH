@@ -487,6 +487,77 @@ paths:
                     shared_at:
                       type: string
 
+  /api/rain-reports:
+    post:
+      summary: Submit Anonymous Rain Report
+      description: Community ground truth for current rain intensity. Anonymous — no identity stored. Reports count for 3 hours, then expire. Rate limited (10/min per IP).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [intensity]
+              properties:
+                intensity:
+                  type: string
+                  enum: [none, light, heavy]
+                flooding:
+                  type: boolean
+                  description: Only meaningful with heavy; stored otherwise as null.
+                city:
+                  type: string
+                lat:
+                  type: number
+                lon:
+                  type: number
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  intensity:
+                    type: string
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+    get:
+      summary: Rain Report Aggregate Counts
+      description: Counts over unexpired reports (last 3 hours), optionally narrowed by city. Counts only — individual rows are never returned. Rate limited (60/min per IP).
+      parameters:
+        - name: city
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  city:
+                    type: string
+                    nullable: true
+                  window_hours:
+                    type: integer
+                  total:
+                    type: integer
+                  none:
+                    type: integer
+                  light:
+                    type: integer
+                  heavy:
+                    type: integer
+                  flooding:
+                    type: integer
+                  latest_at:
+                    type: string
+                    nullable: true
+
   /api/announcements:
     get:
       summary: Active Emergency Announcements Feed

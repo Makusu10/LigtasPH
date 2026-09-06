@@ -51,6 +51,25 @@
   <div id="hourlyStrip" class="hourly-strip" role="list"></div>
 </div>
 
+<div class="card" style="margin-top:16px;" aria-label="Community rain reports">
+  <h2 style="margin:0 0 4px; font-size:14px; font-weight:800; letter-spacing:-0.01em;">Is it raining in your area?</h2>
+  <p style="color:var(--text-secondary); margin:0 0 10px; font-size:13px;">Confirm for your community — ground truth from people nearby. Anonymous, no account. Reports count for 3 hours.</p>
+  <div role="group" aria-label="Rain intensity" style="display:flex; gap:8px; flex-wrap:wrap;">
+    <button class="btn btn-secondary" type="button" data-rain="none" style="flex:1; min-width:120px;">No rain</button>
+    <button class="btn btn-secondary" type="button" data-rain="light" style="flex:1; min-width:120px;">Light rain</button>
+    <button class="btn btn-secondary" type="button" data-rain="heavy" style="flex:1; min-width:120px;">Heavy rain</button>
+  </div>
+  <div id="rainFlood" hidden style="margin-top:10px;">
+    <div style="font-size:13px; font-weight:700; margin-bottom:6px;">Heavy rain — is it flooding in your area?</div>
+    <div role="group" aria-label="Flooding" style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn btn-secondary" type="button" data-flood="1" style="flex:1; min-width:120px;">Yes, flooding</button>
+      <button class="btn btn-secondary" type="button" data-flood="0" style="flex:1; min-width:120px;">No flooding</button>
+    </div>
+  </div>
+  <div id="rainMsg" role="status" style="font-size:13px; color:var(--text-secondary); margin-top:8px; min-height:18px;"></div>
+  <div id="rainCounts" role="status" style="font-size:13px; margin-top:4px;"></div>
+</div>
+
 <div class="card" style="margin-top:16px;" aria-label="Official cross-check sources">
   <h2 style="margin:0 0 4px; font-size:14px; font-weight:800; letter-spacing:-0.01em;">Cross-check official sources</h2>
   <p style="color:var(--text-secondary); margin:0 0 10px; font-size:13px;">Model data above can differ from ground observations. Verify against the officials before acting:</p>
@@ -429,6 +448,114 @@ fetchWeather(14.6308,121.0968,null);
     if(window.LigtasPrefs && window.LigtasPrefs.everyVisible) window.LigtasPrefs.everyVisible(ms, tick);
     else setInterval(tick, ms);
   }catch(e){}
+})();
+</script>
+<script>
+// Community rain reports: anonymous ground truth ("is it raining where
+// you are?"). Location context comes ONLY from explicit positioning
+// (GPS button, LGU picker, typed city) — never the default auto-load
+// grid, which would misattribute reports to Marikina.
+(function(){
+  'use strict';
+  var rainCtx={city:null, lat:null, lon:null, positioned:false};
+  var msgEl=document.getElementById('rainMsg');
+  var countsEl=document.getElementById('rainCounts');
+  var floodBox=document.getElementById('rainFlood');
+  if(!msgEl || !countsEl) return;
+  function setMsg(t){ msgEl.textContent=t||''; }
+  function trackFromControls(){
+    try{
+      var sel=document.getElementById('lguSelect');
+      if(sel && sel.value){
+        var parts=sel.value.split(',');
+        var name=sel.options[sel.selectedIndex].textContent;
+        rainCtx={city:name, lat:Number(parts[0]), lon:Number(parts[1]), positioned:true};
+        return;
+      }
+      var typed=document.getElementById('cityInput');
+      if(typed && typed.value.trim()){
+        rainCtx={city:typed.value.trim(), lat:null, lon:null, positioned:true};
+        return;
+      }
+      rainCtx={city:null, lat:null, lon:null, positioned:false};
+    }catch(e){ rainCtx={city:null, lat:null, lon:null, positioned:false}; }
+  }
+  document.getElementById('lguSelect').addEventListener('change', function(){ trackFromControls(); refreshRainCounts(); });
+  document.getElementById('fetchBtn').addEventListener('click', function(){ trackFromControls(); refreshRainCounts(); });
+  document.getElementById('locBtn').addEventListener('click', function(){
+    if(!navigator.geolocation) return;
+    try{
+      navigator.geolocation.getCurrentPosition(function(pos){
+        rainCtx={city:null, lat:pos.coords.latitude, lon:pos.coords.longitude, positioned:true};
+        refreshRainCounts();
+      }, function(){}, {maximumAge:60000, timeout:8000});
+    }catch(e){}
+  });
+  function scopeLabel(){ return (rainCtx.positioned && rainCtx.city) ? rainCtx.city : 'Metro Manila'; }
+  function refreshRainCounts(){
+    var q=rainCtx.positioned && rainCtx.city ? '?city='+encodeURIComponent(rainCtx.city) : '';
+    fetch('/api/rain-reports'+q, {headers:{Accept:'application/json'}}).then(function(res){
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      return res.json();
+    }).then(function(d){
+      renderCounts(d||{});
+    }).catch(function(){ countsEl.textContent=''; });
+  }
+  function renderCounts(d){
+    countsEl.innerHTML='';
+    var total=d.total||0;
+    var head=document.createElement('div');
+    head.style.cssText='font-size:12px; color:var(--text-secondary); margin-bottom:2px;';
+    head.textContent='Community reports (last 3h, '+scopeLabel()+')';
+    var line=document.createElement('div');
+    line.style.cssText='font-size:13px; font-weight:700;';
+    if(!total){
+      line.textContent='No reports yet — yours could be the first.';
+    }else{
+      var parts=[(d.none||0)+' no rain', (d.light||0)+' light', (d.heavy||0)+' heavy'];
+      var txt=parts.join(' • ');
+      if(d.heavy) txt+=' ('+(d.flooding||0)+' flooding)';
+      line.textContent=total+' report'+(total===1?'':'s')+': '+txt;
+    }
+    countsEl.appendChild(head);
+    countsEl.appendChild(line);
+  }
+  function submit(intensity, flooding){
+    trackFromControls();
+    var body={intensity:intensity};
+    if(rainCtx.positioned){
+      if(rainCtx.city) body.city=rainCtx.city;
+      if(rainCtx.lat!=null && rainCtx.lon!=null){ body.lat=rainCtx.lat; body.lon=rainCtx.lon; }
+    }
+    if(intensity==='heavy' && flooding!=null) body.flooding=flooding;
+    setMsg('Sending…');
+    fetch('/api/rain-reports', {method:'POST', headers:{'Content-Type':'application/json', Accept:'application/json'}, body:JSON.stringify(body)}).then(function(res){
+      if(res.status===429){ throw new Error('Too many reports — try again in a minute.'); }
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      return res.json();
+    }).then(function(){
+      floodBox.hidden=true;
+      setMsg('Thanks — counted.');
+      refreshRainCounts();
+    }).catch(function(e){ setMsg(e && e.message ? e.message : 'Could not save — retry shortly.'); });
+  }
+  document.querySelectorAll('[data-rain]').forEach(function(b){
+    b.addEventListener('click', function(){
+      if(b.dataset.rain==='heavy'){
+        floodBox.hidden=false;
+        var f=floodBox.querySelector('[data-flood]');
+        if(f) f.focus();
+      }else{
+        floodBox.hidden=true;
+        submit(b.dataset.rain, null);
+      }
+    });
+  });
+  document.querySelectorAll('[data-flood]').forEach(function(b){
+    b.addEventListener('click', function(){ submit('heavy', b.dataset.flood); });
+  });
+  trackFromControls();
+  refreshRainCounts();
 })();
 </script>
 {% endblock %}

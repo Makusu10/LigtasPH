@@ -180,6 +180,22 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (
 CREATE INDEX IF NOT EXISTS idx_idempotency_key ON idempotency_keys(key);
 CREATE INDEX IF NOT EXISTS idx_idempotency_expires ON idempotency_keys(expires_at);
 
+-- Community rain reports: anonymous, short-lived ground truth ("is it
+-- raining where you are?"). No identity, no account link — intensity +
+-- optional city/coords only. Readers filter reported_at > now-3h; rows are
+-- never updated, only expire out of queries (pruned opportunistically).
+CREATE TABLE IF NOT EXISTS rain_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    city TEXT,
+    lat REAL CHECK (lat IS NULL OR lat BETWEEN -90 AND 90),
+    lng REAL CHECK (lng IS NULL OR lng BETWEEN -180 AND 180),
+    intensity TEXT NOT NULL CHECK (intensity IN ('none','light','heavy')),
+    flooding INTEGER CHECK (flooding IS NULL OR flooding IN (0,1)),
+    reported_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_rain_reported ON rain_reports(reported_at);
+CREATE INDEX IF NOT EXISTS idx_rain_city ON rain_reports(city);
+
 -- Dataset provenance (GH #7): pins which repo data file revision was
 -- ingested (sha256), when, and under which server build. Trivial KV by
 -- design — no relations, no migrations beyond this table.
