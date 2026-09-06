@@ -282,7 +282,9 @@ input[type="checkbox"], input[type="radio"] { width:18px; height:18px; flex:0 0 
 [data-theme="dark"] .nav-links a:hover { background: rgba(122,162,255,0.14); color: var(--primary); }
 [data-theme="dark"] .nav-links a[aria-current="page"] { background: var(--primary-container); color: #fff; }
 [data-theme="dark"] th { background: rgba(255,255,255,0.04); }
-[data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea { background: rgba(255,255,255,0.06); color: var(--text); }
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]), [data-theme="dark"] select, [data-theme="dark"] textarea { background: rgba(255,255,255,0.06); color: var(--text); }
+/* Same specificity as the base :focus rule, or focused inputs flash white. */
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):focus, [data-theme="dark"] select:focus, [data-theme="dark"] textarea:focus { background: rgba(255,255,255,0.09); }
 /* Dark primary is periwinkle (#7aa2ff) — white button text fails on it,
    so primary buttons keep the light-mode blue fill in dark mode. */
 [data-theme="dark"] .btn-primary { background:#2e5fe0; }

@@ -119,3 +119,18 @@ def test_target_and_contrast_tokens():
     assert "color:#8a5200" in css  # 6.12:1 on cream
     assert "color:#b3261e" in css  # 6.01:1 on pink wash
     assert "background:#2e5fe0" in css  # 5.48:1 white button text
+
+
+def test_dark_input_override_beats_base_specificity():
+    # Base uses input:not([type=...]):not(...) (0,4,1); a bare
+    # [data-theme="dark"] input (0,1,1) loses, leaving white inputs
+    # with light text in dark mode. The override must repeat the :nots.
+    css = (ROOT / "static" / "css" / "main.css").read_text(encoding="utf-8")
+    assert '[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"])' in css
+    assert '[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):focus' in css
+
+
+def test_announcement_scope_not_duplicated():
+    src = (ROOT / "templates" / "admin" / "announcements.html").read_text(encoding="utf-8")
+    assert "{% else %}Everyone{% endif %}" in src
+    assert "{% else %}all{% endif %}" not in src
