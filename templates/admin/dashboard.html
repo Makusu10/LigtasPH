@@ -12,6 +12,10 @@
 {% if unknown %}
 <div class="card notice-warn" style="margin-top:12px;"><div style="font-size:13px;"><b>{{ unknown }}</b> center{{ 's' if unknown != 1 }} awaiting capacity data (Sprint 2 imports) — set capacity in <a href="{{ url_for('admin.centers') }}">Manage Centers</a>.</div></div>
 {% endif %}
+{% if pending_sha %}
+<div class="card notice-warn" style="margin-top:12px;" role="alert"><div style="font-size:13px;"><b>Dataset update pending review.</b> The data file changed (sha256 <code>{{ pending_sha[:12] }}…</code>) and boot refused to auto-import it. Diff the file, then approve below — approval ingests the new rows and records the hash.</div>
+<form method="post" action="{{ url_for('admin.approve_dataset') }}" style="margin-top:8px;" onsubmit="return confirm('Import the changed dataset file now?');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="btn btn-primary" style="padding:8px 14px; font-size:13px; min-height:44px;">Review done — approve &amp; import</button></form></div>
+{% endif %}
 <div class="grid-3" style="margin-top:12px;">
   <div class="card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; text-transform:uppercase;">Total Capacity</div><div style="font-size:20px; font-weight:800;">{{ total_capacity }}</div></div>
   <div class="card"><div style="color:var(--text-secondary); font-size:12px; font-weight:700; text-transform:uppercase;">Total Occupancy</div><div style="font-size:20px; font-weight:800;">{{ total_occ }}</div></div>

@@ -7,7 +7,7 @@ touches. Assertions are delta-based, never absolute counts.
 import hashlib
 import json
 
-from app import create_app, geojson_import_action
+from app import apply_geojson_action, create_app, geojson_import_action
 from scripts.import_evac_centers import DEFAULT_PATH, import_geojson
 from utils.db import get_db, get_meta, init_db, set_meta
 from utils.seed import seed_db
@@ -133,7 +133,7 @@ def test_import_action_decisions(tmp_path):
             set_meta(db, "geojson.sha256", "0" * 64)
             db.commit()
             cur, rec, action = geojson_import_action(db, None)
-            assert action == "refresh" and rec == "0" * 64
+            assert action == "refused" and rec == "0" * 64
         finally:
             set_meta(db, "geojson.sha256", prev)
             db.commit()
@@ -188,3 +188,154 @@ def test_list_carries_dataset_provenance_headers():
     r = _app().test_client().get("/api/centers")
     assert "X-Dataset-Sha256" in r.headers
     assert "X-Dataset-Imported-At" in r.headers
+
+
+def test_apply_refused_records_pending_and_ingests_nothing():
+    app = _app()
+    with app.app_context():
+        db = get_db()
+        prev = {k: get_meta(db, k) for k in
+                ("geojson.sha256", "geojson.pending_sha256")}
+        before = db.execute("SELECT COUNT(*) c FROM evacuation_centers").fetchone()["c"]
+        try:
+            set_meta(db, "geojson.sha256", "0" * 64)
+            db.commit()
+            cur, rec, action = geojson_import_action(db, None)
+            assert action == "refused"
+            assert apply_geojson_action(app, db, None, cur, rec, action) == "refused"
+            assert get_meta(db, "geojson.pending_sha256") == cur
+            after = db.execute("SELECT COUNT(*) c FROM evacuation_centers").fetchone()["c"]
+            assert after == before
+        finally:
+            for k, v in prev.items():
+                set_meta(get_db(), k, v)
+            get_db().commit()
+
+
+def test_apply_skip_clears_pending():
+    app = _app()
+    with app.app_context():
+        db = get_db()
+        prev = {k: get_meta(db, k) for k in
+                ("geojson.sha256", "geojson.pending_sha256")}
+        try:
+            real_sha = hashlib.sha256(DEFAULT_PATH.read_bytes()).hexdigest()
+            set_meta(db, "geojson.sha256", real_sha)
+            set_meta(db, "geojson.pending_sha256", "stale-pending")
+            db.commit()
+            cur, rec, action = geojson_import_action(db, None)
+            assert action == "skip"
+            assert apply_geojson_action(app, db, None, cur, rec, action) == "skip"
+            assert get_meta(db, "geojson.pending_sha256") == ""
+        finally:
+            for k, v in prev.items():
+                set_meta(get_db(), k, v)
+            get_db().commit()
+
+
+def test_status_reports_pending_dataset():
+    app = _app()
+    client = app.test_client()
+    with app.app_context():
+        db = get_db()
+        prev = get_meta(db, "geojson.pending_sha256")
+        set_meta(db, "geojson.pending_sha256", "ab12" * 16)
+        db.commit()
+    try:
+        d = client.get("/api/status").get_json()
+        assert d["dataset"]["pending_sha256"] == "ab12" * 16
+    finally:
+        with app.app_context():
+            set_meta(get_db(), "geojson.pending_sha256", prev)
+            get_db().commit()
+
+
+def test_admin_approve_dataset_clears_pending(monkeypatch):
+    import scripts.import_evac_centers as imp
+    app = _app()
+    client = app.test_client()
+    client.post("/hanapanngbaddieguardsimarkus",
+                data={"username": "admin", "password": "admin123"})
+    monkeypatch.setattr(imp, "import_geojson",
+                        lambda db, src: {"dataset_sha256": "cd34" * 16,
+                                         "imported": 0, "updated": 0,
+                                         "quarantined": 0})
+    with app.app_context():
+        db = get_db()
+        prev = {k: get_meta(db, k) for k in
+                ("geojson.sha256", "geojson.pending_sha256")}
+        set_meta(db, "geojson.pending_sha256", "cd34" * 16)
+        db.commit()
+    try:
+        r = client.post("/admin/dataset/approve")
+        assert r.status_code == 302
+        with app.app_context():
+            assert get_meta(get_db(), "geojson.pending_sha256") == ""
+            assert get_meta(get_db(), "geojson.sha256") == "cd34" * 16
+    finally:
+        with app.app_context():
+            for k, v in prev.items():
+                set_meta(get_db(), k, v)
+            get_db().commit()
+
+
+def test_dashboard_shows_pending_banner():
+    app = _app()
+    client = app.test_client()
+    client.post("/hanapanngbaddieguardsimarkus",
+                data={"username": "admin", "password": "admin123"})
+    with app.app_context():
+        db = get_db()
+        prev = get_meta(db, "geojson.pending_sha256")
+        set_meta(db, "geojson.pending_sha256", "ef56" * 16)
+        db.commit()
+    try:
+        html = client.get("/admin/dashboard").get_data(as_text=True)
+        assert "pending review" in html
+        assert "ef56ef56ef56" in html  # 12-char short sha rendered
+    finally:
+        with app.app_context():
+            set_meta(get_db(), "geojson.pending_sha256", prev)
+            get_db().commit()
+
+
+def test_search_wildcards_match_literally():
+    app = _app()
+    client = app.test_client()
+    names = [f"{PREFIX}-PCT%PROBE", f"{PREFIX}-UNDER_PROBE"]
+    with app.app_context():
+        db = get_db()
+        try:
+            for n in names:
+                db.execute(
+                    "INSERT INTO evacuation_centers (name, address, city, lat, lng)"
+                    " VALUES (?,?,?,?,?)", (n, n + " addr", "Manila", 14.6, 121.0))
+            db.commit()
+            r = client.get("/api/centers", query_string={"q": "%", "limit": 1000})
+            got = [c["name"] for c in r.get_json()]
+            assert f"{PREFIX}-PCT%PROBE" in got  # literal % matched
+            assert "Marikina Sports Center" not in got  # % did not act as wildcard
+            assert f"{PREFIX}-UNDER_PROBE" not in got
+            r = client.get("/api/centers", query_string={"q": "UNDER_PROBE", "limit": 1000})
+            got = [c["name"] for c in r.get_json()]
+            assert f"{PREFIX}-UNDER_PROBE" in got  # literal _ matched
+        finally:
+            _cleanup(app, names)
+
+
+def test_import_lock_serializes_and_fails_open(tmp_path):
+    from utils.import_lock import import_lock
+    probe = str(tmp_path / "test.sqlite")
+    first = import_lock(probe)
+    assert first.acquire() is True
+    try:
+        second = import_lock(probe)
+        assert second.acquire() is False  # busy -> fail open, non-blocking
+        second.release()  # safe no-op path
+    finally:
+        first.release()
+    third = import_lock(probe)
+    assert third.acquire() is True
+    third.release()
+    with import_lock(probe) as locked:
+        assert locked is True

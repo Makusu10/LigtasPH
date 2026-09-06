@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
-from utils.db import get_db
+from utils.db import get_db, get_meta
 from utils.security import login_required
 from utils.validators import validate_phone
 
@@ -30,7 +30,11 @@ def dashboard():
             low_supply+=1
     recent = db.execute("SELECT * FROM evacuation_centers WHERE archived=0 ORDER BY updated_at DESC LIMIT 5").fetchall()
     stale = db.execute("SELECT * FROM evacuation_centers WHERE archived=0 AND julianday('now') - julianday(updated_at) > 7 ORDER BY updated_at ASC LIMIT 5").fetchall()
-    return render_template("admin/dashboard.html", total=total, available=available, nearly=nearly, full=full, unknown=unknown, total_capacity=total_capacity, total_occ=total_occ, low_supply=low_supply, recent=recent, stale=stale)
+    try:
+        pending_sha = get_meta(db, "geojson.pending_sha256")
+    except Exception:
+        pending_sha = ""
+    return render_template("admin/dashboard.html", total=total, available=available, nearly=nearly, full=full, unknown=unknown, total_capacity=total_capacity, total_occ=total_occ, low_supply=low_supply, recent=recent, stale=stale, pending_sha=pending_sha)
 
 @bp.route("/admin/centers")
 @login_required
@@ -326,6 +330,33 @@ def api_keys():
         return redirect(url_for("admin.api_keys"))
     live = {k: current_app.config.get(k, "") for k in envkeys.MANAGED_KEYS}
     return render_template("admin/keys.html", entries=envkeys.entries(live), env_path=str(envkeys.ENV_PATH))
+
+
+@bp.route("/admin/dataset/approve", methods=["POST"])
+@login_required
+def approve_dataset():
+    """GH #7 approve path: explicitly ingest the changed data file whose
+    hash boot refused (pending_sha256), then record the hash + clear pending.
+
+    Synchronous by design — approval is a deliberate operator action, and
+    the caller sees the resulting stats (or the failure) immediately.
+    """
+    from scripts.import_evac_centers import import_geojson, DEFAULT_PATH
+    from utils.db import set_meta
+    db = get_db()
+    try:
+        stats = import_geojson(db, str(DEFAULT_PATH))
+    except Exception as e:
+        flash(f"Dataset import failed — nothing recorded: {e}", "danger")
+        return redirect(url_for("admin.dashboard")), 500
+    set_meta(db, "geojson.sha256", stats["dataset_sha256"])
+    set_meta(db, "geojson.imported_at", current_app.config.get("STARTED_AT", ""))
+    set_meta(db, "geojson.build_id", current_app.config.get("STARTED_AT", ""))
+    set_meta(db, "geojson.pending_sha256", "")
+    db.commit()
+    flash(f"Dataset approved and imported: {stats.get('imported', 0)} new, "
+          f"{stats.get('updated', 0)} refreshed, {stats.get('quarantined', 0)} quarantined.", "success")
+    return redirect(url_for("admin.dashboard"))
 
 
 @bp.route("/admin/restart", methods=["POST"])

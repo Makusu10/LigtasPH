@@ -80,9 +80,20 @@ def api_status():
         if not v or v.startswith("YOUR_"):
             return False
         return v.startswith(prefix) if prefix else True
+    def _meta(key):
+        try:
+            from utils.db import get_meta as _get_meta
+            return _get_meta(get_db(), key)
+        except Exception:
+            return ""
     return jsonify({
         "build_id": current_app.config.get("STARTED_AT", ""),
         "is_demo": bool(current_app.config.get("IS_DEMO", True)),
+        "dataset": {  # GH #7: content identifiers only, never secret values
+            "sha256": _meta("geojson.sha256"),
+            "pending_sha256": _meta("geojson.pending_sha256"),
+            "imported_at": _meta("geojson.imported_at"),
+        },
         "providers": {
             "openweather": _has("OPENWEATHER_API_KEY"),
             "open_meteo": True,  # keyless fallback, always available online
@@ -120,8 +131,10 @@ def api_centers():
     sql = "SELECT * FROM evacuation_centers WHERE archived=0"
     params=[]
     if q:
-        sql += " AND (name LIKE ? OR city LIKE ? OR address LIKE ?)"
-        like = f"%{q}%"
+        # Escape LIKE wildcards so a "q=%" probe matches literally instead
+        # of amplifying into a full-table scan (GH #7 serving-cost note).
+        like = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        sql += " AND (name LIKE ? ESCAPE '\\' OR city LIKE ? ESCAPE '\\' OR address LIKE ? ESCAPE '\\')"
         params.extend([like,like,like])
     if city:
         sql += " AND city=?"

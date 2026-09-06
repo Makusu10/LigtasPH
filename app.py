@@ -25,7 +25,9 @@ def geojson_import_action(db, path):
     Returns (current_sha, recorded_sha, action) where action is one of:
       "skip"    — recorded hash matches the file; nothing to do.
       "import"  — no recorded hash (fresh DB or pre-#7 DB); import + record.
-      "refresh" — recorded hash differs; refresh-only re-import + flag.
+      "refused" — recorded hash differs: the file changed without approval.
+                  The caller must NOT import; it records the new hash as
+                  pending for explicit review (CLI/admin approve path).
     """
     from scripts.import_evac_centers import DEFAULT_PATH as _default
     from utils.db import get_meta
@@ -35,8 +37,70 @@ def geojson_import_action(db, path):
     if recorded_sha and recorded_sha == current_sha:
         return current_sha, recorded_sha, "skip"
     if recorded_sha:
-        return current_sha, recorded_sha, "refresh"
+        return current_sha, recorded_sha, "refused"
     return current_sha, recorded_sha, "import"
+
+def _spawn_geojson_import(app_ref, prev_sha):
+    """Boot-time import worker (daemon thread; never blocks serving)."""
+    from scripts.import_evac_centers import DEFAULT_PATH
+    from utils.import_lock import import_lock
+    db_path = app_ref.config.get("DATABASE", "")
+    def _bg_import():
+        try:
+            with app_ref.app_context():
+                from scripts.import_evac_centers import import_geojson
+                db = get_db()
+                with import_lock(db_path) as locked:
+                    if not locked:
+                        app_ref.logger.warning(
+                            "GeoJSON import lock busy — proceeding anyway "
+                            "(importer is idempotent).")
+                    stats = import_geojson(db, str(DEFAULT_PATH))
+                    set_meta(db, "geojson.sha256",
+                             stats["dataset_sha256"])
+                    set_meta(db, "geojson.imported_at",
+                             STARTED_AT)
+                    set_meta(db, "geojson.build_id", STARTED_AT)
+                    set_meta(db, "geojson.prev_sha256", prev_sha or "")
+                    set_meta(db, "geojson.pending_sha256", "")
+                    db.commit()
+                    app_ref.logger.info(
+                        "GeoJSON auto-import: %s", stats)
+        except Exception as ie:
+            app_ref.logger.warning(
+                "GeoJSON auto-import failed: %s", ie)
+    threading.Thread(
+        target=_bg_import,
+        daemon=True,
+        name="geojson-auto-import",
+    ).start()
+
+def apply_geojson_action(app, db, path, current_sha, recorded_sha, action):
+    """Execute one boot-time dataset decision (GH #7, unit-testable).
+
+    "skip" clears any stale pending flag; "refused" records the new hash
+    as pending and ingests nothing; "import" spawns the background worker.
+    Returns the action taken.
+    """
+    from utils.db import set_meta
+    if action == "skip":
+        set_meta(db, "geojson.pending_sha256", "")
+        db.commit()
+        app.logger.info(
+            "GeoJSON dataset unchanged (sha256 %.12s…), skipping import.",
+            current_sha)
+        return "skip"
+    if action == "refused":
+        app.logger.error(
+            "GeoJSON dataset CHANGED (%.12s… -> %.12s…): refusing "
+            "auto-import. Serving previously imported rows; approve the "
+            "new file explicitly (admin dataset approve or import-geojson CLI).",
+            recorded_sha, current_sha)
+        set_meta(db, "geojson.pending_sha256", current_sha)
+        db.commit()
+        return "refused"
+    _spawn_geojson_import(app, recorded_sha)
+    return "import"
 
 def create_app(env=None):
     if env is None:
@@ -108,52 +172,20 @@ def create_app(env=None):
                 # hosts (Render free tier) would otherwise serve only the 20
                 # demo rows forever. GH #7 trust model: the file is pinned by
                 # sha256 in app_meta. Same hash -> no-op. Changed hash ->
-                # refresh-only re-import (admin numbers never clobbered) plus
-                # a WARNING naming old/new hashes — flagged, never silent.
+                # REFUSED (nothing ingested; hash recorded as pending for
+                # explicit CLI/admin approval) — data-file PRs still need
+                # human review, and now the gate enforces it. Fresh DBs
+                # (no recorded hash) still auto-import once.
                 # Runs in a daemon thread so cold-boot serving never waits on
                 # the 868-feature parse (own app context -> own SQLite conn).
                 try:
                     from scripts.import_evac_centers import DEFAULT_PATH
-                    from utils.db import get_meta, set_meta
                     if DEFAULT_PATH.exists():
                         current_sha, recorded_sha, action = geojson_import_action(
                             get_db(), DEFAULT_PATH)
-                        if action == "skip":
-                            app.logger.info(
-                                "GeoJSON dataset unchanged (sha256 %.12s…), skipping import.",
-                                current_sha)
-                        else:
-                            if action == "refresh":
-                                app.logger.warning(
-                                    "GeoJSON dataset CHANGED (%.12s… -> %.12s…): "
-                                    "re-importing with refresh-only semantics. "
-                                    "Review the data-file diff before trusting new rows.",
-                                    recorded_sha, current_sha)
-                            def _bg_import(app_ref, prev_sha):
-                                try:
-                                    with app_ref.app_context():
-                                        from scripts.import_evac_centers import import_geojson
-                                        db = get_db()
-                                        stats = import_geojson(db, str(DEFAULT_PATH))
-                                        set_meta(db, "geojson.sha256",
-                                                 stats["dataset_sha256"])
-                                        set_meta(db, "geojson.imported_at",
-                                                 STARTED_AT)
-                                        set_meta(db, "geojson.build_id", STARTED_AT)
-                                        set_meta(db, "geojson.prev_sha256",
-                                                 prev_sha or "")
-                                        db.commit()
-                                        app_ref.logger.info(
-                                            "GeoJSON auto-import: %s", stats)
-                                except Exception as ie:
-                                    app_ref.logger.warning(
-                                        "GeoJSON auto-import failed: %s", ie)
-                            threading.Thread(
-                                target=_bg_import,
-                                args=(app, recorded_sha),
-                                daemon=True,
-                                name="geojson-auto-import",
-                            ).start()
+                        apply_geojson_action(
+                            app, get_db(), DEFAULT_PATH,
+                            current_sha, recorded_sha, action)
                 except Exception as ie:
                     app.logger.warning("GeoJSON auto-import skipped: %s", ie)
         except Exception as e:
@@ -176,7 +208,11 @@ def create_app(env=None):
     @app.cli.command("import-geojson")
     @click.argument("path", required=False)
     def import_geojson_cmd(path=None):
-        """Sprint 2: load data/ncr_evacuation_centers.geojson (idempotent)."""
+        """Sprint 2: load data/ncr_evacuation_centers.geojson (idempotent).
+
+        This is the GH #7 approve path: an explicit operator action that
+        records the file hash, clearing any boot-time pending_sha256 flag.
+        """
         import json as _json
         from scripts.import_evac_centers import import_geojson, DEFAULT_PATH
         src = path or str(DEFAULT_PATH)
@@ -187,6 +223,7 @@ def create_app(env=None):
             set_meta(db, "geojson.sha256", stats["dataset_sha256"])
             set_meta(db, "geojson.imported_at", STARTED_AT)
             set_meta(db, "geojson.build_id", STARTED_AT)
+            set_meta(db, "geojson.pending_sha256", "")
             db.commit()
             print(_json.dumps(stats, indent=2))
 
