@@ -13,7 +13,7 @@
       <a href="{{ url_for('public.settings_page') }}" {% if request.endpoint=='public.settings_page' %}aria-current="page"{% endif %}>Settings</a>
     </div>
     <button id="navToggle" class="nav-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="mobileMenu">
-      <i data-lucide="menu" style="width:18px;height:18px"></i>
+      <i data-lucide="menu" aria-hidden="true" style="width:18px;height:18px"></i>
     </button>
   </div>
   <div id="mobileMenu" class="container mobile-menu" role="navigation" aria-label="Mobile">

@@ -34,7 +34,7 @@
     <span class="nav-brand-mark" style="width:36px;height:36px; font-size:14px;">LP</span>
     <h1 style="margin:0; font-size:28px; line-height:1.1; color:var(--navy);">Find evacuation centers and emergency information near you</h1>
   </div>
-  <p style="color:var(--text-secondary); margin:0; max-width:65ch;">LigtasPH is a centralized platform for locating official evacuation centers, checking occupancy and supply status, viewing current weather, and finding emergency hotlines for your city or municipality.</p>
+  <p style="color:var(--text-secondary); margin:0; max-width:65ch;">LigtasPH is a centralized platform for locating listed evacuation centers, checking occupancy and supply status, viewing current weather, and finding emergency hotlines for your city or municipality.</p>
   <form id="heroFind" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px; align-items:stretch;">
     <select id="heroCity" aria-label="Your city" style="flex:1; min-width:180px;"><option value="">Loading cities…</option></select>
     <button type="button" id="heroLocate" class="btn btn-secondary">Use my location</button>
@@ -169,7 +169,7 @@
         if(typeof L === 'undefined') return;
       }
       map = L.map(el, {zoomControl:false}).setView([14.6308,121.0968], 11);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(map);
     }
     const dot=(color)=>`<div style="background:${color};width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></div>`;
     // Center names/cities come from the DB (admin-entered + bulk imports) —

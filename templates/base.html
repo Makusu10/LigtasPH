@@ -101,19 +101,38 @@
   <footer style="border-top:1px solid var(--glass-border); background: rgba(255,255,255,0.55); backdrop-filter: blur(16px); padding:20px 0; margin-top:32px;">
     <div class="container" style="color:var(--text-secondary); font-size:13px; display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
       <span>© 2026 LigtasPH — Integrated Calamity Response & Evacuation Mapping</span>
+      <span><a href="{{ url_for('public.privacy_page') }}">Privacy</a> • <a href="{{ url_for('public.terms_page') }}">Terms</a> • <a href="{{ url_for('public.cookies_page') }}">Cookies</a></span>
       <span>Emergency: <a href="tel:911">911</a> • <a href="tel:143">Red Cross 143</a> • NDRRMC • PAGASA</span>
     </div>
   </footer>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script>try{lucide.createIcons();}catch(e){}</script>
+  <script>
+  // Decorative icon SVGs (Lucide replaces <i data-lucide> at runtime) must
+  // never enter the accessibility tree — every icon here ships next to a
+  // text label. Observed once so dynamically rendered icons are covered too.
+  try{
+    var _hideIcons = function(root){
+      (root.querySelectorAll ? root.querySelectorAll('svg.lucide:not([aria-hidden])') : []).forEach(function(s){ s.setAttribute('aria-hidden','true'); });
+    };
+    _hideIcons(document);
+    new MutationObserver(function(muts){
+      muts.forEach(function(m){ m.addedNodes.forEach(function(n){ if(n.querySelectorAll) _hideIcons(n); }); });
+    }).observe(document.documentElement, {childList:true, subtree:true});
+  }catch(e){}
+  </script>
   <script src="{{ static_asset('js/prefs.js') }}" defer></script>
   <script src="{{ static_asset('js/announcements.js') }}" defer></script>
   <script>
-    // mobile nav toggle
+    // mobile nav toggle (both navs share these ids; admin nav has no menu text change)
     document.addEventListener('DOMContentLoaded', function(){
       const btn = document.getElementById('navToggle');
       const menu = document.getElementById('mobileMenu');
-      if(btn && menu){ btn.addEventListener('click', ()=> menu.classList.toggle('open')); }
+      if(btn && menu){
+        const set = (open)=>{ menu.classList.toggle('open', open); btn.setAttribute('aria-expanded', String(open)); };
+        btn.addEventListener('click', ()=> set(!menu.classList.contains('open')));
+        document.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && menu.classList.contains('open')){ set(false); btn.focus(); } });
+      }
     });
     // Active-tab highlight: a matte overlay on the selected tab. One behavior
     // only — it follows the cursor (sized to the nearest tab so it always

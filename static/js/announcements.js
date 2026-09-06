@@ -170,7 +170,7 @@
     span.appendChild(sm);
     var btn = document.createElement('button');
     btn.className = 'btn btn-secondary';
-    btn.style.cssText = 'padding:6px 12px;font-size:12px;flex:0 0 auto;';
+    btn.style.cssText = 'padding:6px 12px;font-size:12px;flex:0 0 auto;min-height:44px;';
     btn.textContent = 'Acknowledge';
     btn.addEventListener('click', function () { setAcked(a.id); bar.remove(); showNext(); });
     bar.appendChild(span);

@@ -100,7 +100,7 @@
       <label for="gMyName" style="font-size:12px;">Your display name</label>
       <input id="gMyName" placeholder="e.g. Ana" maxlength="40" style="margin:4px 0;">
       <div style="display:flex; gap:6px; margin:4px 0;">
-        <button id="gJoinBtn" class="btn btn-secondary" style="flex:1; padding:6px 8px; font-size:12px;"Join &amp; show/button>
+        <button id="gJoinBtn" class="btn btn-secondary" style="flex:1; padding:6px 8px; font-size:12px;" aria-label="Join group and show live locations">Join &amp; show</button>
         <button id="gShareBtn" class="btn btn-primary" style="flex:1; padding:6px 8px; font-size:12px;" aria-pressed="false">Share: off</button>
       </div>
       <div id="groupStatus" role="status" style="color:var(--text-secondary); font-size:12px; margin-top:4px;"></div>
@@ -461,9 +461,23 @@ function updateHazardsBadge(){
   if(sh) sh.disabled=!n;
 }
 function bindPanelTabs(){
-  [['tabBtnCenters','centers'],['tabBtnHazards','hazards'],['tabBtnRoutes','routes'],['tabBtnGroup','group']].forEach(([id,name])=>{
+  const order=[['tabBtnCenters','centers'],['tabBtnHazards','hazards'],['tabBtnRoutes','routes'],['tabBtnGroup','group']];
+  order.forEach(([id,name])=>{
     const b=document.getElementById(id);
     if(b) b.addEventListener('click', ()=>switchPanelTab(name));
+  });
+  // WAI-ARIA tablist keyboard support: arrows move + activate, Home/End jump.
+  const bar=document.getElementById('panelTabs');
+  if(bar) bar.addEventListener('keydown', (e)=>{
+    const ids=order.map(([id])=>id).filter(id=>{ const el=document.getElementById(id); return el && el.style.display!=='none'; });
+    const at=ids.indexOf(document.activeElement && document.activeElement.id);
+    if(at<0) return;
+    let next=null;
+    if(e.key==='ArrowRight') next=ids[(at+1)%ids.length];
+    else if(e.key==='ArrowLeft') next=ids[(at-1+ids.length)%ids.length];
+    else if(e.key==='Home') next=ids[0];
+    else if(e.key==='End') next=ids[ids.length-1];
+    if(next){ e.preventDefault(); const el=document.getElementById(next); if(el){ el.focus(); el.click(); } }
   });
   // Routes tab content (GPS box) is server-rendered only with a Mapbox token.
   // In OSM fallback the tab stays visible with an explainer + deep links
@@ -1354,13 +1368,13 @@ function initFallback(){
       fallbackEl.textContent=msg||'Map background blocked — try hotspot or disable adblocker. Center dots still work.';
       fallbackEl.style.display=show?'block':'none';
     }
-    let osmLayer=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM', crossOrigin:''}).addTo(_map);
+    let osmLayer=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors', crossOrigin:''}).addTo(_map);
     osmLayer.on('tileerror', function(){
       tileErrors++;
       if(tileErrors>=3 && !switchedToCarto){
         switchedToCarto=true; tileSource='carto';
         _map.removeLayer(osmLayer);
-        L.tileLayer(CARTO_URL,{attribution:'© CartoDB', crossOrigin:''}).addTo(_map);
+        L.tileLayer(CARTO_URL,{attribution:'© OpenStreetMap contributors © CARTO', crossOrigin:''}).addTo(_map);
         showTileFallback('Switched to CartoDB tiles. Center dots still work.', false);
       } else if(tileErrors>=3){
         showTileFallback('', true);

@@ -85,3 +85,15 @@ def hotlines_page():
 @bp.route("/settings")
 def settings_page():
     return render_template("public/settings.html")
+
+@bp.route("/privacy")
+def privacy_page():
+    return render_template("public/privacy.html")
+
+@bp.route("/terms")
+def terms_page():
+    return render_template("public/terms.html")
+
+@bp.route("/cookies")
+def cookies_page():
+    return render_template("public/cookies.html")

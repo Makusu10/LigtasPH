@@ -3,9 +3,9 @@
 {% block content %}
 <h1 style="margin:0 0 8px;">Emergency Hotlines</h1>
 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
-  <input id="q" placeholder="Search agency, number, area" style="flex:1; min-width:200px;">
-  <select id="city"><option value="">All cities</option><option>National</option><option>Marikina</option><option>Quezon City</option><option>Pasig</option><option>Makati</option><option>Mandaluyong</option><option>Manila</option><option>Taguig</option><option>Pasay</option><option>Parañaque</option><option>Las Piñas</option><option>Muntinlupa</option><option>Valenzuela</option><option>Caloocan</option><option>Malabon</option><option>Navotas</option><option>San Juan</option><option>Pateros</option></select>
-  <select id="cat"><option value="">All categories</option><option>National</option><option>DRRMO</option><option>Police</option><option>Fire</option><option>Medical</option><option>Rescue</option><option>Hospital</option><option>Utility</option></select>
+  <input id="q" placeholder="Search agency, number, area" aria-label="Search hotlines by agency, number, or area" style="flex:1; min-width:200px;">
+  <select id="city" aria-label="Filter by city"><option value="">All cities</option><option>National</option><option>Marikina</option><option>Quezon City</option><option>Pasig</option><option>Makati</option><option>Mandaluyong</option><option>Manila</option><option>Taguig</option><option>Pasay</option><option>Parañaque</option><option>Las Piñas</option><option>Muntinlupa</option><option>Valenzuela</option><option>Caloocan</option><option>Malabon</option><option>Navotas</option><option>San Juan</option><option>Pateros</option></select>
+  <select id="cat" aria-label="Filter by category"><option value="">All categories</option><option>National</option><option>DRRMO</option><option>Police</option><option>Fire</option><option>Medical</option><option>Rescue</option><option>Hospital</option><option>Utility</option></select>
 </div>
 <div id="grid" class="grid-3"></div>
 <div id="empty" style="display:none; color:var(--text-secondary); padding:20px; text-align:center; border:1px dashed var(--border); border-radius:8px; margin-top:12px;">No hotline records for this locality.</div>

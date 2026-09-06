@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const load=(src)=>new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
     const go=()=>{
       const map=L.map('detailMap').setView([lat,lng],14);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(map);
       L.marker([lat,lng]).addTo(map).bindPopup({{ c['name']|tojson }});
     };
     if(typeof L !== 'undefined') go();

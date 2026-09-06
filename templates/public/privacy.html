@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block title %}Privacy Policy — LigtasPH{% endblock %}
+{% block content %}
+<section class="card" style="padding:24px; max-width:75ch;">
+  <h1 style="margin:0 0 4px;">Privacy Policy</h1>
+  <p style="color:var(--text-secondary); font-size:13px;">Effective 6 September 2026. This notice is required by the Philippine Data Privacy Act of 2012 (RA 10173).</p>
+
+  <!-- OPERATOR TODO: replace this box with your legal name, address, email, and Data Protection Officer contact before publishing. -->
+  <div class="card notice-warn" style="margin:12px 0;"><div style="font-size:13px;"><b>Operator details (to be filled in):</b> LigtasPH is operated by [Operator legal name], [address], Philippines. Privacy contact: [email]. This page takes effect as written once those details are added — nothing else here is a placeholder.</div></div>
+
+  <h2 style="font-size:17px; margin:18px 0 6px;">1. What this service is</h2>
+  <p style="margin:0;">LigtasPH shows public evacuation-center listings, weather, hazards, hotlines, and emergency announcements for Metro Manila. There are <b>no public accounts, no advertising, no analytics trackers, and no social-media widgets</b>. Most pages work without giving us anything at all.</p>
+
+  <h2 style="font-size:17px; margin:18px 0 6px;">2. Data we process, and why</h2>
+  <table>
+    <thead><tr><th>Data</th><th>When</th><th>Purpose / basis</th><th>Kept for</th></tr></thead>
+    <tbody>
+      <tr><td>Admin username + password hash</td><td>Staff sign-in only</td><td>Consent + legitimate operation of the service</td><td>Until an administrator removes the account</td></tr>
+      <tr><td>Page names you visit (no IP address, no user agent, no account link)</td><td>Every page view (server log table)</td><td>Legitimate interest: capacity planning and abuse detection</td><td>30 days, then auto-deleted</td></tr>
+      <tr><td>Group display name + live coordinates</td><td>Only when you tap Share in an emergency group</td><td>Your explicit consent, given in the moment for rescue coordination</td><td>2 hours, then expired automatically</td></tr>
+      <tr><td>City or coordinates you type or share</td><td>Weather / routing / announcement lookups</td><td>Consent; needed to answer the request</td><td>Not stored (passed to the provider, then discarded)</td></tr>
+      <tr><td>On-device preferences (theme, city, dismissed banners)</td><td>Stored in your browser only</td><td>Strictly necessary for the features to work</td><td>Until you clear site data; never sent to us except as above</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="font-size:17px; margin:18px 0 6px;">3. Who else sees data (third parties)</h2>
+  <p style="margin:0 0 6px;">Depending on the page you open, your browser or our server contacts:</p>
+  <ul style="margin:0; padding-left:20px; font-size:14px;">
+    <li><b>Maps:</b> Mapbox (only if configured), OpenStreetMap and CartoDB tiles — tile coordinates are inherent to loading a map.</li>
+    <li><b>Weather/air/hazards:</b> OpenWeather, Open-Meteo, USGS, NASA FIRMS (server-side; city or coordinates only).</li>
+    <li><b>Libraries/fonts:</b> unpkg (Leaflet, Lucide icons), Google Fonts (icon font). No cookies are set by these on our pages.</li>
+    <li><b>Outbound links you choose:</b> Google Maps, Waze, PAGASA, Red Cross — their own policies apply once you leave.</li>
+  </ul>
+  <p>No data is sold, rented, or shared for marketing. Ever.</p>
+
+  <h2 style="font-size:17px; margin:18px 0 6px;">4. Your rights (DPA 2012)</h2>
+  <p style="margin:0;">You may request access, correction, blocking, or deletion of your personal data, object to processing, and claim damages for violations. Contact the operator above; complaints may also go to the National Privacy Commission (privacy.gov.ph). Group pins delete themselves after 2 hours; anything else we hold about you is deleted on verified request.</p>
+
+  <h2 style="font-size:17px; margin:18px 0 6px;">5. Security and breaches</h2>
+  <p style="margin:0;">Passwords are hashed, admin sessions expire after 4 hours, traffic should run over HTTPS in production, and provider keys never reach the browser. If a breach poses real risk to you, we will notify you without delay and the NPC within 72 hours, as the law requires.</p>
+
+  <h2 style="font-size:17px; margin:18px 0 6px;">6. Children</h2>
+  <p style="margin:0;">This is general-audience emergency information with no age gate. Location sharing is strictly opt-in per tap — guardians should supervise minors using group sharing.</p>
+
+  <h2 style="font-size:17px; margin:18px 0 6px;">7. Changes</h2>
+  <p style="margin:0;">Material changes will be noted here with a new effective date. Continued use after changes means acceptance.</p>
+</section>
+{% endblock %}

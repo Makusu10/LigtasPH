@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Terms of Use — LigtasPH{% endblock %}
+{% block content %}
+<section class="card" style="padding:24px; max-width:75ch;">
+  <h1 style="margin:0 0 4px;">Terms of Use</h1>
+  <p style="color:var(--text-secondary); font-size:13px;">Effective 6 September 2026. Governed by the laws of the Republic of the Philippines.</p>
+
+  <!-- OPERATOR TODO: replace with your legal name, address, and contact before publishing. -->
+  <p style="font-size:13px; color:var(--text-secondary);">Between you and [Operator legal name], [address], Philippines (“we”, “the operator”). Contact: [email].</p>
+
+  <h2 style="font-size:17px; margin:18px 0 6px;">1. What this site is — and is not</h2>
+  <p style="margin:0;">LigtasPH is a <b>free informational directory</b>: evacuation-center listings, occupancy and supply reports, weather, hazards, hotlines, and public announcements. <b>It is not an emergency service.</b> If anyone is in immediate danger, call <a href="tel:911">911</a> or the local DRRMO first — do not wait on this site.</p>
+
+  <h2 style="font-size:17px; margin:18px 0 6px;">2. Verify before you move</h2>
+  <p style="margin:0;">Center status, capacity, weather, and hazard overlays can be stale, estimated, or wrong — some rows are explicitly marked unverified, capacity-unreported, or demo data. Always confirm a center is open and reachable with your barangay, LGU, or DRRMO before traveling, especially offline or from cached pages.</p>
+
+  <h2 style="font-size:17px; margin:18px 0 6px;">3. Acceptable use</h2>
+  <ul style="margin:0; padding-left:20px; font-size:14px;">
+    <li>Use group location sharing only with the knowledge of the people in the group.</li>
+    <li>Do not abuse the service: no scraping floods (rate limits apply and violators are blocked), no false emergency reports, no disruption of the site or its providers.</li>
+    <li>Administrator accounts are issued by the operator and remain the operator's responsibility to secure and revoke.</li>
+  </ul>
+
+  <h2 style="font-size:17px; margin:18px 0 6px;">4. Content and intellectual property</h2>
+  <p style="margin:0;">The site's code and layout belong to the operator. Map data and imagery belong to their sources and are used under their terms: © OpenStreetMap contributors, © CARTO, Mapbox, DOST Project NOAH, USGS, NASA FIRMS, PAGASA. Do not strip attributions when reusing map screenshots. Data you submit (e.g. a group display name) stays yours; you grant us only the license needed to display it back to your group until it expires.</p>
+
+  <h2 style="font-size:17px; margin:18px 0 6px;">5. No warranty; limited liability</h2>
+  <p style="margin:0;">The service is provided “as is”, without warranties of accuracy, availability, or fitness for any purpose, to the fullest extent the law allows. We are not liable for decisions made from site content, for provider outages, or for cached/offline data — but nothing here limits liability that Philippine law does not allow to be limited, including for gross negligence or willful misconduct.</p>
+
+  <h2 style="font-size:17px; margin:18px 0 6px;">6. Changes and contact</h2>
+  <p style="margin:0;">We may update these terms with a new effective date above. Questions: [email]. See also our <a href="{{ url_for('public.privacy_page') }}">Privacy Policy</a> and <a href="{{ url_for('public.cookies_page') }}">Cookie Policy</a>.</p>
+</section>
+{% endblock %}

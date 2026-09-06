@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block title %}Cookie Policy — LigtasPH{% endblock %}
+{% block content %}
+<section class="card" style="padding:24px; max-width:75ch;">
+  <h1 style="margin:0 0 4px;">Cookie Policy</h1>
+  <p style="color:var(--text-secondary); font-size:13px;">Effective 6 September 2026. Last verified against the running code on the same date.</p>
+
+  <h2 style="font-size:17px; margin:18px 0 6px;">1. Do you need a consent banner?</h2>
+  <p style="margin:0;"><b>No — and that is deliberate.</b> LigtasPH sets only strictly-necessary cookies (below), runs no analytics, no advertising, and no cross-site trackers. Philippine law has no cookie-banner requirement, and consent banners for strictly-necessary storage would be pure friction on an emergency-information site. If tracking is ever added, this page and the site will gain an opt-in banner first.</p>
+
+  <h2 style="font-size:17px; margin:18px 0 6px;">2. Cookies this site sets</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Purpose</th><th>When set</th><th>Expires</th></tr></thead>
+    <tbody>
+      <tr><td><code>session</code></td><td>Signed session: administrator sign-in state, CSRF protection, one-time notices. HttpOnly, SameSite=Lax, Secure on HTTPS deployments.</td><td>Staff sign-in, or any page that flashes a notice</td><td>4 hours of inactivity</td></tr>
+    </tbody>
+  </table>
+  <p>That is the entire list. There are no analytics, advertising, or third-party tracking cookies.</p>
+
+  <h2 style="font-size:17px; margin:18px 0 6px;">3. On-device storage (not cookies, stays in your browser)</h2>
+  <table>
+    <thead><tr><th>Key</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>ligtasph_theme</code>, <code>ligtasph_ann_city_v1</code>, <code>ligtasph_ann_pos_v1</code></td><td>Theme, saved city, last known position for relevant lookups</td></tr>
+      <tr><td><code>ligtasph_ann_ack_*</code>, <code>ligtasph_ann_cache_v1</code></td><td>Which banners you dismissed; offline announcement cache</td></tr>
+      <tr><td>Service-Worker cache</td><td>Offline map shell, datasets, and tiles (never group live locations)</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="font-size:17px; margin:18px 0 6px;">4. Third parties</h2>
+  <p style="margin:0;">Map tiles (OpenStreetMap, CartoDB), libraries (unpkg), fonts (Google Fonts), and Mapbox (when configured) receive the standard technical data any web fetch reveals (IP address, requested URL) but set no cookies through our pages to our knowledge as of the date above. Outbound links (Google Maps, Waze, PAGASA) are governed by their own policies once you click through.</p>
+
+  <h2 style="font-size:17px; margin:18px 0 6px;">5. Managing this</h2>
+  <p style="margin:0;">Clear cookies and site data in your browser settings to sign out everywhere and erase on-device preferences. Blocking all cookies still lets you read every public page; only staff sign-in will stop working. Verify all of the above yourself in DevTools → Application → Cookies / Local Storage.</p>
+</section>
+{% endblock %}
