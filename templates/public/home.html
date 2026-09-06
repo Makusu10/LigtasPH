@@ -24,7 +24,7 @@
 <div id="ann-history" class="card" hidden role="dialog" aria-label="Announcement history">
   <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;">
     <h2 style="margin:0; font-size:15px;">Announcements</h2>
-    <button id="ann-dismiss-all" class="btn btn-secondary" style="padding:4px 10px; font-size:11px;">Dismiss all</button>
+    <button id="ann-dismiss-all" class="btn btn-secondary" style="padding:4px 10px; font-size:12px;">Dismiss all</button>
   </div>
   <div style="font-size:12px; color:var(--text-secondary); margin-bottom:6px;">Newest first, including expired.</div>
   <div id="ann-history-items"></div>
@@ -202,7 +202,7 @@
         try{ map.fitBounds(L.latLngBounds(bounds).pad(0.2)); }catch(e){}
         try{ map.invalidateSize(); }catch(e){}
       }
-    }catch(e){ console.warn(e); }
+    }catch(e){ const pc2=document.getElementById('previewCount'); if(pc2) pc2.textContent='Map preview unavailable offline.'; console.warn(e); }
     // weather summary fetch (saved position > saved city > Marikina default;
     // the label always names what the numbers actually describe)
     try{

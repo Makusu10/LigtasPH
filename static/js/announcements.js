@@ -130,11 +130,22 @@
     if (a.scope && a.scope !== 'all') meta.push(a.scope === 'city' ? ('For ' + (a.city || '')) : 'For your area');
     if (a.ends_at) meta.push('Until ' + String(a.ends_at).replace('T', ' ').slice(0, 16) + ' UTC');
     ov.querySelector('#ann-modal-meta').textContent = meta.join(' • ');
+    ov.querySelector('#ann-ack').textContent = 'Acknowledge';
     ov.querySelector('#ann-ack').addEventListener('click', function () {
       setAcked(a.id);
       ov.remove();
       showNext();
     });
+    // Non-critical modals are Esc-dismissable (critical requires acknowledge).
+    if (a.severity !== 'critical') {
+      ov.querySelector('#ann-ack').addEventListener('keydown', function (e) {
+        if (e && (e.key === 'Escape' || e.key === 'Esc')) {
+          setAcked(a.id);
+          ov.remove();
+          showNext();
+        }
+      });
+    }
     // Critical popups require acknowledge — no overlay-click dismiss.
     document.body.appendChild(ov);
     ov.querySelector('#ann-ack').focus();
@@ -151,9 +162,12 @@
     bar.style.borderColor = sev.border;
     bar.style.color = sev.text;
     var span = document.createElement('span');
-    span.innerHTML = '<strong></strong> <span></span>';
-    span.querySelector('strong').textContent = a.title || 'Announcement';
-    span.querySelector('span').textContent = ' — ' + (a.message || '');
+    var st = document.createElement('strong');
+    st.textContent = a.title || 'Announcement';
+    var sm = document.createElement('span');
+    sm.textContent = ' — ' + (a.message || '');
+    span.appendChild(st);
+    span.appendChild(sm);
     var btn = document.createElement('button');
     btn.className = 'btn btn-secondary';
     btn.style.cssText = 'padding:6px 12px;font-size:12px;flex:0 0 auto;';
@@ -235,6 +249,9 @@
     if (window.location.pathname.indexOf('/admin') === 0) return;
     // Skip on home: the banner + bell replace the modal there.
     if (document.getElementById('home-ann-banner')) return;
+    // Skip on the map: fullbleed map chrome (zoom controls, dock, sheet)
+    // must never be covered — announcements live on the home tab.
+    if (document.querySelector('.map-shell')) return;
     if (!popupsEnabled()) return;
     refreshPos();
     fetchLive().then(run, function () { run(loadCache()); });

@@ -4,12 +4,16 @@
 {% include 'partials/nav_admin.html' %}
 <h1 style="margin:12px 0 8px;">Evacuation Center Management</h1>
 <p style="color:var(--text-secondary); margin:0 0 12px;">Archive instead of delete. Supply statuses: Unknown/Low/Adequate/High. Occupancy validated.</p>
+<div style="display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
+  <input type="search" id="centerSearch" placeholder="Search name or city…" aria-label="Search evacuation centers" style="flex:1; min-width:200px; margin:0;">
+  <span id="centerCount" role="status" style="font-size:12px; color:var(--text-secondary); white-space:nowrap;"></span>
+</div>
 <div style="overflow:auto; border:1px solid var(--border); border-radius:8px;">
 <table>
   <thead><tr><th>Name</th><th>City</th><th>Capacity</th><th>Occupancy</th><th>Status</th><th>Updated</th><th>Archived</th><th>Actions</th></tr></thead>
-  <tbody>
+  <tbody id="centerRows">
     {% for c in centers %}
-      <tr>
+      <tr data-search="{{ ((c['name'] or '') ~ ' ' ~ (c['city'] or '') ~ ' ' ~ c['id'])|lower }}">
         <td style="font-weight:700;"><a href="{{ url_for('public.center_detail', center_id=c['id']) }}">{{ c['name'] }}</a></td>
         <td>{{ c['city'] }}</td><td>{{ c['capacity'] if c['capacity'] is not none else 'Unreported' }}</td><td>{{ c['current_occupancy'] if c['current_occupancy'] is not none else '—' }}</td>
         <td><span class="badge badge-unknown">{{ c['operational_status'] }}</span> Food {{ c['food_status'] }} Water {{ c['water_status'] }}</td>
@@ -32,8 +36,34 @@
         </td>
       </tr>
     {% else %}<tr><td colspan="8" style="color:var(--text-secondary);">No centers. Run flask seed.</td></tr>{% endfor %}
+    <tr id="centerNoMatch" hidden><td colspan="8" style="color:var(--text-secondary);">No centers match this search.</td></tr>
   </tbody>
 </table>
 </div>
 <p style="color:var(--text-secondary); font-size:12px; margin-top:8px;">Edits write an audit row to center_status_updates. Archiving hides centers from public/API without deleting.</p>
+{% endblock %}
+{% block scripts %}
+<script>
+  // Instant client-side filter (name + city + id) so admins can jump to
+  // one row out of hundreds without paging or a round-trip.
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const box = document.getElementById('centerSearch');
+    const count = document.getElementById('centerCount');
+    const empty = document.getElementById('centerNoMatch');
+    const rows = Array.from(document.querySelectorAll('#centerRows tr[data-search]'));
+    function render(){
+      const q = (box.value || '').trim().toLowerCase();
+      let n = 0;
+      rows.forEach(r=>{
+        const hit = !q || (r.dataset.search || '').includes(q);
+        r.hidden = !hit;
+        if (hit) n++;
+      });
+      if (empty) empty.hidden = n !== 0;
+      if (count) count.textContent = q ? `Showing ${n} of ${rows.length}` : `${rows.length} centers`;
+    }
+    box.addEventListener('input', render);
+    render();
+  });
+</script>
 {% endblock %}

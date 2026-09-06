@@ -86,4 +86,20 @@ def test_quake_popup_urls_schemed_checked():
     assert "function safeUrl(" in src
     assert 'href="${q.url' not in src  # Leaflet popup must not use raw URL
     assert 'href="${esc(p.url' not in src  # escaping alone can't stop javascript:
-    assert src.count("safeUrl(") >= 3  # defined once + used in both popups
+    assert src.count("safeUrl(") >= 4  # defined once + used in all quake popups
+
+
+def test_announcement_topbar_built_without_innerhtml():
+    src = (Path(__file__).resolve().parent.parent / "static" / "js" / "announcements.js").read_text(encoding="utf-8")
+    assert "span.innerHTML" not in src  # textContent-only construction (XSS-safe)
+    assert "ann-map-bell" not in src  # no bell injected into map chrome
+    assert "querySelector('.map-shell')) return;" in src  # map never covered: home tab only
+
+
+def test_map_critique_fixes_present():
+    src = (_TEMPLATES / "map.html").read_text(encoding="utf-8")
+    assert "data-fbroute" in src  # OSM fallback keeps a Ruta-dito path
+    assert "rb.style.display='none'" not in src  # Routes tab never hidden
+    assert "min-height:44px" in src  # 44px touch-target floor
+    assert "maybeAutoFlood" in src  # ?city= arrivals pre-select NOAH flood
+    assert ".demo-banner{ display:block;" in src  # sample-data warning never hidden on phones

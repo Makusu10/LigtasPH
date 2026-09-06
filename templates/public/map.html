@@ -4,7 +4,7 @@
 <div class="map-fullbleed">
   <div class="map-shell">
     <div id="map"></div>
-    <div id="tileFallback" role="status" aria-live="polite" style="display:none; position:absolute; bottom:16px; left:50%; transform:translateX(-50%); z-index:1002; background:rgba(255,255,255,0.95); border:1px solid var(--border); border-radius:10px; padding:8px 14px; font-size:12px; max-width:380px; text-align:center; box-shadow:0 2px 10px rgba(0,0,0,0.12); pointer-events:none;">Map background blocked — try hotspot or disable adblocker. Center dots still work.</div>
+    <div id="tileFallback" role="status" aria-live="polite" style="display:none; position:absolute; bottom:16px; left:50%; transform:translateX(-50%); z-index:1002; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:8px 14px; font-size:12px; max-width:380px; text-align:center; box-shadow:0 2px 10px rgba(0,0,0,0.12); pointer-events:none;">Map background blocked — try hotspot or disable adblocker. Center dots still work.</div>
     <button id="panelOpen" class="btn btn-secondary" style="display:none; position:absolute; top:12px; left:12px; z-index:1001; padding:8px 12px; font-size:13px;" aria-label="Show details panel">☰ Details</button>
     <aside id="sidePanel" class="card" aria-label="Map details and filters">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -60,7 +60,7 @@
         <label for="navDest" style="font-size:12px;">Go somewhere (like Maps/Waze)</label>
         <div style="position:relative;">
           <input id="navDest" placeholder="e.g. SM Marikina, hospital…" autocomplete="off" style="margin:4px 0;">
-          <div id="navSuggest" style="position:absolute; z-index:20; left:0; right:0; background:#fff; border:1px solid var(--border); border-radius:8px; overflow:hidden; display:none; max-height:180px; overflow:auto; box-shadow:0 4px 12px rgba(0,0,0,0.12);"></div>
+          <div id="navSuggest" style="position:absolute; z-index:20; left:0; right:0; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:8px; overflow:hidden; display:none; max-height:180px; overflow:auto; box-shadow:0 4px 12px rgba(0,0,0,0.12);"></div>
         </div>
         <label for="navOrigin" style="font-size:12px;">Start (blank = my GPS location)</label>
         <input id="navOrigin" placeholder="My Location" autocomplete="off" style="margin:4px 0;">
@@ -99,7 +99,7 @@
       <label for="gMyName" style="font-size:12px;">Your display name</label>
       <input id="gMyName" placeholder="e.g. Ana" maxlength="40" style="margin:4px 0;">
       <div style="display:flex; gap:6px; margin:4px 0;">
-        <button id="gJoinBtn" class="btn btn-secondary" style="flex:1; padding:6px 8px; font-size:12px;">Join &amp; show</button>
+        <button id="gJoinBtn" class="btn btn-secondary" style="flex:1; padding:6px 8px; font-size:12px;"Join &amp; show/button>
         <button id="gShareBtn" class="btn btn-primary" style="flex:1; padding:6px 8px; font-size:12px;" aria-pressed="false">Share: off</button>
       </div>
       <div id="groupStatus" role="status" style="color:var(--text-secondary); font-size:12px; margin-top:4px;"></div>
@@ -112,7 +112,7 @@
       <legend style="font-size:12px; font-weight:700; padding:0 4px;">Hazards overlay</legend>
       <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzQuake"> Earthquakes (USGS)</label>
       <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzFire"> Active fires (FIRMS)</label>
-      <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzHeat"> Fire density heat</label>
+      <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px; margin-left:26px; font-size:12px;"><input type="checkbox" id="hzHeat"> Fire density heat</label>
       <div style="border-top:1px solid var(--border); margin:8px 0 6px; padding-top:6px; font-weight:700; font-size:12px;">Project NOAH (Metro Manila)</div>
       <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzFlood"> Flood — 5-yr return</label>
       <label style="display:flex; gap:6px; align-items:center; margin-bottom:4px;"><input type="checkbox" id="hzSlide"> Landslide</label>
@@ -122,15 +122,15 @@
           <option value="ssa3">SSA3</option><option value="ssa4" selected>SSA4</option>
         </select>
       </label>
-      <div style="display:flex; gap:8px; font-size:11px; color:var(--text-secondary); margin:2px 0 4px;">
+      <div style="display:flex; gap:8px; font-size:12px; color:var(--text-secondary); margin:2px 0 4px;">
         <span><i style="display:inline-block; width:10px; height:10px; background:#facc15; border-radius:2px;"></i> Low</span>
         <span><i style="display:inline-block; width:10px; height:10px; background:#f97316; border-radius:2px;"></i> Moderate</span>
         <span><i style="display:inline-block; width:10px; height:10px; background:#dc2626; border-radius:2px;"></i> High</span>
       </div>
-      <div style="font-size:11px; color:var(--text-secondary);">Source: Project NOAH (DOST). SSA4 = worst-case advisory.</div>
-      <div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">Rings: purple ≈ quake felt area by magnitude • red ≈ 1 km fire watch. Estimates, not official danger zones.</div>
+      <div style="font-size:12px; color:var(--text-secondary);">Source: Project NOAH (DOST). SSA4 = worst-case advisory.</div>
+      <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">Rings: purple ≈ quake felt area by magnitude — red ≈ 1 km fire watch. Estimates, not official danger zones.</div>
       <div id="hzStatus" role="status" style="color:var(--text-secondary); font-size:12px; margin-top:6px;"></div>
-      <button id="showHazardsBtn" class="btn btn-secondary" style="width:100%; margin-top:6px; padding:6px 8px; font-size:12px;" disabled>Show hazards on map</button>
+      <button id="showHazardsBtn" class="btn btn-primary" style="width:100%; margin-top:6px; padding:6px 8px; font-size:13px;" disabled>Show hazards on map</button>
     </fieldset>
     </div>
     </aside>
@@ -194,6 +194,28 @@
     #routeDock #routeDockSteps{ max-height:24vh; }
     body:has(.map-shell) .demo-banner{ display:none; }
   }
+  /* Critique fixes: 44px touch targets across panel + dock (wet-thumb rule),
+     larger hazard hit rows, readable status microcopy. */
+  #panelTabs button{ min-height:44px; font-size:13px; }
+  #sidePanel .btn, #routeDock .btn{ min-height:44px; }
+  #tabHazards label{ min-height:44px; }
+  #tabHazards input[type=checkbox]{ width:20px; height:20px; flex:0 0 auto; }
+  #tabHazards select{ min-height:44px; }
+  #liveStamp, #mapCount{ font-size:12px; }
+  /* Dark mode: hardcoded light surfaces from JS-injected controls. */
+  [data-theme="dark"] #ann-topbar{ background:rgba(20,28,40,.96) !important; border-color:rgba(255,255,255,.16) !important; color:var(--text) !important; }
+  @media (max-width: 400px){
+    /* Small-phone sheet: scrollable tabs, shorter sheet, dock docked ABOVE
+       the open sheet (or at the bottom when the sheet is collapsed). */
+    #panelTabs{ overflow-x:auto; }
+    #panelTabs button{ min-width:72px; }
+    #sidePanel{ max-height:38%; }
+    #routeDock{ width:calc(100% - 16px); bottom:calc(38% + 12px); }
+    #sidePanel.collapsed + #routeDock{ bottom:12px; }
+    #routeDock > div:first-child{ flex-wrap:wrap; }
+    /* Never hide the sample-data warning — shrink it to a 12px bar. */
+    body:has(.map-shell) .demo-banner{ display:block; font-size:12px; padding:6px 10px; }
+  }
 </style>
 {% endblock %}
 {% block scripts %}
@@ -249,7 +271,7 @@ function getFiltered(){
 }
 function renderList(filtered, onLocate){
   const list=document.getElementById('list'); list.innerHTML='';
-  if(filtered.length===0){ list.innerHTML='<div style="color:var(--text-secondary); font-size:13px; padding:8px;">No centers match. Clear filters or view all.</div>'; return; }
+    if(filtered.length===0){ list.innerHTML='<div style="color:var(--text-secondary); font-size:13px; padding:8px;">No centers match. Clear filters or view all.</div>'; return; }
   filtered.forEach(c=>{
     const row=document.createElement('div');
     row.style.cssText='border:1px solid var(--border); border-radius:8px; padding:8px 10px; display:flex; justify-content:space-between; gap:8px; align-items:center;';
@@ -334,7 +356,7 @@ async function setActiveGroup(code, opts){
 }
 function postMyLocation(silent){
   return new Promise((resolve)=>{
-    if(!navigator.geolocation){ if(!silent) groupStatusMsg('Geolocation not supported on this device.'); resolve(false); return; }
+      if(!navigator.geolocation){ if(!silent) groupStatusMsg('Geolocation not supported on this device.'); resolve(false); return; }
     navigator.geolocation.getCurrentPosition(async (pos)=>{
       try{
         const res=await fetch('/api/locations', {method:'POST', headers:{'Content-Type':'application/json'},
@@ -443,11 +465,62 @@ function bindPanelTabs(){
     if(b) b.addEventListener('click', ()=>switchPanelTab(name));
   });
   // Routes tab content (GPS box) is server-rendered only with a Mapbox token.
+  // In OSM fallback the tab stays visible with an explainer + deep links
+  // instead of vanishing (users otherwise lose routing with no warning).
   if(!document.getElementById('gpsBox')){
-    const rb=document.getElementById('tabBtnRoutes');
-    if(rb) rb.style.display='none';
+    renderFbRoutePanel();
   }
   updateHazardsBadge();
+}
+// Panel open helper (shared by route dock + fallback routing).
+function openPanel(){
+  const panel=document.getElementById('sidePanel'), open=document.getElementById('panelOpen');
+  if(panel) panel.classList.remove('collapsed');
+  if(open) open.style.display='none';
+}
+// Flood auto-select for ?city= arrivals (set during city hydration).
+let autoFloodWanted=false;
+function maybeAutoFlood(refresh){
+  if(!autoFloodWanted) return; autoFloodWanted=false;
+  const fz=document.getElementById('hzFlood');
+  if(fz && !fz.checked) fz.checked=true;
+  try{ updateHazardsBadge(); }catch(e){}
+  try{ if(typeof refresh==='function') refresh(); }catch(e){}
+}
+// OSM-fallback routing: no in-app turn-by-turn without Mapbox. Tapping
+// "Route here" stores the destination and opens the Routes tab with
+// Google/Waze deep links + copy-coordinates (works with no token).
+let fbDest=null;
+function fbRouteTo(lat, lng, name){
+  lat=+lat; lng=+lng;
+  if(!isFinite(lat)||!isFinite(lng)) return;
+  fbDest={lat:lat, lng:lng, name:name||'Destination'};
+  renderFbRoutePanel();
+  openPanel();
+  try{ switchPanelTab('routes'); }catch(e){}
+}
+function renderFbRoutePanel(){
+  const rp=document.getElementById('tabRoutes');
+  if(!rp || document.getElementById('gpsBox')) return;
+  const d=fbDest;
+  rp.innerHTML =
+    '<div style="font-size:13px; font-weight:700; margin-bottom:4px;">Routes (OSM mode)</div>'+
+    '<div style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">Turn-by-turn needs Mapbox — use the buttons below to navigate.</div>'+
+    (d ? '<div style="font-size:13px; margin-bottom:8px;">Destination:<br><strong>'+esc(d.name)+'</strong><br><span style="color:var(--text-secondary);">'+d.lat.toFixed(5)+', '+d.lng.toFixed(5)+'</span></div>'+
+    '<div style="display:flex; flex-direction:column; gap:8px;">'+
+    '<a class="btn btn-primary" style="min-height:44px; text-decoration:none; text-align:center;" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination='+d.lat+','+d.lng+'">Google Maps</a>'+
+    '<a class="btn btn-secondary" style="min-height:44px; text-decoration:none; text-align:center;" target="_blank" rel="noopener" href="https://waze.com/ul?ll='+d.lat+'%2C'+d.lng+'&navigate=yes">Waze</a>'+
+    '<button id="fbCopyBtn" class="btn btn-secondary" style="min-height:44px;">Copy coordinates</button></div>'
+    : '<div style="font-size:12px; color:var(--text-secondary);">Pick a center on the map, open its popup, and press “Route here”.</div>');
+  const cb=document.getElementById('fbCopyBtn');
+  if(cb && d) cb.addEventListener('click', ()=>{
+    const s=d.lat.toFixed(5)+', '+d.lng.toFixed(5);
+    const done=(ok)=>{ cb.textContent=ok?'Copied!':('Copy failed — '+s); };
+    try{
+      if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(s).then(()=>done(true), ()=>done(false));
+      else done(false);
+    }catch(e){ done(false); }
+  });
 }
 async function fetchQuakes(lat, lon, signal){
   const res=await fetch(`/api/earthquakes?lat=${lat}&lon=${lon}&radius_km=500`, {signal});
@@ -500,6 +573,12 @@ async function loadCenters(){
     try{ want=new URLSearchParams(location.search).get('city') || localStorage.getItem('ligtasph_ann_city_v1') || ''; }catch(e){}
     if(want && cities.includes(want)) sel.value=want;
     else if(cur && cities.includes(cur)) sel.value=cur;
+    // Arriving with a city context (flood-prone NCR): pre-select the NOAH
+    // flood layer so the most relevant hazard shows without digging.
+    // The booted engine renders it once via maybeAutoFlood (no camera move).
+    try{
+      if(new URLSearchParams(location.search).get('city') && cities.includes(want)) autoFloodWanted=true;
+    }catch(e){}
   }
 }
 // Live center updates: version check every 15s, full re-fetch only on
@@ -542,7 +621,7 @@ function bindFilterInputs(render){
   document.getElementById('cityFilter').addEventListener('change', render);
   document.getElementById('statusFilter').addEventListener('change', render);
   document.getElementById('supplyFilter').addEventListener('change', render);
-  document.getElementById('clearBtn').addEventListener('click', ()=>{ document.getElementById('q').value=''; document.getElementById('statusFilter').value=''; document.getElementById('supplyFilter').value=''; document.getElementById('cityFilter').value=''; if(USE_MAPBOX) clearRoute(); render();});
+  document.getElementById('clearBtn').addEventListener('click', ()=>{ document.getElementById('q').value=''; document.getElementById('statusFilter').value=''; document.getElementById('supplyFilter').value=''; document.getElementById('cityFilter').value=''; render();});
 }
 // ---------- detected-hazard area overlays (estimated, illustrative) ----------
 // Quake ring radius doubles per magnitude unit from a 15 km M3 baseline:
@@ -562,8 +641,8 @@ function circlePolygon(lon, lat, radiusKm, steps){
   }
   return coords;
 }
-const QUAKE_RING_NOTE='<div style="font-size:11px;color:var(--text-secondary);">Purple ring ≈ estimated felt area (illustrative, not official).</div>';
-const FIRE_RING_NOTE='<div style="font-size:11px;color:var(--text-secondary);">Red ring ≈ 1 km watch perimeter (illustrative).</div>';
+const QUAKE_RING_NOTE='<div style="font-size:12px;color:var(--text-secondary);">Purple ring ≈ estimated felt area (naramdaman lang, not official).</div>';
+const FIRE_RING_NOTE='<div style="font-size:12px;color:var(--text-secondary);">Red ring ≈ 1 km watch perimeter (illustrative).</div>';
 function debounceHazards(refresh){
   const wrapped=()=>{ updateHazardsBadge(); refresh(); };
   ['hzQuake','hzFire','hzHeat','hzFlood','hzSlide','hzSurge'].forEach(id=>{
@@ -673,7 +752,7 @@ async function initMapbox(){
     const b=document.createElement('button');
     b.type='button'; b.title='Use my location'; b.setAttribute('aria-label','Use my location');
     b.textContent='⌖';
-    b.style.cssText='position:absolute; top:78px; right:10px; z-index:5; width:30px; height:30px; font-size:16px; line-height:28px; text-align:center; cursor:pointer; background:#fff; border:none; border-radius:6px; box-shadow:0 0 0 2px rgba(0,0,0,0.1);';
+    b.style.cssText='position:absolute; top:78px; right:10px; z-index:5; width:44px; height:44px; font-size:18px; line-height:42px; text-align:center; cursor:pointer; background:var(--surface,#fff); border:none; border-radius:6px; box-shadow:0 0 0 2px rgba(0,0,0,0.1);';
     b.addEventListener('click', ()=>{ gpsStatus('Waiting for GPS fix…'); try{ geo.trigger(); }catch(e){ gpsStatus(gpsErrorHint()); } });
     document.getElementById('map').appendChild(b);
   });
@@ -886,7 +965,7 @@ async function initMapbox(){
     }));
     document.getElementById('navGo').addEventListener('click', async ()=>{
       const typed=(document.getElementById('navDest').value||'').trim();
-      if(!typed){ routeStatus('Type a destination first (or use Route here on a center).'); return; }
+        if(!typed){ routeStatus('Type a destination first (or use Route here on a center).'); return; }
       hideSuggest();
       try{
         routeStatus('Locating destination…');
@@ -953,7 +1032,7 @@ async function initMapbox(){
       paint:{'text-color':'#ffffff'}});
     map.addLayer({id:'centers-points', type:'circle', source:CENTERS_SRC, filter:['!',['has','point_count']],
       paint:{'circle-color':['get','color'],'circle-opacity':0.92,
-        'circle-stroke-color':'#ffffff','circle-stroke-width':2,'circle-radius':7}});
+        'circle-stroke-color':'#ffffff','circle-stroke-width':2,'circle-radius':10}});
     map.on('click','centers-clusters', (e)=>{
       const f=map.queryRenderedFeatures(e.point, {layers:['centers-clusters']});
       if(!f.length) return;
@@ -968,7 +1047,7 @@ async function initMapbox(){
       const p=f[0].properties, g=f[0].geometry.coordinates;
       new mapboxgl.Popup({offset:12, maxWidth:'300px'})
         .setLngLat(g)
-        .setHTML(centerPopupHTML(p, `<button data-route="${p.lat},${p.lng}" data-name="${esc(p.name)}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">Route here</button>`))
+        .setHTML(centerPopupHTML(p, `<button data-route="${p.lat},${p.lng}" data-name="${esc(p.name)}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px; min-height:44px;">Route here</button>`))
         .addTo(map);
     });
     [['centers-clusters'],['centers-points']].forEach(([lid])=>{
@@ -1006,7 +1085,7 @@ async function initMapbox(){
       setTimeout(()=>{
         new mapboxgl.Popup({offset:12, maxWidth:'300px'})
           .setLngLat([c.lng,c.lat])
-          .setHTML(centerPopupHTML(c, `<button data-route="${c.lat},${c.lng}" data-name="${esc(c.name)}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px;">Route here</button>`))
+          .setHTML(centerPopupHTML(c, `<button data-route="${c.lat},${c.lng}" data-name="${esc(c.name)}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px; min-height:44px;">Route here</button>`))
           .addTo(map);
       }, 750);
     });
@@ -1148,7 +1227,7 @@ async function initMapbox(){
       new mapboxgl.Popup({offset:12, maxWidth:'280px'}).setLngLat(e.lngLat).setHTML(
         `<div style="min-width:180px"><div style="font-weight:800;">${esc(name)}</div>`+
         (sub?`<div style="font-size:12px;color:var(--text-secondary);">${sub}</div>`:'')+
-        `<button data-route="${lat},${lng}" data-name="${esc(name)}" class="btn btn-primary" style="padding:6px 10px; font-size:12px; margin-top:8px;">Route here</button></div>`
+        `<button data-route="${lat},${lng}" data-name="${esc(name)}" class="btn btn-primary" style="padding:6px 10px; font-size:12px; min-height:44px; margin-top:8px;">Route here</button></div>`
       ).addTo(map);
     }catch(err){ /* style not ready — ignore tap */ }
   });
@@ -1199,6 +1278,7 @@ async function initMapbox(){
     try{ geo.trigger(); }catch(e){ gpsStatus(gpsErrorHint()); }
   });
   debounceHazards(refreshHazards);
+  maybeAutoFlood(refreshHazards);
   document.getElementById('showHazardsBtn').addEventListener('click', zoomToHazards);
   map.on('moveend', ()=>{ clearTimeout(hzTimer); hzTimer=setTimeout(refreshHazards, 500); });
   // Viewport count only (clusters hold the points — nothing to rebuild).
@@ -1247,7 +1327,7 @@ function initFallback(){
       onAdd: function(){
         const b=L.DomUtil.create('button','');
         b.type='button'; b.title='Use my location'; b.setAttribute('aria-label','Use my location');
-        b.style.cssText='width:30px;height:30px;font-size:16px;line-height:28px;text-align:center;cursor:pointer;background:#fff;border:2px solid rgba(0,0,0,0.2);border-radius:4px;';
+        b.style.cssText='width:44px;height:44px;font-size:18px;line-height:40px;text-align:center;cursor:pointer;background:var(--surface,#fff);border:2px solid rgba(0,0,0,0.2);border-radius:4px;';
         b.textContent='⌖';
         L.DomEvent.on(b,'click', (e)=>{ L.DomEvent.stopPropagation(e); useLocationFb(); });
         return b;
@@ -1277,8 +1357,18 @@ function initFallback(){
     _quakeLayer=L.layerGroup().addTo(_map); _fireLayer=L.layerGroup().addTo(_map);
     loadCenters().then(renderFb).then(()=>initCentersLive(renderFb));
     bindFilterInputs(renderFb);
-    document.getElementById('locBtn').addEventListener('click', useLocationFb);
+    // locBtn lives inside the Mapbox-only GPS box — guard for tokenless render.
+    const _locBtn=document.getElementById('locBtn');
+    if(_locBtn) _locBtn.addEventListener('click', useLocationFb);
     debounceHazards(refreshHazardsFb);
+    maybeAutoFlood(refreshHazardsFb);
+    // Fallback "Route here" buttons (event delegation on map container).
+    document.getElementById('map').addEventListener('click', (ev)=>{
+      const btn = ev.target.closest('[data-fbroute]');
+      if(!btn) return;
+      const [lat, lng] = btn.dataset.fbroute.split(',').map(Number);
+      fbRouteTo(lat, lng, btn.dataset.name);
+    });
   document.getElementById('showHazardsBtn').addEventListener('click', zoomToHazardsFb);
     _map.on('moveend', ()=>{ clearTimeout(hzTimer); hzTimer=setTimeout(refreshHazardsFb, 500); });
     let markTimerFb=null;
@@ -1323,7 +1413,7 @@ function renderMarkersFb(filtered){
       const c=members[0];
       const m=L.marker([c.lat,c.lng], {icon:L.divIcon({html:dot(statusColor(c.occupancy_status)), className:'', iconSize:[14,14]})}).addTo(_map);
       m._cid=c.id;
-      m.bindPopup(centerPopupHTML(c));
+      m.bindPopup(centerPopupHTML(c, `<button data-fbroute="${c.lat},${c.lng}" data-name="${esc(c.name)}" class="btn btn-secondary" style="padding:6px 8px; font-size:12px; min-height:44px;">Route here</button>`));
       _markers.push(m);
     }else{
       const lat=members.reduce((s,c)=>s+c.lat,0)/members.length;
@@ -1442,12 +1532,12 @@ async function refreshHazardsFb(){
   await Promise.all(jobs);
 }
 function useLocationFb(){
-  if(!navigator.geolocation){ alert('Geolocation not supported. Please select manually.'); return; }
+  if(!navigator.geolocation){ hzStatus('Geolocation unavailable — select manually.'); return; }
   navigator.geolocation.getCurrentPosition(pos=>{
     const lat=pos.coords.latitude, lng=pos.coords.longitude;
     L.marker([lat,lng], {icon: L.divIcon({html:'<div style="background:var(--primary); width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.4)"></div>', className:'', iconSize:[16,16]})}).addTo(_map).bindPopup('Your location').openPopup();
     _map.setView([lat,lng],13);
-  }, err=>{ alert('Location denied. You can search by city or address.'); }, {enableHighAccuracy:true, timeout:8000});
+  }, err=>{ hzStatus('Location denied — search by city or address.'); }, {enableHighAccuracy:true, timeout:8000});
 }
 document.addEventListener('DOMContentLoaded', ()=>{
   bindPanelToggle();
